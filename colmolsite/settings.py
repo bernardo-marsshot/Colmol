@@ -8,6 +8,7 @@ SECRET_KEY = 'dev-secret-key-change-me'
 DEBUG = True
 ALLOWED_HOSTS = ["*"]
 
+
 # Fix for Replit CSRF origin checking - specific domain only for security
 CSRF_TRUSTED_ORIGINS = [
     'https://ded4662a-0092-48bc-9710-6cd245f7f229-00-39d2szwd6llyv.picard.replit.dev',
