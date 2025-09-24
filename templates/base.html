@@ -27,7 +27,10 @@
 <body>
 <nav class="navbar navbar-expand-lg navbar-dark">
   <div class="container-fluid">
-    <a class="navbar-brand" href="/">COLMOL</a>
+    <a class="navbar-brand d-flex align-items-center" href="/">
+      <img src="{% static 'colmol-logo.png' %}" alt="Colmol" style="height: 32px; margin-right: 10px;">
+      COLMOL
+    </a>
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#nav"><span class="navbar-toggler-icon"></span></button>
     <div class="collapse navbar-collapse" id="nav">
       <ul class="navbar-nav me-auto mb-2 mb-lg-0">
@@ -47,7 +50,6 @@
 <footer class="container my-5">
   <hr class="border-secondary" />
   <div class="text-center">
-    <p class="mb-0">Protótipo COLMOL • Receção Inteligente — Django</p>
     <p class="mb-0 text-muted">Protótipo desenvolvido por <strong>Mars Shot - Redefining Limits</strong> <a href="https://www.marsshot.eu" target="_blank" class="text-decoration-none">www.marsshot.eu</a></p>
   </div>
 </footer>
