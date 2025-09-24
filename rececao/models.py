@@ -9,7 +9,6 @@ class Supplier(models.Model):
     def __str__(self):
         return f"{self.code} - {self.name}"
 
-
 class PurchaseOrder(models.Model):
     number = models.CharField(max_length=100, unique=True)
     supplier = models.ForeignKey(Supplier, on_delete=models.CASCADE, related_name='purchase_orders')
