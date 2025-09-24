@@ -44,9 +44,41 @@ new Chart(ctx, {
   type: 'doughnut',
   data: {
     labels: ['Matched','Exceções','Por processar'],
-    datasets: [{ data: [{{ matched }}, {{ exceptions }}, {{ total_docs|add:'-0' }} - ({{ matched }} + {{ exceptions }}) ] }]
+    datasets: [{ 
+      data: [{{ matched }}, {{ exceptions }}, {{ total_docs|add:'-0' }} - ({{ matched }} + {{ exceptions }}) ],
+      backgroundColor: [
+        '#FF6B35',  // Laranja do cliente para documentos matched
+        '#DC3545',  // Vermelho para exceções
+        '#F8F9FA'   // Cinza muito claro para documentos por processar
+      ],
+      borderColor: [
+        '#FF6B35',
+        '#DC3545', 
+        '#F8F9FA'
+      ],
+      borderWidth: 2
+    }]
   },
-  options: { responsive:true }
+  options: { 
+    responsive: true,
+    plugins: {
+      legend: {
+        labels: {
+          color: '#000000',  // Texto preto para as legendas
+          font: {
+            size: 14,
+            weight: 'normal'
+          },
+          usePointStyle: true
+        }
+      }
+    },
+    elements: {
+      arc: {
+        borderWidth: 3
+      }
+    }
+  }
 });
 </script>
 {% endblock %}
