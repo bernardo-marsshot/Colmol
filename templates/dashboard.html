@@ -1,0 +1,48 @@
+
+{% extends "base.html" %}
+{% block content %}
+<h1 class="mb-3">Dashboard</h1>
+<div class="row g-3">
+  <div class="col-md-3"><div class="card p-3"><div>Total Docs</div><h3>{{ total_docs }}</h3></div></div>
+  <div class="col-md-3"><div class="card p-3"><div>Matched</div><h3>{{ matched }}</h3></div></div>
+  <div class="col-md-3"><div class="card p-3"><div>Com Exceções</div><h3>{{ exceptions }}</h3></div></div>
+  <div class="col-md-3"><div class="card p-3"><div>Fornecedores</div><h3>{{ suppliers }}</h3></div></div>
+</div>
+
+<div class="card p-3 mt-4">
+  <h5 class="mb-3">Processamento</h5>
+  <canvas id="kpiChart"></canvas>
+</div>
+
+<div class="card p-3 mt-4">
+  <h5>Últimos documentos</h5>
+  <table class="table table-dark table-hover align-middle">
+    <thead><tr><th>Data</th><th>Fornecedor</th><th>Doc</th><th>PO</th><th>Estado</th></tr></thead>
+    <tbody>
+    {% for d in latest %}
+      <tr>
+        <td>{{ d.received_at|date:"Y-m-d H:i" }}</td>
+        <td>{{ d.supplier.name }}</td>
+        <td><a href="{% url 'inbound_detail' d.pk %}">{{ d.get_doc_type_display }} {{ d.number }}</a></td>
+        <td>{% if d.po %}{{ d.po.number }}{% else %}-{% endif %}</td>
+        <td>{% if d.match_result %}{{ d.match_result.status }}{% else %}-{% endif %}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="5" class="text-center">Sem documentos ainda.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<script>
+const ctx = document.getElementById('kpiChart');
+new Chart(ctx, {
+  type: 'doughnut',
+  data: {
+    labels: ['Matched','Exceções','Por processar'],
+    datasets: [{ data: [{{ matched }}, {{ exceptions }}, {{ total_docs|add:'-0' }} - ({{ matched }} + {{ exceptions }}) ] }]
+  },
+  options: { responsive:true }
+});
+</script>
+{% endblock %}

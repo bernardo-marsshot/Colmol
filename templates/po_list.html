@@ -1,0 +1,27 @@
+
+{% extends "base.html" %}
+{% block content %}
+<h1>Encomendas a Fornecedores (POs)</h1>
+<div class="card p-3 mt-3">
+  <table class="table table-dark table-hover">
+    <thead><tr><th>PO</th><th>Fornecedor</th><th>Linhas</th></tr></thead>
+    <tbody>
+      {% for p in pos %}
+      <tr>
+        <td>{{ p.number }}</td>
+        <td>{{ p.supplier.name }}</td>
+        <td>
+          <ul class="mb-0">
+          {% for l in p.lines.all %}
+            <li>{{ l.internal_sku }} — pedida {{ l.qty_ordered }} ± {{ l.tolerance }}</li>
+          {% endfor %}
+          </ul>
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="3">Sem POs. Use o admin para criar dados de exemplo.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

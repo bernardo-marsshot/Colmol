@@ -1,0 +1,53 @@
+
+{% extends "base.html" %}
+{% block content %}
+<h2>{{ inbound.get_doc_type_display }} {{ inbound.number }} — {{ inbound.supplier.name }}</h2>
+<p>Recebido: {{ inbound.received_at|date:"Y-m-d H:i" }} • PO: {% if inbound.po %}{{ inbound.po.number }}{% else %}-{% endif %}</p>
+
+<div class="row g-3">
+  <div class="col-md-7">
+    <div class="card p-3">
+      <h5>Linhas extraídas</h5>
+      <table class="table table-dark table-sm align-middle">
+        <thead><tr><th>Fornecedor</th><th>SKU Interno (sugerido)</th><th>Qtd</th></tr></thead>
+        <tbody>
+        {% for l in inbound.lines.all %}
+          <tr>
+            <td>{{ l.supplier_code }}</td>
+            <td>{{ l.maybe_internal_sku|default:"—" }}</td>
+            <td>{{ l.qty_received }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="col-md-5">
+    <div class="card p-3">
+      <h5>Resultado do Matching</h5>
+      {% if result %}
+        <p>Status: <strong>{{ result.status }}</strong></p>
+        <p>Certificação: <code>{{ result.certified_id }}</code></p>
+        <pre class="bg-dark p-2 rounded">{{ result.summary|json_script:"summary" }}</pre>
+      {% else %}
+        <p>Pendente</p>
+      {% endif %}
+    </div>
+    <div class="card p-3 mt-3">
+      <h5>Exceções</h5>
+      <ul>
+        {% for e in inbound.exceptions.all %}
+          <li>{{ e.line_ref }} — {{ e.issue }}</li>
+        {% empty %}
+          <li>Sem exceções 🎉</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="card p-3 mt-3">
+  <h5>Ficheiro original</h5>
+  <a class="btn btn-outline-light" href="{{ inbound.file.url }}" target="_blank">Abrir PDF/Imagem</a>
+</div>
+{% endblock %}

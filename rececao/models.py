@@ -1,0 +1,83 @@
+
+from django.db import models
+
+class Supplier(models.Model):
+    name = models.CharField(max_length=200, unique=True)
+    email = models.EmailField(blank=True, null=True)
+    code = models.CharField(max_length=50, unique=True)
+
+    def __str__(self):
+        return f"{self.code} - {self.name}"
+
+class PurchaseOrder(models.Model):
+    number = models.CharField(max_length=100, unique=True)
+    supplier = models.ForeignKey(Supplier, on_delete=models.CASCADE, related_name='purchase_orders')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.number
+
+class POLine(models.Model):
+    po = models.ForeignKey(PurchaseOrder, on_delete=models.CASCADE, related_name='lines')
+    internal_sku = models.CharField(max_length=120)  # código interno Colmol
+    description = models.CharField(max_length=255, blank=True)
+    unit = models.CharField(max_length=20, default='UN')
+    qty_ordered = models.DecimalField(max_digits=12, decimal_places=3)
+    tolerance = models.DecimalField(max_digits=6, decimal_places=3, default=0)  # tolerância admitida
+
+    class Meta:
+        unique_together = ('po','internal_sku')
+
+    def __str__(self):
+        return f"{self.po.number} · {self.internal_sku}"
+
+class CodeMapping(models.Model):
+    supplier = models.ForeignKey(Supplier, on_delete=models.CASCADE, related_name='code_mappings')
+    supplier_code = models.CharField(max_length=120)
+    internal_sku = models.CharField(max_length=120)
+    confidence = models.FloatField(default=1.0)
+
+    class Meta:
+        unique_together = ('supplier','supplier_code')
+
+    def __str__(self):
+        return f"{self.supplier.code}:{self.supplier_code} -> {self.internal_sku}"
+
+class InboundDocument(models.Model):
+    DOC_TYPES = (
+        ('GR','Guia de Remessa'),
+        ('FT','Fatura'),
+    )
+    supplier = models.ForeignKey(Supplier, on_delete=models.CASCADE, related_name='inbound_docs')
+    doc_type = models.CharField(max_length=2, choices=DOC_TYPES, default='GR')
+    number = models.CharField(max_length=120)
+    file = models.FileField(upload_to='inbound/')
+    received_at = models.DateTimeField(auto_now_add=True)
+    parsed_payload = models.JSONField(default=dict, blank=True)  # resultado do OCR/extração
+    po = models.ForeignKey(PurchaseOrder, on_delete=models.SET_NULL, null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.get_doc_type_display()} {self.number} ({self.supplier})"
+
+class ReceiptLine(models.Model):
+    inbound = models.ForeignKey(InboundDocument, on_delete=models.CASCADE, related_name='lines')
+    supplier_code = models.CharField(max_length=120)
+    maybe_internal_sku = models.CharField(max_length=120, blank=True)  # resultado do mapping
+    description = models.CharField(max_length=255, blank=True)
+    unit = models.CharField(max_length=20, default='UN')
+    qty_received = models.DecimalField(max_digits=12, decimal_places=3, default=0)
+
+class MatchResult(models.Model):
+    inbound = models.OneToOneField(InboundDocument, on_delete=models.CASCADE, related_name='match_result')
+    status = models.CharField(max_length=30, default='pending')  # matched / exceptions / pending
+    summary = models.JSONField(default=dict, blank=True)  # KPIs do matching (linhas OK, divergências, etc.)
+    certified_id = models.CharField(max_length=64, blank=True)  # hash/UUID da receção
+
+class ExceptionTask(models.Model):
+    inbound = models.ForeignKey(InboundDocument, on_delete=models.CASCADE, related_name='exceptions')
+    line_ref = models.CharField(max_length=120)  # referência da linha (supplier_code / internal_sku)
+    issue = models.CharField(max_length=255)  # descrição do problema
+    suggested_internal_sku = models.CharField(max_length=120, blank=True)
+    suggested_qty = models.DecimalField(max_digits=12, decimal_places=3, null=True, blank=True)
+    resolved = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
