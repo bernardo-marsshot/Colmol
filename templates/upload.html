@@ -5,7 +5,7 @@
 <form method="post" enctype="multipart/form-data" class="card p-4 mt-3">
   {% csrf_token %}
   {{ form.as_p }}
-  <button class="btn btn-success">Processar</button>
+  <button class="">Processar</button>
 </form>
-<p class="mt-3">Aceita PDF/Imagem. O protótipo usa OCR de demonstração (stub) e matching simples.</p>
+<p class="mt-3">Aceita PDF/Imagem.</p>
 {% endblock %}
