@@ -1,4 +1,5 @@
 
+{% load static %}
 <!doctype html>
 <html lang="pt">
 <head>
@@ -18,6 +19,9 @@
     .btn-primary{ background-color:#cc4400; border-color:#cc4400; color:#ffffff; }
     .btn-primary:hover{ background-color:#993300; border-color:#993300; }
     .border-secondary{ border-color:#e55a00 !important; }
+    .table{ background-color:#ffffff; color:#000000; }
+    .table th{ background-color:#f8f9fa; color:#000000; border-bottom: 2px solid #e55a00; }
+    .table td{ border-top: 1px solid #dee2e6; }
   </style>
 </head>
 <body>
@@ -42,7 +46,10 @@
 
 <footer class="container my-5">
   <hr class="border-secondary" />
-  <p>Protótipo COLMOL • Receção Inteligente — Django</p>
+  <div class="text-center">
+    <p class="mb-0">Protótipo COLMOL • Receção Inteligente — Django</p>
+    <p class="mb-0 text-muted">Protótipo desenvolvido por <strong>Mars Shot - Redefining Limits</strong> <a href="https://www.marsshot.eu" target="_blank" class="text-decoration-none">www.marsshot.eu</a></p>
+  </div>
 </footer>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
