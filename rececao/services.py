@@ -7,9 +7,21 @@ def fake_ocr_extract(file_path:str):
     """Stub OCR: returns a deterministic toy payload.
     In real use, plug AWS Textract / Google Document AI / Azure Form Recognizer.
     """
-    # Demo payload with two lines
+    # Demo payload with QR code and document data
     payload = {
-        "po_number": "PO-2025-0001",
+        "document_number": "GR-2025-0123",
+        "po_number": "PO-2025-0001", 
+        "supplier_name": "TechBuild Lda",
+        "delivery_date": "2025-09-24",
+        "qr_code": {
+            "data": "GR-2025-0123|PO-2025-0001|TechBuild|24/09/2025",
+            "validation_url": "https://colmol.app/verify/abc123def456",
+            "hash": "abc123def456789"
+        },
+        "totals": {
+            "total_lines": 2,
+            "total_quantity": 30
+        },
         "lines": [
             {"supplier_code":"Bl D23 E150", "description":"Bloco D23 150", "unit":"UN", "qty": 20},
             {"supplier_code":"Bl D23 E100", "description":"Bloco D23 100", "unit":"UN", "qty": 10},

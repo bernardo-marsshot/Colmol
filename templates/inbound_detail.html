@@ -6,14 +6,43 @@
 
 <div class="row g-3">
   <div class="col-md-7">
+    {% if inbound.parsed_payload.qr_code %}
+    <div class="card p-3 mb-3">
+      <h5>Dados QR Code</h5>
+      <div class="row">
+        <div class="col-md-8">
+          <p><strong>Dados:</strong> {{ inbound.parsed_payload.qr_code.data }}</p>
+          <p><strong>Hash:</strong> <code>{{ inbound.parsed_payload.qr_code.hash }}</code></p>
+          {% if inbound.parsed_payload.qr_code.validation_url %}
+          <p><strong>Validação:</strong> <a href="{{ inbound.parsed_payload.qr_code.validation_url }}" target="_blank">Verificar autenticidade</a></p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+    
+    {% if inbound.parsed_payload.document_number or inbound.parsed_payload.po_number %}
+    <div class="card p-3 mb-3">
+      <h5>Dados OCR Extraídos</h5>
+      {% if inbound.parsed_payload.document_number %}<p><strong>Documento:</strong> {{ inbound.parsed_payload.document_number }}</p>{% endif %}
+      {% if inbound.parsed_payload.po_number %}<p><strong>PO Referenciado:</strong> {{ inbound.parsed_payload.po_number }}</p>{% endif %}
+      {% if inbound.parsed_payload.supplier_name %}<p><strong>Fornecedor (OCR):</strong> {{ inbound.parsed_payload.supplier_name }}</p>{% endif %}
+      {% if inbound.parsed_payload.delivery_date %}<p><strong>Data Entrega:</strong> {{ inbound.parsed_payload.delivery_date }}</p>{% endif %}
+      {% if inbound.parsed_payload.totals %}
+      <p><strong>Totais:</strong> {{ inbound.parsed_payload.totals.total_lines }} linhas, {{ inbound.parsed_payload.totals.total_quantity }} unidades</p>
+      {% endif %}
+    </div>
+    {% endif %}
+    
     <div class="card p-3">
       <h5>Linhas extraídas</h5>
       <table class="table table-sm align-middle">
-        <thead><tr><th>Fornecedor</th><th>SKU Interno (sugerido)</th><th>Qtd</th></tr></thead>
+        <thead><tr><th>Código Fornecedor</th><th>Descrição</th><th>SKU Interno</th><th>Qtd</th></tr></thead>
         <tbody>
         {% for l in inbound.lines.all %}
           <tr>
             <td>{{ l.supplier_code }}</td>
+            <td>{{ l.description|default:"—" }}</td>
             <td>{{ l.maybe_internal_sku|default:"—" }}</td>
             <td>{{ l.qty_received }}</td>
           </tr>
@@ -48,6 +77,6 @@
 
 <div class="card p-3 mt-3">
   <h5>Ficheiro original</h5>
-  <a class="btn btn-outline-light" href="{{ inbound.file.url }}" target="_blank">Abrir PDF/Imagem</a>
+  <a class="btn text-white" style="background-color: #FF6B35; border-color: #FF6B35;" href="{{ inbound.file.url }}" target="_blank">Abrir PDF/Imagem</a>
 </div>
 {% endblock %}
