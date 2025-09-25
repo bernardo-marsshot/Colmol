@@ -1,3 +1,9 @@
 
 Django==5.0.6
 Django==5.0.6
+openai
+openpyxl
+Pillow
+PyPDF2
+pytesseract
+pdf2image

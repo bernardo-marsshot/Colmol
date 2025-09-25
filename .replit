@@ -1,9 +1,11 @@
 modules = ["web", "python-3.11"]
 [agent]
 expertMode = true
+integrations = ["python_openai:1.0.0"]
 
 [nix]
 channel = "stable-25_05"
+packages = ["freetype", "hdf5", "lcms2", "libimagequant", "libjpeg", "libtiff", "libwebp", "libxcrypt", "openjpeg", "poppler-utils", "poppler_utils", "tcl", "tesseract", "tk", "zlib"]
 
 [workflows]
 runButton = "Project"
@@ -34,7 +36,7 @@ localPort = 5000
 externalPort = 80
 
 [[ports]]
-localPort = 42565
+localPort = 40333
 externalPort = 3000
 
 [deployment]

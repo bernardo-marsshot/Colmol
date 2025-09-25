@@ -76,7 +76,16 @@
 </div>
 
 <div class="card p-3 mt-3">
-  <h5>Ficheiro original</h5>
-  <a class="btn text-white" style="background-color: #FF6B35; border-color: #FF6B35;" href="{{ inbound.file.url }}" target="_blank">Abrir PDF/Imagem</a>
+  <h5>Ficheiro original & Exportação</h5>
+  <div class="d-flex gap-2 mb-3">
+    <a class="btn text-white" style="background-color: #FF6B35; border-color: #FF6B35;" href="{{ inbound.file.url }}" target="_blank">Abrir PDF/Imagem</a>
+    <a class="btn btn-success" href="{% url 'export_excel' inbound.pk %}">📊 Exportar Excel</a>
+  </div>
+  
+  {% if inbound.parsed_payload.numero_requisicao %}
+  <div class="alert alert-info">
+    <strong>💾 Dados processados:</strong> Requisição {{ inbound.parsed_payload.numero_requisicao }} com {{ inbound.parsed_payload.totals.total_lines }} linhas e {{ inbound.parsed_payload.totals.total_quantity }} unidades.
+  </div>
+  {% endif %}
 </div>
 {% endblock %}

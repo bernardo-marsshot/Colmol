@@ -1,9 +1,10 @@
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.db.models import Sum
+from django.http import HttpResponse
 from .models import InboundDocument, MatchResult, Supplier, PurchaseOrder
 from .forms import InboundUploadForm
-from .services import process_inbound
+from .services import process_inbound, export_document_to_excel
 
 def dashboard(request):
     total_docs = InboundDocument.objects.count()
@@ -39,3 +40,7 @@ def inbound_detail(request, pk):
 def po_list(request):
     pos = PurchaseOrder.objects.all().order_by('-id')
     return render(request, 'po_list.html', {'pos': pos})
+
+def export_excel(request, pk):
+    """Export document to Excel"""
+    return export_document_to_excel(pk)
