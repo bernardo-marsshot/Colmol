@@ -18,7 +18,23 @@
 </div>
 
 <div class="card p-3 mt-4">
-  <h5 class="mb-4">Últimos documentos</h5>
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="mb-0">Últimos documentos</h5>
+    <div class="d-flex gap-3">
+      <small class="d-flex align-items-center gap-1">
+        <span class="badge bg-success">✓</span>
+        <span class="text-muted">Processado</span>
+      </small>
+      <small class="d-flex align-items-center gap-1">
+        <span class="badge bg-warning">!</span>
+        <span class="text-muted">Com exceções</span>
+      </small>
+      <small class="d-flex align-items-center gap-1">
+        <span class="badge bg-secondary">-</span>
+        <span class="text-muted">Pendente</span>
+      </small>
+    </div>
+  </div>
   
   {% for d in latest %}
   <div class="row mb-3 align-items-center">
