@@ -72,6 +72,85 @@
       border-color: #993300;
     }
 
+    /* Botões estilo Bizneo modernos */
+    .btn-bizneo-primary {
+      background: linear-gradient(135deg, #FF6B35 0%, #e55a00 100%);
+      border: none;
+      border-radius: 8px;
+      padding: 12px 20px;
+      color: white;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 4px 12px rgba(255, 107, 53, 0.25);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .btn-bizneo-primary:hover {
+      background: linear-gradient(135deg, #e55a00 0%, #cc4400 100%);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(255, 107, 53, 0.35);
+      color: white;
+      text-decoration: none;
+    }
+
+    .btn-bizneo-primary:active {
+      transform: translateY(0);
+      box-shadow: 0 2px 8px rgba(255, 107, 53, 0.3);
+    }
+
+    .btn-bizneo-success {
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      border: none;
+      border-radius: 8px;
+      padding: 12px 20px;
+      color: white;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
+    }
+
+    .btn-bizneo-success:hover {
+      background: linear-gradient(135deg, #059669 0%, #047857 100%);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(16, 185, 129, 0.35);
+      color: white;
+      text-decoration: none;
+    }
+
+    .btn-bizneo-success:active {
+      transform: translateY(0);
+      box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+    }
+
+    /* Ícones SVG nos botões */
+    .btn-bizneo-primary svg,
+    .btn-bizneo-success svg {
+      flex-shrink: 0;
+    }
+
+    /* Responsividade dos botões */
+    @media (max-width: 768px) {
+      .btn-bizneo-primary,
+      .btn-bizneo-success {
+        width: 100%;
+        justify-content: center;
+        margin-bottom: 8px;
+      }
+    }
+
     .border-secondary {
       border-color: #e55a00 !important;
     }
