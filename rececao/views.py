@@ -19,11 +19,32 @@ def dashboard(request):
 
     suppliers = Supplier.objects.count()
 
-    latest = (
+    latest_docs = (
         InboundDocument.objects
         .select_related('supplier', 'po', 'match_result')
         .order_by('-received_at')[:10]
     )
+    
+    # Calculate reading percentage for each document
+    latest = []
+    for doc in latest_docs:
+        # Calculate reading percentage
+        summary = doc.match_result.summary if hasattr(doc, 'match_result') and doc.match_result else {}
+        total_lines = summary.get('total_lines_in_document', 0)
+        lines_read = summary.get('lines_read_successfully', 0)
+        
+        # Fallback for older documents
+        if total_lines == 0 and doc.parsed_payload:
+            total_lines = len(doc.parsed_payload.get('lines', []))
+            lines_ok = summary.get('lines_ok', 0)
+            lines_read = lines_ok
+        
+        # Calculate percentage
+        reading_percentage = (lines_read / total_lines * 100) if total_lines > 0 else 0
+        
+        # Add percentage attribute to document
+        doc.reading_percentage = round(reading_percentage, 1)
+        latest.append(doc)
     
     # Get latest document statistics for line reading chart
     latest_doc = InboundDocument.objects.select_related('supplier', 'po', 'match_result').order_by('-received_at').first()
