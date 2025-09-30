@@ -40,15 +40,23 @@ def dashboard(request):
     
     if latest_doc:
         summary = latest_doc.match_result.summary if hasattr(latest_doc, 'match_result') and latest_doc.match_result else {}
+        
+        # Get values with fallbacks for older documents without new fields
         total_lines = summary.get('total_lines_in_document', 0)
         lines_read = summary.get('lines_read_successfully', 0)
+        
+        # If old document doesn't have new fields, try to calculate from parsed_payload
+        if total_lines == 0 and latest_doc.parsed_payload:
+            total_lines = len(latest_doc.parsed_payload.get('lines', []))
+            lines_ok = summary.get('lines_ok', 0)
+            lines_read = lines_ok  # Use lines_ok as approximation for lines_read
         
         latest_doc_stats = {
             'has_doc': True,
             'total_lines': total_lines,
             'lines_read': lines_read,
             'lines_error': total_lines - lines_read if total_lines > 0 else 0,
-            'last_line_read': summary.get('last_successful_line'),
+            'last_line_read': summary.get('last_successful_line', lines_read if lines_read > 0 else None),
             'first_error_line': summary.get('first_error_line'),
             'doc_number': latest_doc.number,
             'supplier_name': latest_doc.supplier.name,
