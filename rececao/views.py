@@ -1,8 +1,9 @@
 # views.py
-from django.shortcuts import render
+from django.shortcuts import render, redirect, get_object_or_404
 from django.db.models import Count
-# Ajusta os imports ao teu projeto/app:
-from .models import InboundDocument, Supplier  # garante que estes modelos existem no teu app
+from .models import InboundDocument, Supplier, PurchaseOrder
+from .forms import InboundUploadForm
+from .services import process_inbound, export_document_to_excel
 
 def dashboard(request):
     # Contagens por estado
