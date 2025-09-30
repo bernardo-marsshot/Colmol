@@ -348,8 +348,30 @@ def process_inbound(inbound: InboundDocument):
     # Persist match result
     import uuid, json
     res, _ = MatchResult.objects.get_or_create(inbound=inbound)
+    
+    # Calculate line statistics for the chart
+    total_lines_in_doc = len(payload.get("lines", []))
+    lines_read_successfully = ok
+    first_error_line = None
+    
+    # Find first error line number
+    if exceptions:
+        # Try to find the line number in the document
+        for idx, line in enumerate(payload.get("lines", []), 1):
+            line_code = line.get("supplier_code", "")
+            if any(line_code in ex.get("line", "") for ex in exceptions):
+                first_error_line = idx
+                break
+    
     res.status = 'matched' if issues == 0 else 'exceptions'
-    res.summary = {"lines_ok": ok, "lines_issues": issues}
+    res.summary = {
+        "lines_ok": ok, 
+        "lines_issues": issues,
+        "total_lines_in_document": total_lines_in_doc,
+        "lines_read_successfully": lines_read_successfully,
+        "first_error_line": first_error_line,
+        "last_successful_line": lines_read_successfully if lines_read_successfully > 0 else None
+    }
     res.certified_id = hashlib.sha256((str(inbound.id)+str(payload)).encode()).hexdigest()[:16]
     res.save()
 
