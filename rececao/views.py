@@ -23,6 +23,37 @@ def dashboard(request):
         .select_related('supplier', 'po', 'match_result')
         .order_by('-received_at')[:10]
     )
+    
+    # Get latest document statistics for line reading chart
+    latest_doc = InboundDocument.objects.select_related('supplier', 'po', 'match_result').order_by('-received_at').first()
+    latest_doc_stats = {
+        'has_doc': False,
+        'total_lines': 0,
+        'lines_read': 0,
+        'lines_error': 0,
+        'last_line_read': None,
+        'first_error_line': None,
+        'doc_number': '',
+        'supplier_name': '',
+        'doc_type': ''
+    }
+    
+    if latest_doc:
+        summary = latest_doc.match_result.summary if hasattr(latest_doc, 'match_result') and latest_doc.match_result else {}
+        total_lines = summary.get('total_lines_in_document', 0)
+        lines_read = summary.get('lines_read_successfully', 0)
+        
+        latest_doc_stats = {
+            'has_doc': True,
+            'total_lines': total_lines,
+            'lines_read': lines_read,
+            'lines_error': total_lines - lines_read if total_lines > 0 else 0,
+            'last_line_read': summary.get('last_successful_line'),
+            'first_error_line': summary.get('first_error_line'),
+            'doc_number': latest_doc.number,
+            'supplier_name': latest_doc.supplier.name,
+            'doc_type': latest_doc.get_doc_type_display()
+        }
 
     ctx = {
         'total_docs': total_docs,
@@ -32,6 +63,7 @@ def dashboard(request):
         'pending': pending,
         'suppliers': suppliers,
         'latest': latest,
+        'latest_doc_stats': latest_doc_stats,
     }
     return render(request, 'dashboard.html', ctx)
 
