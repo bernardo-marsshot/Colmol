@@ -7,3 +7,5 @@ Pillow
 PyPDF2
 pytesseract
 pdf2image
+opencv-python
+pyzbar

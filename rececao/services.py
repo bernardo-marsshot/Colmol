@@ -13,6 +13,16 @@ from django.http import HttpResponse
 from .models import InboundDocument, ReceiptLine, CodeMapping, MatchResult, ExceptionTask, POLine
 from django.db import transaction
 
+# Optional QR code support (requires system library zbar)
+try:
+    from pyzbar.pyzbar import decode
+    import cv2
+    import numpy as np
+    QR_CODE_ENABLED = True
+except ImportError:
+    QR_CODE_ENABLED = False
+    print("⚠️ QR code support not available - install zbar system library to enable")
+
 def real_ocr_extract(file_path: str):
     """Real OCR using local Tesseract - extracts data from actual documents"""
     
@@ -68,20 +78,55 @@ def extract_text_from_pdf(file_path: str) -> str:
         # If text extraction fails, try OCR
         return extract_text_from_pdf_with_ocr(file_path)
 
-def extract_text_from_pdf_with_ocr(file_path: str) -> str:
-    """Convert PDF pages to images and extract text with Tesseract OCR"""
+def detect_and_read_qrcodes(image) -> str:
+    """Detect and decode QR codes from image (if QR support is available)"""
+    if not QR_CODE_ENABLED:
+        return ""
+    
     try:
-        # Convert PDF pages to images
-        pages = convert_from_path(file_path, dpi=300, first_page=1, last_page=3)  # Limit to first 3 pages
+        # Convert PIL Image to numpy array for OpenCV
+        img_array = np.array(image)
+        
+        # Convert RGB to BGR (OpenCV format)
+        if len(img_array.shape) == 3:
+            img_array = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
+        
+        # Decode QR codes
+        qr_codes = decode(img_array)
+        
+        qr_text = ""
+        if qr_codes:
+            for qr in qr_codes:
+                qr_data = qr.data.decode('utf-8')
+                print(f"✅ QR Code detected: {qr_data[:50]}...")
+                qr_text += f"\n[QR CODE]: {qr_data}\n"
+        
+        return qr_text
+        
+    except Exception as e:
+        print(f"⚠️ Error detecting QR codes: {e}")
+        return ""
+
+def extract_text_from_pdf_with_ocr(file_path: str) -> str:
+    """Convert PDF pages to images and extract text with Tesseract OCR + QR codes"""
+    try:
+        # Convert ALL PDF pages to images (no page limit)
+        print(f"📄 Converting PDF to images for complete OCR processing...")
+        pages = convert_from_path(file_path, dpi=300)  # NO PAGE LIMIT - read everything!
         
         all_text = ""
         for i, page in enumerate(pages):
-            print(f"🔍 Running OCR on page {i+1}...")
+            print(f"🔍 Processing page {i+1}/{len(pages)}...")
             
-            # Run OCR on each page
+            # First, check for QR codes on this page
+            qr_text = detect_and_read_qrcodes(page)
+            if qr_text:
+                all_text += qr_text
+            
+            # Run enhanced OCR on each page
             page_text = pytesseract.image_to_string(
                 page, 
-                config='--psm 6 -l por',  # Portuguese language
+                config='--psm 6 --oem 3 -l por',  # Enhanced: PSM 6 (uniform block) + OEM 3 (best LSTM)
                 lang='por'
             )
             
@@ -91,6 +136,7 @@ def extract_text_from_pdf_with_ocr(file_path: str) -> str:
             else:
                 print(f"⚠️ Page {i+1}: No text found")
         
+        print(f"✅ Complete PDF OCR finished: {len(pages)} pages processed, {len(all_text)} total characters")
         return all_text.strip()
         
     except Exception as e:
@@ -98,11 +144,24 @@ def extract_text_from_pdf_with_ocr(file_path: str) -> str:
         return ""
 
 def extract_text_from_image(file_path: str) -> str:
-    """Extract text using Tesseract OCR"""
+    """Extract text using Tesseract OCR + QR code detection"""
     try:
         image = Image.open(file_path)
-        text = pytesseract.image_to_string(image, config='--psm 6 -l por')
-        return text.strip()
+        
+        # Check for QR codes first
+        qr_text = detect_and_read_qrcodes(image)
+        
+        # Run enhanced OCR
+        ocr_text = pytesseract.image_to_string(
+            image, 
+            config='--psm 6 --oem 3 -l por',  # Enhanced config
+            lang='por'
+        )
+        
+        # Combine QR and OCR text
+        combined_text = qr_text + "\n" + ocr_text if qr_text else ocr_text
+        return combined_text.strip()
+        
     except Exception as e:
         print(f"Error with OCR: {e}")
         return ""
