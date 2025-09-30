@@ -1,24 +1,40 @@
-
-from django.shortcuts import render, redirect, get_object_or_404
-from django.db.models import Sum
-from django.http import HttpResponse
-from .models import InboundDocument, MatchResult, Supplier, PurchaseOrder
-from .forms import InboundUploadForm
-from .services import process_inbound, export_document_to_excel
+# views.py
+from django.shortcuts import render
+from django.db.models import Count
+# Ajusta os imports ao teu projeto/app:
+from .models import InboundDocument, Supplier  # garante que estes modelos existem no teu app
 
 def dashboard(request):
+    # Contagens por estado
     total_docs = InboundDocument.objects.count()
-    matched = MatchResult.objects.filter(status='matched').count()
-    exceptions = MatchResult.objects.filter(status='exceptions').count()
+    matched    = InboundDocument.objects.filter(match_result__status='matched').count()
+    exceptions = InboundDocument.objects.filter(match_result__status='exception').count()
+    errors     = InboundDocument.objects.filter(match_result__status='error').count()
+
+    # Pendente = tudo o que não tem resultado ainda (ou qualquer outro estado não coberto acima)
+    pending = total_docs - matched - exceptions - errors
+    if pending < 0:
+        pending = 0  # salvaguarda, caso existam estados “extra” ou inconsistências
+
     suppliers = Supplier.objects.count()
-    latest = InboundDocument.objects.order_by('-received_at')[:10]
-    return render(request, 'dashboard.html', {
+
+    latest = (
+        InboundDocument.objects
+        .select_related('supplier', 'po', 'match_result')
+        .order_by('-received_at')[:10]
+    )
+
+    ctx = {
         'total_docs': total_docs,
         'matched': matched,
         'exceptions': exceptions,
+        'errors': errors,
+        'pending': pending,
         'suppliers': suppliers,
         'latest': latest,
-    })
+    }
+    return render(request, 'dashboard.html', ctx)
+
 
 def upload_inbound(request):
     msg = None

@@ -1,12 +1,32 @@
-
 {% extends "base.html" %}
 {% block content %}
 <h1 class="mb-3">Dashboard</h1>
+
 <div class="row g-3">
-  <div class="col-md-3"><div class="card p-3"><div>Total Docs</div><h3>{{ total_docs }}</h3></div></div>
-  <div class="col-md-3"><div class="card p-3"><div>Matched</div><h3>{{ matched }}</h3></div></div>
-  <div class="col-md-3"><div class="card p-3"><div>Com Exceções</div><h3>{{ exceptions }}</h3></div></div>
-  <div class="col-md-3"><div class="card p-3"><div>Fornecedores</div><h3>{{ suppliers }}</h3></div></div>
+  <div class="col-md-3">
+    <div class="card p-3">
+      <div>Total Docs</div>
+      <h3>{{ total_docs }}</h3>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card p-3">
+      <div>Processado</div>
+      <h3>{{ matched }}</h3>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card p-3">
+      <div>Com Exceções</div>
+      <h3>{{ exceptions }}</h3>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card p-3">
+      <div>Fornecedores</div>
+      <h3>{{ suppliers }}</h3>
+    </div>
+  </div>
 </div>
 
 <div class="row mt-4">
@@ -15,6 +35,7 @@
       <h5 class="mb-3">Processamento</h5>
       <canvas id="kpiChart" style="max-height: 300px;"></canvas>
     </div>
+  </div>
 </div>
 
 <div class="card p-3 mt-4">
@@ -39,7 +60,7 @@
       </small>
     </div>
   </div>
-  
+
   {% for d in latest %}
   <div class="row mb-3 align-items-center">
     <div class="col-md-2">
@@ -50,31 +71,40 @@
     </div>
     <div class="col-md-4">
       <a href="{% url 'inbound_detail' d.pk %}" class="btn-bizneo-document">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          <polyline points="14,2 14,8 20,8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          <line x1="16" y1="13" x2="8" y2="13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          <line x1="16" y1="17" x2="8" y2="17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"
+          aria-hidden="true">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round" />
+          <polyline points="14,2 14,8 20,8" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+            stroke-linejoin="round" />
+          <line x1="16" y1="13" x2="8" y2="13" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+            stroke-linejoin="round" />
+          <line x1="16" y1="17" x2="8" y2="17" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+            stroke-linejoin="round" />
         </svg>
         {{ d.get_doc_type_display }} {{ d.number }}
       </a>
     </div>
     <div class="col-md-2">
       {% if d.po %}
-        <small class="text-muted">PO: {{ d.po.number }}</small>
+      <small class="text-muted">PO: {{ d.po.number }}</small>
       {% else %}
-        <small class="text-muted">-</small>
+      <small class="text-muted">-</small>
       {% endif %}
     </div>
     <div class="col-md-1">
       {% if d.match_result %}
-        {% if d.match_result.status == 'matched' %}
-          <span class="badge bg-success">✓</span>
-        {% else %}
-          <span class="badge bg-warning">!</span>
-        {% endif %}
+      {% if d.match_result.status == 'matched' %}
+      <span class="badge bg-success">✓</span>
+      {% elif d.match_result.status == 'exception' %}
+      <span class="badge bg-warning">!</span>
+      {% elif d.match_result.status == 'error' %}
+      <span class="badge bg-danger">✗</span>
       {% else %}
-        <span class="badge bg-secondary">-</span>
+      <span class="badge bg-secondary">-</span>
+      {% endif %}
+      {% else %}
+      <span class="badge bg-secondary">-</span>
       {% endif %}
     </div>
   </div>
@@ -85,45 +115,55 @@
   {% endfor %}
 </div>
 
+{# Garante que o Chart.js está carregado. Se já o incluis no base.html, podes remover a linha abaixo. #}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 <script>
 const ctx = document.getElementById('kpiChart');
 new Chart(ctx, {
   type: 'doughnut',
   data: {
-    labels: ['Matched','Exceções','Por processar'],
-    datasets: [{ 
-      data: [{{ matched }}, {{ exceptions }}, {{ total_docs }} - {{ matched }} - {{ exceptions }}],
+    labels: ['Processado', 'Com exceções', 'Erro', 'Pendente'],
+    datasets: [{
+      data: [{{ matched }}, {{ exceptions }}, {{ errors|default:0 }}, {{ pending|default:0 }}],
       backgroundColor: [
-        '#FF6B35',  // Laranja do cliente para documentos matched
-        '#DC3545',  // Vermelho para exceções
-        '#F8F9FA'   // Cinza muito claro para documentos por processar
+        '#198754',  // Verde (bg-success) - Processado
+        '#ffc107',  // Amarelo (bg-warning) - Com exceções
+        '#dc3545',  // Vermelho (bg-danger) - Erro
+        '#6c757d'   // Cinzento (bg-secondary) - Pendente
       ],
       borderColor: [
-        '#FF6B35',
-        '#DC3545', 
-        '#F8F9FA'
+        '#198754',
+        '#ffc107',
+        '#dc3545',
+        '#6c757d'
       ],
       borderWidth: 2
     }]
   },
-  options: { 
+  options: {
     responsive: true,
     plugins: {
       legend: {
         labels: {
-          color: '#000000',  // Texto preto para as legendas
-          font: {
-            size: 14,
-            weight: 'normal'
-          },
+          color: '#000000',
+          font: { size: 14, weight: 'normal' },
           usePointStyle: true
+        }
+      },
+      tooltip: {
+        callbacks: {
+          label: function(context) {
+            const total = {{ total_docs|default:0 }};
+            const val = context.parsed;
+            const pct = total ? (val * 100 / total).toFixed(1) : 0;
+            return context.label + ': ' + val + ' (' + pct + '%)';
+          }
         }
       }
     },
-    elements: {
-      arc: {
-        borderWidth: 3
-      }
+    elements: { 
+      arc: { borderWidth: 3 } 
     }
   }
 });
