@@ -1,0 +1,205 @@
+{
+  "numero_requisicao": "",
+  "document_number": "UP",
+  "po_number": "UP",
+  "supplier_name": "",
+  "delivery_date": "31/12/2025",
+  "lines": [
+    {
+      "supplier_code": "INA",
+      "description": "3720-760 Vila de CucujaesZona Industrial das CavadasPágina 1/2",
+      "unit": "UNI",
+      "qty": 2.0,
+      "mini_codigo": "20x760",
+      "dimensoes": {
+        "comprimento": 760,
+        "largura": 20,
+        "espessura": 0
+      }
+    },
+    {
+      "supplier_code": "CWH",
+      "description": "1ECWH Nº 10874/25EU de 04-09-2025",
+      "unit": "UNI",
+      "qty": 5.0,
+      "mini_codigo": "9x2025",
+      "dimensoes": {
+        "comprimento": 2025,
+        "largura": 9,
+        "espessura": 0
+      }
+    },
+    {
+      "supplier_code": "CWH",
+      "description": "1ECWH Nº 10954/25EU de 05-09-2025",
+      "unit": "UNI",
+      "qty": 5.0,
+      "mini_codigo": "9x2025",
+      "dimensoes": {
+        "comprimento": 2025,
+        "largura": 9,
+        "espessura": 0
+      }
+    },
+    {
+      "supplier_code": "CWH",
+      "description": "1ECWH Nº 10955/25EU de 05-09-2025",
+      "unit": "UNI",
+      "qty": 5.0,
+      "mini_codigo": "9x2025",
+      "dimensoes": {
+        "comprimento": 2025,
+        "largura": 9,
+        "espessura": 0
+      }
+    },
+    {
+      "supplier_code": "CWH",
+      "description": "1ECWH Nº 10966/25EU de 05-09-2025",
+      "unit": "UNI",
+      "qty": 5.0,
+      "mini_codigo": "9x2025",
+      "dimensoes": {
+        "comprimento": 2025,
+        "largura": 9,
+        "espessura": 0
+      }
+    },
+    {
+      "supplier_code": "CWH",
+      "description": "1ECWH Nº 11108/25EU de 09-09-2025",
+      "unit": "UNI",
+      "qty": 5.0,
+      "mini_codigo": "9x2025",
+      "dimensoes": {
+        "comprimento": 2025,
+        "largura": 9,
+        "espessura": 0
+      }
+    },
+    {
+      "supplier_code": "CWH",
+      "description": "1ECWH Nº 11754/25EU de 22-09-2025",
+      "unit": "UNI",
+      "qty": 5.0,
+      "mini_codigo": "9x2025",
+      "dimensoes": {
+        "comprimento": 2025,
+        "largura": 9,
+        "espessura": 0
+      }
+    },
+    {
+      "supplier_code": "CWH",
+      "description": "1ECWH Nº 11877/25EU de 24-09-2025",
+      "unit": "UNI",
+      "qty": 5.0,
+      "mini_codigo": "9x2025",
+      "dimensoes": {
+        "comprimento": 2025,
+        "largura": 9,
+        "espessura": 0
+      }
+    },
+    {
+      "supplier_code": "CWH",
+      "description": "1ECWH Nº 11970/25EU de 25-09-2025",
+      "unit": "UNI",
+      "qty": 5.0,
+      "mini_codigo": "9x2025",
+      "dimensoes": {
+        "comprimento": 2025,
+        "largura": 9,
+        "espessura": 0
+      }
+    },
+    {
+      "supplier_code": "CWH",
+      "description": "1ECWH Nº 12028/25EU de 26-09-2025",
+      "unit": "UNI",
+      "qty": 5.0,
+      "mini_codigo": "9x2025",
+      "dimensoes": {
+        "comprimento": 2025,
+        "largura": 9,
+        "espessura": 0
+      }
+    },
+    {
+      "supplier_code": "CWH",
+      "description": "1ECWH Nº 12119/25EU de 29-09-2025",
+      "unit": "UNI",
+      "qty": 5.0,
+      "mini_codigo": "9x2025",
+      "dimensoes": {
+        "comprimento": 2025,
+        "largura": 9,
+        "espessura": 0
+      }
+    },
+    {
+      "supplier_code": "U/N.",
+      "description": "1GRWH 25EU/N.º5589 de 02/10/2025 07:34",
+      "unit": "UNI",
+      "qty": 4.0,
+      "mini_codigo": "25x7",
+      "dimensoes": {
+        "comprimento": 7,
+        "largura": 25,
+        "espessura": 0
+      }
+    },
+    {
+      "supplier_code": "INA",
+      "description": "3720-760 Vila de CucujaesZona Industrial das CavadasPágina 2/2",
+      "unit": "UNI",
+      "qty": 2.0,
+      "mini_codigo": "20x760",
+      "dimensoes": {
+        "comprimento": 760,
+        "largura": 20,
+        "espessura": 0
+      }
+    },
+    {
+      "supplier_code": "ADA",
+      "description": "N/ Morada - 2025-10-02 / 08:12",
+      "unit": "UNI",
+      "qty": 2.0,
+      "mini_codigo": "10x2",
+      "dimensoes": {
+        "comprimento": 2,
+        "largura": 10,
+        "espessura": 0
+      }
+    },
+    {
+      "supplier_code": "T50",
+      "description": "IBAN: PT50 0018 0000 0035 7622 0016 8",
+      "unit": "UNI",
+      "qty": 8.0,
+      "mini_codigo": "22x16",
+      "dimensoes": {
+        "comprimento": 16,
+        "largura": 22,
+        "espessura": 0
+      }
+    },
+    {
+      "supplier_code": "T50",
+      "description": "IBAN: PT50 0010 0000 5543 8990 0018 9",
+      "unit": "UNI",
+      "qty": 9.0,
+      "mini_codigo": "90x18",
+      "dimensoes": {
+        "comprimento": 18,
+        "largura": 90,
+        "espessura": 0
+      }
+    }
+  ],
+  "totals": {
+    "total_lines": 16,
+    "total_quantity": 77.0
+  }
+}
