@@ -51,18 +51,22 @@ def save_extraction_to_json(data: dict, filename: str = "extracao.json"):
 def real_ocr_extract(file_path: str):
     """OCR real (Tesseract). Extrai texto e faz parse para estrutura."""
     text_content = ""
+    qr_codes = []
     ext = os.path.splitext(file_path)[1].lower()
 
     if ext == ".pdf":
-        text_content = extract_text_from_pdf(file_path)
+        text_content, qr_codes = extract_text_from_pdf(file_path)
     elif ext in [".jpg", ".jpeg", ".png", ".tiff", ".bmp"]:
-        text_content = extract_text_from_image(file_path)
+        text_content, qr_codes = extract_text_from_image(file_path)
 
     # Pré-visualização (debug) para validação
     preview = "\n".join(text_content.splitlines()[:60])
     print("---- OCR PREVIEW (primeiras linhas) ----")
     print(preview)
     print("----------------------------------------")
+    
+    if qr_codes:
+        print(f"✅ {len(qr_codes)} QR code(s) detectado(s)")
 
     if not text_content.strip():
         print("❌ OCR vazio")
@@ -73,6 +77,7 @@ def real_ocr_extract(file_path: str):
             "po_number": "",
             "supplier_name": "",
             "delivery_date": "",
+            "qr_codes": qr_codes,
             "lines": [],
             "totals": {
                 "total_lines": 0,
@@ -82,12 +87,12 @@ def real_ocr_extract(file_path: str):
         save_extraction_to_json(error_result)
         return error_result
 
-    result = parse_portuguese_document(text_content)
+    result = parse_portuguese_document(text_content, qr_codes)
     save_extraction_to_json(result)
     return result
 
 
-def extract_text_from_pdf(file_path: str) -> str:
+def extract_text_from_pdf(file_path: str):
     """Tenta extrair texto (texto embutido). Se falhar, usa OCR página a página."""
     try:
         text = ""
@@ -99,7 +104,7 @@ def extract_text_from_pdf(file_path: str) -> str:
 
         if text.strip() and len(text.strip()) > 50:
             print(f"✅ PDF text extraction: {len(text)} chars")
-            return text.strip()
+            return text.strip(), []
 
         print("📄 PDF sem texto embutido—usar OCR…")
         return extract_text_from_pdf_with_ocr(file_path)
@@ -109,67 +114,74 @@ def extract_text_from_pdf(file_path: str) -> str:
         return extract_text_from_pdf_with_ocr(file_path)
 
 
-def detect_and_read_qrcodes(image) -> str:
-    """Lê QR codes (se disponível)."""
+def detect_and_read_qrcodes(image, page_number=None):
+    """Lê QR codes e retorna lista estruturada."""
     if not QR_CODE_ENABLED:
-        return ""
+        return []
 
     try:
         arr = np.array(image)
         if len(arr.shape) == 3:
             arr = cv2.cvtColor(arr, cv2.COLOR_RGB2BGR)
         qr_codes = decode(arr)
-        out = ""
+        result = []
         for qr in qr_codes or []:
             data = qr.data.decode("utf-8")
             print(f"✅ QR: {data[:80]}…")
-            out += f"\n[QR CODE]: {data}\n"
-        return out
+            qr_info = {"data": data}
+            if page_number is not None:
+                qr_info["page"] = page_number
+            result.append(qr_info)
+        return result
     except Exception as e:
         print(f"⚠️ QR erro: {e}")
-        return ""
+        return []
 
 
-def extract_text_from_pdf_with_ocr(file_path: str) -> str:
+def extract_text_from_pdf_with_ocr(file_path: str):
     """Converte todas as páginas para imagem e aplica Tesseract."""
     try:
         print("📄 Converter PDF → imagens (OCR)…")
         pages = convert_from_path(file_path, dpi=300)
         all_text = ""
+        all_qr_codes = []
         for i, page in enumerate(pages, 1):
             print(f"🔍 Página {i}/{len(pages)}")
-            all_text += detect_and_read_qrcodes(page)
+            qr_codes = detect_and_read_qrcodes(page, page_number=i)
+            all_qr_codes.extend(qr_codes)
             page_text = pytesseract.image_to_string(
                 page, config="--psm 6 --oem 3 -l por", lang="por")
             if page_text.strip():
                 all_text += f"\n--- Página {i} ---\n{page_text}\n"
         print(f"✅ OCR completo: {len(pages)} páginas")
-        return all_text.strip()
+        return all_text.strip(), all_qr_codes
     except Exception as e:
         print(f"❌ OCR PDF erro: {e}")
-        return ""
+        return "", []
 
 
-def extract_text_from_image(file_path: str) -> str:
+def extract_text_from_image(file_path: str):
     """OCR para imagem ( + leitura de QR)."""
     try:
         img = Image.open(file_path)
-        qr_text = detect_and_read_qrcodes(img)
+        qr_codes = detect_and_read_qrcodes(img)
         ocr_text = pytesseract.image_to_string(img,
                                                config="--psm 6 --oem 3 -l por",
                                                lang="por")
-        return (qr_text + "\n" +
-                ocr_text).strip() if qr_text else ocr_text.strip()
+        return ocr_text.strip(), qr_codes
     except Exception as e:
         print(f"❌ OCR imagem erro: {e}")
-        return ""
+        return "", []
 
 
 # ----------------- PARSE: heurísticas PT -----------------
 
 
-def parse_portuguese_document(text: str):
+def parse_portuguese_document(text: str, qr_codes=None):
     """Extrai cabeçalho (req/doc/fornecedor/data) e linhas de produto."""
+    if qr_codes is None:
+        qr_codes = []
+    
     lines = text.split("\n")
     result = {
         "numero_requisicao": "",
@@ -177,6 +189,7 @@ def parse_portuguese_document(text: str):
         "po_number": "",
         "supplier_name": "",
         "delivery_date": "",
+        "qr_codes": qr_codes,
         "lines": [],
         "totals": {
             "total_lines": 0,
