@@ -222,6 +222,7 @@ def parse_portuguese_document(text: str):
         legacy.append({
             "supplier_code": p["codigo_fornecedor"],
             "description": p["descricao"],
+            "linha_raw": p["linha_raw"],
             "unit": p["unidade"],
             "qty": p["quantidade"],
             "mini_codigo": p["mini_codigo"],
@@ -297,6 +298,7 @@ def extract_product_lines(text: str):
         produto = {
             "codigo_fornecedor": m_code.upper(),
             "descricao": line,
+            "linha_raw": raw,
             "dimensoes": {
                 "comprimento": comp,
                 "largura": larg,
