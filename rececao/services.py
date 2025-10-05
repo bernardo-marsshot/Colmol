@@ -1,177 +1,175 @@
-# rececao/services.py  (VERSÃO SEM PDFPLUMBER)
+
 import hashlib
 import os
 import re
 from io import BytesIO
 from PIL import Image
-
 import PyPDF2
 import pytesseract
 from pdf2image import convert_from_path
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill
-
 from django.http import HttpResponse
+from .models import InboundDocument, ReceiptLine, CodeMapping, MatchResult, ExceptionTask, POLine
 from django.db import transaction
 
-from .models import (
-    InboundDocument, ReceiptLine, CodeMapping, MatchResult, ExceptionTask, POLine,
-    PurchaseOrder
-)
+# Optional QR code support (requires system library zbar)
+try:
+    from pyzbar.pyzbar import decode
+    import cv2
+    import numpy as np
+    QR_CODE_ENABLED = True
+except ImportError:
+    QR_CODE_ENABLED = False
+    print("⚠️ QR code support not available - install zbar system library to enable")
 
-# (Opcional) caminho do Tesseract no Windows:
-# pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-
-# ----------------- Helpers PT -----------------
-
-def normalize_qty_pt(s: str) -> float:
-    """34,00 -> 34.0 | 1.234,50 -> 1234.5 | 5,000 -> 5.0"""
-    if s is None:
-        return 0.0
-    s = str(s).replace('\u00A0', ' ').strip()
-    # remove pontos de milhar apenas quando seguidos de 3 dígitos
-    s = re.sub(r'\.(?=\d{3}\b)', '', s)
-    # troca vírgula decimal por ponto
-    s = s.replace(',', '.')
-    try:
-        return float(s)
-    except Exception:
-        return 0.0
-
-def normalize_money_pt(s: str) -> float:
-    if s is None:
-        return 0.0
-    s = re.sub(r'[^\d,.-]', '', str(s))
-    return normalize_qty_pt(s)
-
-# ----------------- OCR / Leitura de PDF -----------------
+def real_ocr_extract(file_path: str):
+    """Real OCR using local Tesseract - extracts data from actual documents"""
+    
+    text_content = ""
+    file_ext = os.path.splitext(file_path)[1].lower()
+    
+    # Extract text based on file type
+    if file_ext == '.pdf':
+        text_content = extract_text_from_pdf(file_path)
+    elif file_ext in ['.jpg', '.jpeg', '.png', '.tiff', '.bmp']:
+        text_content = extract_text_from_image(file_path)
+    
+    if not text_content.strip():
+        print("❌ No text extracted from document - OCR failed")
+        return {
+            "error": "OCR failed - no text extracted from document",
+            "numero_requisicao": f"ERROR-{os.path.basename(file_path)}",
+            "document_number": "",
+            "po_number": "",
+            "supplier_name": "",
+            "delivery_date": "",
+            "lines": [],
+            "totals": {"total_lines": 0, "total_quantity": 0}
+        }
+    
+    print(f"✅ OCR successful: {len(text_content)} characters extracted")
+    # Parse Portuguese document
+    return parse_portuguese_document(text_content)
 
 def extract_text_from_pdf(file_path: str) -> str:
-    """Extrai texto de um PDF: tenta PyPDF2; se falhar/for insuficiente, cai para OCR."""
+    """Extract text from PDF using both text extraction and OCR"""
     try:
+        # First try direct text extraction
         with open(file_path, 'rb') as file:
             reader = PyPDF2.PdfReader(file)
             text = ""
             for page in reader.pages:
-                page_text = page.extract_text() or ""
-                text += page_text + "\n"
-        if text and len(text.strip()) > 50:
-            print(f"✅ PyPDF2 extraiu {len(text)} caracteres.")
+                page_text = page.extract_text()
+                if page_text:  # Handle None returns
+                    text += page_text + "\n"
+        
+        # If we got meaningful text, return it
+        if text.strip() and len(text.strip()) > 50:
+            print(f"✅ PDF text extraction successful: {len(text)} chars")
             return text.strip()
-        else:
-            print("📄 PyPDF2 devolveu pouco texto. A usar OCR…")
+        
+        # Otherwise, convert PDF to images and run OCR
+        print("📄 PDF has no extractable text, converting to images for OCR...")
+        return extract_text_from_pdf_with_ocr(file_path)
+        
     except Exception as e:
-        print(f"⚠️ Erro PyPDF2: {e} — a usar OCR…")
+        print(f"❌ Error extracting PDF text, falling back to OCR: {e}")
+        # If text extraction fails, try OCR
+        return extract_text_from_pdf_with_ocr(file_path)
 
-    # Fallback: OCR completo (PDF → imagens)
-    return extract_text_from_pdf_with_ocr(file_path)
+def detect_and_read_qrcodes(image) -> str:
+    """Detect and decode QR codes from image (if QR support is available)"""
+    if not QR_CODE_ENABLED:
+        return ""
+    
+    try:
+        # Convert PIL Image to numpy array for OpenCV
+        img_array = np.array(image)
+        
+        # Convert RGB to BGR (OpenCV format)
+        if len(img_array.shape) == 3:
+            img_array = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
+        
+        # Decode QR codes
+        qr_codes = decode(img_array)
+        
+        qr_text = ""
+        if qr_codes:
+            for qr in qr_codes:
+                qr_data = qr.data.decode('utf-8')
+                print(f"✅ QR Code detected: {qr_data[:50]}...")
+                qr_text += f"\n[QR CODE]: {qr_data}\n"
+        
+        return qr_text
+        
+    except Exception as e:
+        print(f"⚠️ Error detecting QR codes: {e}")
+        return ""
 
 def extract_text_from_pdf_with_ocr(file_path: str) -> str:
-    """Converte todas as páginas do PDF em imagens e corre Tesseract OCR."""
+    """Convert PDF pages to images and extract text with Tesseract OCR + QR codes"""
     try:
-        print("📷 A converter PDF para imagens (OCR em todas as páginas)…")
-        pages = convert_from_path(file_path, dpi=300)
+        # Convert ALL PDF pages to images (no page limit)
+        print(f"📄 Converting PDF to images for complete OCR processing...")
+        pages = convert_from_path(file_path, dpi=300)  # NO PAGE LIMIT - read everything!
+        
         all_text = ""
-        for i, page in enumerate(pages, 1):
-            print(f"🔍 OCR página {i}/{len(pages)}…")
-            ocr_text = pytesseract.image_to_string(page, lang='por', config='--psm 6')
-            all_text += f"\n--- Página {i} ---\n{ocr_text}\n"
-        print(f"✅ OCR terminou ({len(all_text)} caracteres).")
+        for i, page in enumerate(pages):
+            print(f"🔍 Processing page {i+1}/{len(pages)}...")
+            
+            # First, check for QR codes on this page
+            qr_text = detect_and_read_qrcodes(page)
+            if qr_text:
+                all_text += qr_text
+            
+            # Run enhanced OCR on each page
+            page_text = pytesseract.image_to_string(
+                page, 
+                config='--psm 6 --oem 3 -l por',  # Enhanced: PSM 6 (uniform block) + OEM 3 (best LSTM)
+                lang='por'
+            )
+            
+            if page_text.strip():
+                all_text += f"\n--- Página {i+1} ---\n{page_text}\n"
+                print(f"✅ Page {i+1}: {len(page_text)} characters extracted")
+            else:
+                print(f"⚠️ Page {i+1}: No text found")
+        
+        print(f"✅ Complete PDF OCR finished: {len(pages)} pages processed, {len(all_text)} total characters")
         return all_text.strip()
+        
     except Exception as e:
-        print(f"❌ Erro no OCR: {e}")
+        print(f"❌ Error with PDF OCR: {e}")
         return ""
 
 def extract_text_from_image(file_path: str) -> str:
-    """OCR para imagem (JPG/PNG/TIFF/BMP)."""
+    """Extract text using Tesseract OCR + QR code detection"""
     try:
         image = Image.open(file_path)
-        ocr_text = pytesseract.image_to_string(image, lang='por', config='--psm 6')
-        return ocr_text.strip()
+        
+        # Check for QR codes first
+        qr_text = detect_and_read_qrcodes(image)
+        
+        # Run enhanced OCR
+        ocr_text = pytesseract.image_to_string(
+            image, 
+            config='--psm 6 --oem 3 -l por',  # Enhanced config
+            lang='por'
+        )
+        
+        # Combine QR and OCR text
+        combined_text = qr_text + "\n" + ocr_text if qr_text else ocr_text
+        return combined_text.strip()
+        
     except Exception as e:
-        print(f"❌ OCR imagem erro: {e}")
+        print(f"Error with OCR: {e}")
         return ""
 
-# ----------------- Parse (cabeçalho + linhas + totais) a partir de TEXTO -----------------
-
-# filtros de ruído para não confundir moradas/IBAN com linhas de item
-NOISE_KEYWORDS = [
-    'iban','nib','morada','endereço','endereco','address',
-    'página','pagina','guia de remessa','nota de encomenda',
-    'doc','documento','telefone','telemóvel','email','e-mail',
-    'contribuinte','nif','código postal','zona industrial',
-    'código do cliente','cliente','fornecedor:'
-]
-NOISE_REGEXES = [
-    r'^\s*(p(á|a)gina)\s*\d+/?\d+\s*$',
-    r'^\s*\d{2}[/-]\d{2}[/-]\d{2,4}\s*$',
-    r'^\s*(n[ºo]\s*)?\d{6,}\s*$',
-]
-
-def is_noise_line(s: str) -> bool:
-    low = (s or "").lower()
-    if len(low) < 3:
-        return True
-    if any(kw in low for kw in NOISE_KEYWORDS):
-        return True
-    if any(re.search(rx, low, re.IGNORECASE) for rx in NOISE_REGEXES):
-        return True
-    # muitas palavras e sem números → provável morada/texto corrido
-    if not re.search(r'\d', low) and len(low.split()) >= 6:
-        return True
-    return False
-
-def extract_product_lines(text: str):
-    """
-    Foco: CÓDIGO FORNECEDOR (início da linha) + DESCRIÇÃO + QUANTIDADE (fim da linha).
-    Ex.: "CWH 1ECWH Nº 10955/25EU de 05-09-2025 .... 5,000"
-    """
-    products = []
-    for raw in text.split('\n'):
-        line = ' '.join((raw or '').strip().split())  # normaliza espaços
-        if len(line) < 4:
-            continue
-        if is_noise_line(line):
-            continue
-
-        # Código no INÍCIO (INA | CWH | U/N. | ADA | T50, etc.)
-        code_rx = r'^\s*(?P<code>[A-Z]{2,6}(?:[./-][A-Z0-9]{1,4})?)\b'
-        m_code = re.search(code_rx, line)
-        if not m_code:
-            continue
-
-        # Quantidade no FIM (5 | 5,0 | 5,000 | 1.234,50) com/sem "un/uni/unidades"
-        qty_rx = r'(?P<qty>\d{1,3}(?:[\.\s]?\d{3})*(?:,\d+)?|\d+(?:,\d+)?)(?:\s*(?:un|uni|unid|unidades))?\s*$'
-        m_qty = re.search(qty_rx, line, flags=re.IGNORECASE)
-        if not m_qty:
-            continue
-
-        code = m_code.group('code').upper()
-        qty  = normalize_qty_pt(m_qty.group('qty'))
-
-        # descrição = tudo entre o código e a quantidade
-        start_desc = m_code.end()
-        end_desc   = m_qty.start()
-        desc = line[start_desc:end_desc].strip(' -–:;')
-
-        # segurança extra contra moradas/cabeçalhos
-        if is_noise_line(desc):
-            continue
-
-        produto = {
-            "codigo_fornecedor": code,
-            "descricao": desc if desc else code,
-            "dimensoes": {"comprimento": 0, "largura": 0, "espessura": 0},
-            "quantidade": qty,
-            "unidade": "UNI",
-            "mini_codigo": ""
-        }
-        products.append(produto)
-
-    return products
-
 def parse_portuguese_document(text: str):
-    """Extrai header (doc/po/data/fornecedor), LINHAS e TOTAIS a partir do texto plano."""
+    """Parse Portuguese delivery receipt into structured data"""
+    lines = text.split('\n')
+    
     result = {
         "numero_requisicao": "",
         "document_number": "",
@@ -179,99 +177,157 @@ def parse_portuguese_document(text: str):
         "supplier_name": "",
         "delivery_date": "",
         "lines": [],
-        "totals": {"total_lines": 0, "total_quantity": 0},
-        # secção financeira heurística (se existir no texto)
-        "finance": {"total_mercadoria": None, "iva": None, "total_eur": None}
+        "totals": {"total_lines": 0, "total_quantity": 0}
     }
-
-    lines = text.split('\n')
-
-    # Cabeçalho (heurísticas tolerantes)
+    
+    # Extract key info with regex patterns
     patterns = {
-        "req": r"(?:req|requisição)\.?\s*n?[oº]?\s*:?\s*([A-Z0-9\-/]+)",
-        "doc": r"(?:guia|gr|documento)\.?\s*n?[oº]?\s*:?\s*([A-Z0-9\-/]+)",
-        "data": r"(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})",
-        "forn": r"(?:fornecedor|supplier|empresa)\.?\s*:?\s*([^\n]+)"
+        'req': r'(?:req|requisição)\.?\s*n?[oº]?\s*:?\s*([A-Z0-9\-/]+)',
+        'doc': r'(?:guia|gr|documento)\.?\s*n?[oº]?\s*:?\s*([A-Z0-9\-/]+)',
+        'data': r'(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})',
+        'fornecedor': r'(?:fornecedor|empresa)\.?\s*:?\s*([^\n]+)'
     }
-
-    for ln in lines:
-        low = ln.lower().strip()
-        if not result["numero_requisicao"]:
-            m = re.search(patterns["req"], low, re.IGNORECASE)
-            if m: result["numero_requisicao"] = m.group(1).upper()
-        if not result["document_number"]:
-            m = re.search(patterns["doc"], low, re.IGNORECASE)
-            if m:
-                result["document_number"] = m.group(1).upper()
-                result["po_number"] = result["document_number"]
-        if not result["delivery_date"]:
-            m = re.search(patterns["data"], ln)
-            if m: result["delivery_date"] = m.group(1)
-        if not result["supplier_name"]:
-            m = re.search(patterns["forn"], low)
-            if m: result["supplier_name"] = m.group(1).strip().title()
-
-    # Linhas de item (texto)
+    
+    for line in lines:
+        line_lower = line.lower().strip()
+        
+        # Extract requisition number
+        req_match = re.search(patterns['req'], line_lower, re.IGNORECASE)
+        if req_match and not result["numero_requisicao"]:
+            result["numero_requisicao"] = req_match.group(1).upper()
+        
+        # Extract document number  
+        doc_match = re.search(patterns['doc'], line_lower, re.IGNORECASE)
+        if doc_match and not result["document_number"]:
+            result["document_number"] = doc_match.group(1).upper()
+            result["po_number"] = doc_match.group(1).upper() # For compatibility
+        
+        # Extract date
+        date_match = re.search(patterns['data'], line)
+        if date_match and not result["delivery_date"]:
+            result["delivery_date"] = date_match.group(1)
+        
+        # Extract supplier
+        supplier_match = re.search(patterns['fornecedor'], line_lower)
+        if supplier_match and not result["supplier_name"]:
+            result["supplier_name"] = supplier_match.group(1).title()
+    
+    # Extract product lines
     product_lines = extract_product_lines(text)
-
+    
+    # Convert to legacy format for compatibility
     legacy_lines = []
-    for p in product_lines:
+    for produto in product_lines:
         legacy_lines.append({
-            "supplier_code": p["codigo_fornecedor"],
-            "description": p["descricao"],
-            "unit": p["unidade"],
-            "qty": p["quantidade"],
-            "mini_codigo": p["mini_codigo"],
-            "dimensoes": p["dimensoes"]
+            "supplier_code": produto["codigo_fornecedor"],
+            "description": produto["descricao"], 
+            "unit": produto["unidade"],
+            "qty": produto["quantidade"],
+            "mini_codigo": produto["mini_codigo"],
+            "dimensoes": produto["dimensoes"]
         })
-
+    
     result["lines"] = legacy_lines
     result["totals"]["total_lines"] = len(legacy_lines)
-    result["totals"]["total_quantity"] = sum(x["qty"] for x in legacy_lines)
-
-    # Totais (se existirem no texto — heurísticas)
-    full_text = "\n".join(lines)
-    def find_money(label_regex):
-        m = re.search(rf'{label_regex}\s+([0-9\.\s]*,\d{{2}}|\d+)', full_text, re.IGNORECASE)
-        return normalize_money_pt(m.group(1)) if m else None
-
-    result["finance"]["total_mercadoria"] = find_money(r'Total\s+Mercadoria')
-    result["finance"]["iva"] = find_money(r'IVA|Iva')
-    m_total = re.search(r'Total\s*\(EUR\)\s+([0-9\.\s]*,\d{2}|\d+)', full_text, re.IGNORECASE)
-    if m_total:
-        result["finance"]["total_eur"] = normalize_money_pt(m_total.group(1))
-
+    result["totals"]["total_quantity"] = sum(linha["qty"] for linha in legacy_lines)
+    
     return result
 
-# ----------------- Orquestração -----------------
+def extract_product_lines(text: str):
+    """Extract product lines from text"""
+    lines = text.split('\n')
+    products = []
+    
+    for line in lines:
+        line_clean = line.strip()
+        if len(line_clean) < 5:
+            continue
+            
+        # Look for product patterns
+        product_match = re.search(r'(BL[A-Z0-9\-]+|BLOCO[A-Z0-9\-\s]+|D\d+)', line, re.IGNORECASE)
+        if product_match:
+            produto = {
+                "codigo_fornecedor": product_match.group(1),
+                "descricao": line_clean,
+                "dimensoes": {"comprimento": 0, "largura": 0, "espessura": 0},
+                "quantidade": 0,
+                "unidade": "UNI",
+                "mini_codigo": ""
+            }
+            
+            # Extract dimensions
+            dim_match = re.search(r'(\d+)\s*x\s*(\d+)(?:\s*x\s*(\d+))?', line)
+            if dim_match:
+                try:
+                    produto["dimensoes"]["largura"] = int(dim_match.group(1))
+                    produto["dimensoes"]["comprimento"] = int(dim_match.group(2))
+                    if dim_match.group(3):
+                        produto["dimensoes"]["espessura"] = int(dim_match.group(3))
+                except ValueError:
+                    pass
+            
+            # Extract quantity
+            qty_match = re.search(r'(\d+(?:[.,]\d+)?)\s*(?:un|uni|unidades)', line, re.IGNORECASE)
+            if qty_match:
+                try:
+                    produto["quantidade"] = float(qty_match.group(1).replace(',', '.'))
+                except ValueError:
+                    produto["quantidade"] = 0
+            
+            # Generate mini código
+            produto["mini_codigo"] = generate_mini_codigo(produto)
+            products.append(produto)
+    
+    return products
 
-def real_ocr_extract(file_path: str):
-    """1) PyPDF2 → texto; 2) OCR fallback; 3) Parse textual."""
-    ext = os.path.splitext(file_path)[1].lower()
-    if ext == ".pdf":
-        text_content = extract_text_from_pdf(file_path)
-    elif ext in [".jpg", ".jpeg", ".png", ".tiff", ".bmp"]:
-        text_content = extract_text_from_image(file_path)
+def generate_mini_codigo(linha):
+    """Generate Mini Código"""
+    dimensoes = linha.get("dimensoes", {})
+    codigo = linha.get("codigo_fornecedor", "")
+    
+    comp = dimensoes.get("comprimento", 0)
+    larg = dimensoes.get("largura", 0)
+    esp = dimensoes.get("espessura", 0)
+    
+    # Extract density if present
+    densidade_match = re.search(r'(D\d+)', codigo)
+    densidade = densidade_match.group(1) if densidade_match else ""
+    
+    if all([comp, larg, esp]) and densidade:
+        return f"{densidade}-{larg}x{comp}x{esp}"
+    elif all([comp, larg, esp]):
+        return f"{larg}x{comp}x{esp}"
     else:
-        text_content = ""
+        return codigo
 
-    # Log de debug (primeiras linhas)
-    preview = "\n".join(text_content.splitlines()[:60])
-    print("---- PREVIEW TEXTO ----\n" + preview + "\n-----------------------")
-
-    if not text_content.strip():
-        return {
-            "error": "OCR failed - no text extracted from document",
-            "numero_requisicao": f"ERROR-{os.path.basename(file_path)}",
-            "document_number": "", "po_number": "",
-            "supplier_name": "", "delivery_date": "",
-            "lines": [], "totals": {"total_lines": 0, "total_quantity": 0},
-            "finance": {"total_mercadoria": None, "iva": None, "total_eur": None}
-        }
-
-    return parse_portuguese_document(text_content)
-
-# ----------------- Mapping / Matching / Export -----------------
+def get_realistic_fallback():
+    """Realistic fallback data when OCR fails"""
+    return {
+        "numero_requisicao": "REQ-2025-0045",
+        "document_number": "GR-2025-0234",
+        "po_number": "GR-2025-0234", 
+        "supplier_name": "Blocos Portugal SA",
+        "delivery_date": "25/09/2025",
+        "lines": [
+            {
+                "supplier_code": "BLC-D25-200x300x150",
+                "description": "Bloco betão celular D25 200x300x150",
+                "unit": "UNI",
+                "qty": 48,
+                "mini_codigo": "D25-200x300x150",
+                "dimensoes": {"comprimento": 300, "largura": 200, "espessura": 150}
+            },
+            {
+                "supplier_code": "BLC-D30-200x600x200", 
+                "description": "Bloco betão celular D30 200x600x200",
+                "unit": "UNI",
+                "qty": 24,
+                "mini_codigo": "D30-200x600x200",
+                "dimensoes": {"comprimento": 600, "largura": 200, "espessura": 200}
+            }
+        ],
+        "totals": {"total_lines": 2, "total_quantity": 72}
+    }
 
 def map_supplier_codes(supplier, payload):
     mapped = []
@@ -280,25 +336,30 @@ def map_supplier_codes(supplier, payload):
         mapping = CodeMapping.objects.filter(supplier=supplier, supplier_code=supplier_code).first()
         mapped.append({
             **l,
-            "internal_sku": (mapping.internal_sku if mapping else None),
-            "confidence": (mapping.confidence if mapping else 0.0),
+            "internal_sku": mapping.internal_sku if mapping else None,
+            "confidence": mapping.confidence if mapping else 0.0
         })
     return mapped
 
 @transaction.atomic
 def process_inbound(inbound: InboundDocument):
+    # Extract using real OCR
     payload = real_ocr_extract(inbound.file.path)
-
+    
+    # Check if OCR failed
     if payload.get("error"):
+        print(f"❌ OCR failed for document {inbound.id}: {payload['error']}")
+        # Create exception task for OCR failure
         ExceptionTask.objects.create(
-            inbound=inbound, line_ref="OCR",
+            inbound=inbound, 
+            line_ref="OCR", 
             issue=f"OCR extraction failed: {payload['error']}"
         )
-
+    
     inbound.parsed_payload = payload
     inbound.save()
 
-    # recria ReceiptLines
+    # Create receipt lines
     inbound.lines.all().delete()
     mapped_lines = map_supplier_codes(inbound.supplier, payload)
     for ml in mapped_lines:
@@ -306,128 +367,163 @@ def process_inbound(inbound: InboundDocument):
             inbound=inbound,
             supplier_code=ml["supplier_code"],
             maybe_internal_sku=ml.get("internal_sku") or "",
-            description=ml.get("description", ""),
-            unit=ml.get("unit", "UN"),
-            qty_received=ml.get("qty", 0),
+            description=ml.get("description",""),
+            unit=ml.get("unit","UN"),
+            qty_received=ml.get("qty",0)
         )
 
-    # tenta ligar à PO
+    # Try to link to PO by number
+    from .models import PurchaseOrder
     po = PurchaseOrder.objects.filter(number=payload.get("po_number")).first()
     if po:
         inbound.po = po
         inbound.save()
 
-    # Matching
+    # Matching rules: compare receipt vs PO lines
     ok = 0; issues = 0; exceptions = []
     if inbound.po:
         for r in inbound.lines.all():
             pol = None
             if r.maybe_internal_sku:
                 pol = POLine.objects.filter(po=inbound.po, internal_sku=r.maybe_internal_sku).first()
+            # If we don't have mapping, raise exception
             if not pol:
                 issues += 1
-                exceptions.append({"line": r.supplier_code, "issue": "Código não mapeado para SKU interno"})
+                exceptions.append({"line": r.supplier_code, "issue":"Código não mapeado para SKU interno", "suggested": ""})
                 continue
+            # quantity check with tolerance
             diff = float(r.qty_received) - float(pol.qty_ordered)
             if abs(diff) > float(pol.tolerance):
                 issues += 1
-                exceptions.append({
-                    "line": r.maybe_internal_sku,
-                    "issue": f"Quantidade divergente (recebida {r.qty_received} vs pedida {pol.qty_ordered} ± tol {pol.tolerance})"
-                })
+                exceptions.append({"line": r.maybe_internal_sku, "issue": f"Quantidade divergente (recebida {r.qty_received} vs pedida {pol.qty_ordered} ± tol {pol.tolerance})"})
             else:
                 ok += 1
     else:
+        # No PO linked, all lines become exceptions
         for r in inbound.lines.all():
             issues += 1
-            exceptions.append({"line": r.supplier_code, "issue": "PO não identificada"})
+            exceptions.append({"line": r.supplier_code, "issue": "PO não identificado no documento"})
 
+    # Persist match result
+    import uuid, json
     res, _ = MatchResult.objects.get_or_create(inbound=inbound)
+    
+    # Calculate line statistics for the chart
     total_lines_in_doc = len(payload.get("lines", []))
     lines_read_successfully = ok
     first_error_line = None
+    
+    # Find first error line number
     if exceptions:
+        # Try to find the line number in the document
         for idx, line in enumerate(payload.get("lines", []), 1):
-            code = line.get("supplier_code", "")
-            if any(code in ex.get("line", "") for ex in exceptions):
+            line_code = line.get("supplier_code", "")
+            if any(line_code in ex.get("line", "") for ex in exceptions):
                 first_error_line = idx
                 break
-
-    res.status = "matched" if issues == 0 else "exceptions"
+    
+    res.status = 'matched' if issues == 0 else 'exceptions'
     res.summary = {
-        "lines_ok": ok,
+        "lines_ok": ok, 
         "lines_issues": issues,
         "total_lines_in_document": total_lines_in_doc,
         "lines_read_successfully": lines_read_successfully,
         "first_error_line": first_error_line,
-        "last_successful_line": (lines_read_successfully or None),
+        "last_successful_line": lines_read_successfully if lines_read_successfully > 0 else None
     }
     res.certified_id = hashlib.sha256((str(inbound.id)+str(payload)).encode()).hexdigest()[:16]
     res.save()
 
+    # Store exception tasks
     inbound.exceptions.all().delete()
     for ex in exceptions:
         ExceptionTask.objects.create(inbound=inbound, line_ref=ex["line"], issue=ex["issue"])
     return res
 
 def export_document_to_excel(inbound_id: int) -> HttpResponse:
-    """Exporta: Nº Requisição, Mini Código, Dimensões, Quantidade, Código Fornecedor, Descrição."""
-    inbound = InboundDocument.objects.get(id=inbound_id)
-
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Requisição Processada"
-
-    headers = ["Nº Requisição", "Mini Código", "Dimensões (LxCxE)", "Quantidade", "Código Fornecedor", "Descrição"]
-    header_font = Font(bold=True, color="FFFFFF")
-    header_fill = PatternFill(start_color="FF6B35", end_color="FF6B35", fill_type="solid")
-
-    for col, header in enumerate(headers, 1):
-        cell = ws.cell(row=1, column=col, value=header)
-        cell.font = header_font
-        cell.fill = header_fill
-        cell.alignment = Alignment(horizontal="center")
-
-    numero_req = inbound.parsed_payload.get("numero_requisicao", "") or f"REQ-{inbound.id}"
-
-    for row, linha in enumerate(inbound.lines.all(), 2):
-        dimensoes = ""
-        mini_codigo = ""
-        for payload_line in inbound.parsed_payload.get("lines", []):
-            if payload_line.get("supplier_code") == linha.supplier_code:
-                dims = payload_line.get("dimensoes", {})
-                if dims and any(dims.values()):
-                    larg = dims.get('largura', 0)
-                    comp = dims.get('comprimento', 0)
-                    esp  = dims.get('espessura', 0)
-                    if larg and comp and esp:
-                        dimensoes = f"{larg}x{comp}x{esp}"
-                    elif larg and comp:
-                        dimensoes = f"{larg}x{comp}"
-                mini_codigo = payload_line.get("mini_codigo", "")
-                break
-
-        ws.cell(row=row, column=1, value=numero_req)
-        ws.cell(row=row, column=2, value=mini_codigo or linha.maybe_internal_sku)
-        ws.cell(row=row, column=3, value=dimensoes)
-        ws.cell(row=row, column=4, value=float(linha.qty_received))
-        ws.cell(row=row, column=5, value=linha.supplier_code)
-        ws.cell(row=row, column=6, value=linha.description)
-
-    # Ajuste automático de largura
-    for column in ws.columns:
-        max_length = 0
-        letter = column[0].column_letter
-        for cell in column:
-            try:
-                max_length = max(max_length, len(str(cell.value)))
-            except Exception:
-                pass
-        ws.column_dimensions[letter].width = min(max_length + 2, 50)
-
-    response = HttpResponse(
-        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    )
-    response['Content-Disposition'] = f'attachment; filename="requisicao_{numero_req}_{inbound.id}.xlsx"'
-    wb.save(response)
-    return response
+    """Export document data to Excel format"""
+    try:
+        inbound = InboundDocument.objects.get(id=inbound_id)
+        
+        # Create workbook
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Requisição Processada"
+        
+        # Headers
+        headers = ["Nº Requisição", "Mini Código", "Dimensões (LxCxE)", "Quantidade", "Código Fornecedor", "Descrição"]
+        
+        # Style headers
+        header_font = Font(bold=True, color="FFFFFF")
+        header_fill = PatternFill(start_color="FF6B35", end_color="FF6B35", fill_type="solid")
+        
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = Alignment(horizontal="center")
+        
+        # Data rows
+        numero_req = inbound.parsed_payload.get("numero_requisicao", "") or f"REQ-{inbound.id}"
+        
+        for row, linha in enumerate(inbound.lines.all(), 2):
+            # Get real dimensions from parsed payload, not internal SKU
+            dimensoes = ""
+            
+            # Extract actual dimensions from parsed payload
+            for payload_line in inbound.parsed_payload.get("lines", []):
+                if payload_line.get("supplier_code") == linha.supplier_code:
+                    dims = payload_line.get("dimensoes", {})
+                    if dims and any(dims.values()):
+                        larg = dims.get('largura', 0)
+                        comp = dims.get('comprimento', 0) 
+                        esp = dims.get('espessura', 0)
+                        if larg and comp and esp:
+                            dimensoes = f"{larg}x{comp}x{esp}"
+                        elif larg and comp:
+                            dimensoes = f"{larg}x{comp}"
+                    break
+            
+            # If no dimensions found, leave empty (don't use internal SKU)
+            if not dimensoes:
+                dimensoes = ""
+            
+            mini_codigo = ""
+            # Extract mini código from parsed payload
+            for payload_line in inbound.parsed_payload.get("lines", []):
+                if payload_line.get("supplier_code") == linha.supplier_code:
+                    mini_codigo = payload_line.get("mini_codigo", "")
+                    break
+            
+            ws.cell(row=row, column=1, value=numero_req)
+            ws.cell(row=row, column=2, value=mini_codigo or linha.maybe_internal_sku)
+            ws.cell(row=row, column=3, value=dimensoes)
+            ws.cell(row=row, column=4, value=float(linha.qty_received))
+            ws.cell(row=row, column=5, value=linha.supplier_code)
+            ws.cell(row=row, column=6, value=linha.description)
+        
+        # Auto-adjust column widths
+        for column in ws.columns:
+            max_length = 0
+            column_letter = column[0].column_letter
+            for cell in column:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            adjusted_width = min(max_length + 2, 50)
+            ws.column_dimensions[column_letter].width = adjusted_width
+        
+        # Create response
+        response = HttpResponse(
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = f'attachment; filename="requisicao_{numero_req}_{inbound.id}.xlsx"'
+        
+        wb.save(response)
+        return response
+        
+    except Exception as e:
+        print(f"Error exporting to Excel: {e}")
+        raise
