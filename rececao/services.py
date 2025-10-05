@@ -19,15 +19,15 @@ from django.db import transaction
 from .models import (InboundDocument, ReceiptLine, CodeMapping, MatchResult,
                      ExceptionTask, POLine, PurchaseOrder)
 
-# --- QR opcional (requer lib de sistema zbar) ---
+# --- QR code detection (usando OpenCV) ---
 try:
-    from pyzbar.pyzbar import decode
     import cv2
     import numpy as np
     QR_CODE_ENABLED = True
+    print("✅ QR code detection disponível (OpenCV)")
 except ImportError:
     QR_CODE_ENABLED = False
-    print("⚠️ QR code não disponível (instale zbar para ativar).")
+    print("⚠️ QR code não disponível (instale opencv-python para ativar)")
 
 # Se precisares especificar o caminho do tesseract no Windows:
 # pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
@@ -115,23 +115,43 @@ def extract_text_from_pdf(file_path: str):
 
 
 def detect_and_read_qrcodes(image, page_number=None):
-    """Lê QR codes e retorna lista estruturada."""
+    """Lê QR codes usando OpenCV e retorna lista estruturada."""
     if not QR_CODE_ENABLED:
         return []
 
     try:
         arr = np.array(image)
-        if len(arr.shape) == 3:
+        if len(arr.shape) == 3 and arr.shape[2] == 3:
             arr = cv2.cvtColor(arr, cv2.COLOR_RGB2BGR)
-        qr_codes = decode(arr)
+        elif len(arr.shape) == 3 and arr.shape[2] == 4:
+            arr = cv2.cvtColor(arr, cv2.COLOR_RGBA2BGR)
+        
+        # Usa o detector de QR code do OpenCV
+        detector = cv2.QRCodeDetector()
+        data, vertices_array, _ = detector.detectAndDecode(arr)
+        
         result = []
-        for qr in qr_codes or []:
-            data = qr.data.decode("utf-8")
+        if vertices_array is not None and data:
             print(f"✅ QR: {data[:80]}…")
             qr_info = {"data": data}
             if page_number is not None:
                 qr_info["page"] = page_number
             result.append(qr_info)
+        
+        # Tenta detectar múltiplos QR codes (OpenCV 4.5.4+)
+        try:
+            multi_data = detector.detectAndDecodeMulti(arr)
+            if multi_data[0]:  # Se detectou algum
+                for i, qr_data in enumerate(multi_data[1]):
+                    if qr_data and qr_data not in [r["data"] for r in result]:
+                        print(f"✅ QR: {qr_data[:80]}…")
+                        qr_info = {"data": qr_data}
+                        if page_number is not None:
+                            qr_info["page"] = page_number
+                        result.append(qr_info)
+        except:
+            pass  # Versão do OpenCV pode não suportar detectAndDecodeMulti
+        
         return result
     except Exception as e:
         print(f"⚠️ QR erro: {e}")
