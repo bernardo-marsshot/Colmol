@@ -315,6 +315,116 @@ def extract_text_from_image(file_path: str):
 # ----------------- PARSE: heurísticas PT -----------------
 
 
+def extract_guia_remessa_products(text: str):
+    """
+    Extrai produtos da tabela de Guia de Remessa com parser flexível.
+    Campos: Artigo, Descrição, Lote Produção, Quant., Un., Vol., Preço Un., Desconto, Iva, Total
+    """
+    products = []
+    lines = text.split("\n")
+    
+    current_ref = ""
+    
+    # Regex para detectar referências de ordem (mais flexível)
+    ref_pattern = re.compile(r"^\s*(\d[A-Z]{2,6}\s+N[oº°]\s*\d+[/\-]\d+[A-Z]{0,4}\s+de\s+\d{2}-\d{2}-\d{4})", re.IGNORECASE)
+    
+    # Regex mais flexível para linha de produto
+    # Formato: E0748001901  131,59 1  34,00 3,00 ML 3,99 23,00 5159-250602064 BALTIC fb, TOFFEE
+    # Artigo: letras + números (mais flexível)
+    # Volume: pode ser decimal
+    # Lote: pode estar vazio ou ter vários formatos
+    # Unidade: pode ter 2-10 caracteres
+    product_pattern = re.compile(
+        r"^([A-Z]+\d+[A-Z0-9]*)\s+"  # Artigo (flexível: E0748001901, ABC123, etc.)
+        r"([\d,\.]+)\s+"  # Total
+        r"([\d,\.]+)\s+"  # Volume (aceita decimais)
+        r"([\d,\.]+)\s+"  # Quantidade
+        r"([\d,\.]+)\s+"  # Desconto
+        r"([A-Z]{2,10})\s+"  # Unidade (mais flexível)
+        r"([\d,\.]+)\s+"  # Preço Unitário
+        r"([\d,\.]+)\s+"  # IVA
+        r"([\w\-#]*)\s*"  # Lote (opcional, pode estar vazio)
+        r"(.+?)\s*$",  # Descrição (resto da linha)
+        re.IGNORECASE
+    )
+    
+    for line in lines:
+        stripped = line.strip()
+        
+        # Verifica se é uma referência de ordem
+        ref_match = ref_pattern.match(stripped)
+        if ref_match:
+            current_ref = ref_match.group(1).strip()
+            continue
+        
+        # Verifica se é uma linha de produto
+        prod_match = product_pattern.match(stripped)
+        if prod_match:
+            try:
+                # Função auxiliar para normalizar números PT/EN
+                def normalize_number(value: str) -> float:
+                    """
+                    Converte número para float, suportando formatos PT e EN.
+                    PT: 1.234,56 (ponto=milhares, vírgula=decimal)
+                    EN: 1,234.56 ou 1234.56 (ponto=decimal)
+                    """
+                    value = value.strip()
+                    
+                    # Se tem vírgula, assume formato PT (vírgula é decimal)
+                    if "," in value:
+                        # Remove pontos (separadores de milhares)
+                        value = value.replace(".", "")
+                        # Substitui vírgula por ponto
+                        value = value.replace(",", ".")
+                    # Se tem ponto mas não tem vírgula, assume formato EN (ponto é decimal)
+                    # Remove apenas vírgulas que seriam separadores de milhares
+                    else:
+                        value = value.replace(",", "")
+                    
+                    return float(value)
+                
+                artigo = prod_match.group(1).strip()
+                total = normalize_number(prod_match.group(2))
+                volume = normalize_number(prod_match.group(3))
+                quantidade = normalize_number(prod_match.group(4))
+                desconto = normalize_number(prod_match.group(5))
+                unidade = prod_match.group(6).strip()
+                preco_un = normalize_number(prod_match.group(7))
+                iva = normalize_number(prod_match.group(8))
+                lote = prod_match.group(9).strip() if prod_match.group(9) else ""
+                descricao = prod_match.group(10).strip()
+                
+                # Validações básicas
+                if not artigo or not descricao:
+                    continue
+                
+                product = {
+                    "referencia_ordem": current_ref if current_ref else None,
+                    "artigo": artigo,
+                    "descricao": descricao,
+                    "lote_producao": lote if lote else None,
+                    "quantidade": quantidade,
+                    "unidade": unidade,
+                    "volume": volume,
+                    "preco_unitario": preco_un,
+                    "desconto": desconto,
+                    "iva": iva,
+                    "total": total
+                }
+                
+                products.append(product)
+            except (ValueError, IndexError) as e:
+                print(f"⚠️ Erro ao parsear linha de produto '{stripped[:50]}...': {e}")
+                continue
+    
+    if products:
+        print(f"✅ Extraídos {len(products)} produtos da Guia de Remessa")
+    else:
+        print("⚠️ Nenhum produto encontrado no formato Guia de Remessa")
+    
+    return products
+
+
 def parse_portuguese_document(text: str, qr_codes=None):
     """Extrai cabeçalho (req/doc/fornecedor/data) e linhas de produto."""
     if qr_codes is None:
@@ -328,6 +438,7 @@ def parse_portuguese_document(text: str, qr_codes=None):
         "supplier_name": "",
         "delivery_date": "",
         "qr_codes": qr_codes,
+        "produtos": [],  # Nova estrutura para produtos da guia de remessa
         "lines": [],
         "totals": {
             "total_lines": 0,
@@ -366,23 +477,30 @@ def parse_portuguese_document(text: str, qr_codes=None):
             if m:
                 result["supplier_name"] = m.group(1).title()
 
-    product_lines = extract_product_lines(text)
-
-    legacy = []
-    for p in product_lines:
-        legacy.append({
-            "supplier_code": p["codigo_fornecedor"],
-            "description": p["descricao"],
-            "linha_raw": p["linha_raw"],
-            "unit": p["unidade"],
-            "qty": p["quantidade"],
-            "mini_codigo": p["mini_codigo"],
-            "dimensoes": p["dimensoes"],
-        })
-
-    result["lines"] = legacy
-    result["totals"]["total_lines"] = len(legacy)
-    result["totals"]["total_quantity"] = sum(x["qty"] for x in legacy)
+    # Extrai produtos da Guia de Remessa (novo formato)
+    guia_products = extract_guia_remessa_products(text)
+    if guia_products:
+        result["produtos"] = guia_products
+        result["totals"]["total_lines"] = len(guia_products)
+        result["totals"]["total_quantity"] = sum(p["quantidade"] for p in guia_products)
+    else:
+        # Fallback: usa extração antiga se não encontrar produtos no novo formato
+        product_lines = extract_product_lines(text)
+        legacy = []
+        for p in product_lines:
+            legacy.append({
+                "supplier_code": p["codigo_fornecedor"],
+                "description": p["descricao"],
+                "linha_raw": p["linha_raw"],
+                "unit": p["unidade"],
+                "qty": p["quantidade"],
+                "mini_codigo": p["mini_codigo"],
+                "dimensoes": p["dimensoes"],
+            })
+        result["lines"] = legacy
+        result["totals"]["total_lines"] = len(legacy)
+        result["totals"]["total_quantity"] = sum(x["qty"] for x in legacy)
+    
     return result
 
 
