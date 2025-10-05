@@ -125,6 +125,36 @@ def extract_text_from_pdf(file_path: str):
         return extract_text_from_pdf_with_ocr(file_path)
 
 
+def parse_qrcode_fiscal_pt(qr_data: str):
+    """Parse de QR code fiscal português (formato A:valor*B:valor*...)."""
+    try:
+        if not qr_data or "*" not in qr_data:
+            return None
+        
+        parsed = {}
+        fields = qr_data.split("*")
+        
+        for field in fields:
+            if ":" in field:
+                key, value = field.split(":", 1)
+                # Mantém como string (não converte para número)
+                parsed[key] = value
+        
+        # Valida se é realmente um QR fiscal português
+        # QR fiscal deve ter pelo menos os campos A (NIF emitente) e outros campos básicos
+        if not parsed or "A" not in parsed:
+            return None
+        
+        # Verifica se tem campos típicos de QR fiscal PT (A, B, C, D, etc.)
+        fiscal_fields = set("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+        has_fiscal_pattern = any(key in fiscal_fields for key in parsed.keys())
+        
+        return parsed if has_fiscal_pattern else None
+    except Exception as e:
+        print(f"⚠️ Erro ao parsear QR fiscal: {e}")
+        return None
+
+
 def detect_and_read_qrcodes(image, page_number=None):
     """Lê QR codes usando OpenCV e retorna lista estruturada."""
     if not QR_CODE_ENABLED:
@@ -144,9 +174,22 @@ def detect_and_read_qrcodes(image, page_number=None):
         result = []
         if vertices_array is not None and data:
             print(f"✅ QR: {data[:80]}…")
-            qr_info = {"data": data}
+            
+            # Tenta parsear QR code fiscal português
+            parsed = parse_qrcode_fiscal_pt(data)
+            if parsed:
+                # Se parseou com sucesso, coloca os dados estruturados no campo "data"
+                qr_info = {
+                    "data": parsed,
+                    "raw_data": data
+                }
+            else:
+                # Se não conseguiu parsear, mantém como string
+                qr_info = {"data": data}
+            
             if page_number is not None:
                 qr_info["page"] = page_number
+            
             result.append(qr_info)
         
         # Tenta detectar múltiplos QR codes (OpenCV 4.5.4+)
@@ -154,11 +197,29 @@ def detect_and_read_qrcodes(image, page_number=None):
             multi_data = detector.detectAndDecodeMulti(arr)
             if multi_data[0]:  # Se detectou algum
                 for i, qr_data in enumerate(multi_data[1]):
-                    if qr_data and qr_data not in [r["data"] for r in result]:
+                    # Verifica se já não foi adicionado
+                    already_added = False
+                    for existing in result:
+                        if existing.get("raw_data") == qr_data or existing.get("data") == qr_data:
+                            already_added = True
+                            break
+                    
+                    if qr_data and not already_added:
                         print(f"✅ QR: {qr_data[:80]}…")
-                        qr_info = {"data": qr_data}
+                        
+                        # Tenta parsear QR code fiscal português
+                        parsed = parse_qrcode_fiscal_pt(qr_data)
+                        if parsed:
+                            qr_info = {
+                                "data": parsed,
+                                "raw_data": qr_data
+                            }
+                        else:
+                            qr_info = {"data": qr_data}
+                        
                         if page_number is not None:
                             qr_info["page"] = page_number
+                        
                         result.append(qr_info)
         except:
             pass  # Versão do OpenCV pode não suportar detectAndDecodeMulti
