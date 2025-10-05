@@ -1,5 +1,6 @@
 # rececao/services.py
 import hashlib
+import json
 import os
 import re
 from io import BytesIO
@@ -11,6 +12,7 @@ from pdf2image import convert_from_path
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill
 
+from django.conf import settings
 from django.http import HttpResponse
 from django.db import transaction
 
@@ -33,6 +35,19 @@ except ImportError:
 # ----------------- OCR: PDF/Imagens -----------------
 
 
+def save_extraction_to_json(data: dict, filename: str = "extracao.json"):
+    """Salva os dados extraídos em um arquivo JSON."""
+    try:
+        json_path = os.path.join(settings.BASE_DIR, filename)
+        with open(json_path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        print(f"✅ Dados salvos em {json_path}")
+        return json_path
+    except Exception as e:
+        print(f"❌ Erro ao salvar JSON: {e}")
+        return None
+
+
 def real_ocr_extract(file_path: str):
     """OCR real (Tesseract). Extrai texto e faz parse para estrutura."""
     text_content = ""
@@ -51,7 +66,7 @@ def real_ocr_extract(file_path: str):
 
     if not text_content.strip():
         print("❌ OCR vazio")
-        return {
+        error_result = {
             "error": "OCR failed - no text extracted from document",
             "numero_requisicao": f"ERROR-{os.path.basename(file_path)}",
             "document_number": "",
@@ -64,8 +79,12 @@ def real_ocr_extract(file_path: str):
                 "total_quantity": 0
             },
         }
+        save_extraction_to_json(error_result)
+        return error_result
 
-    return parse_portuguese_document(text_content)
+    result = parse_portuguese_document(text_content)
+    save_extraction_to_json(result)
+    return result
 
 
 def extract_text_from_pdf(file_path: str) -> str:
