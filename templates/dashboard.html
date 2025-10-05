@@ -1,32 +1,18 @@
 {% extends "base.html" %}
+
+{% block page_head %}
+  <!-- Chart.js só nesta página -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
+
 {% block content %}
 <h1 class="mb-3">Painel de Controlo</h1>
 
 <div class="row g-3">
-  <div class="col-md-3">
-    <div class="card p-3">
-      <div>Total de Documentos</div>
-      <h3>{{ total_docs }}</h3>
-    </div>
-  </div>
-  <div class="col-md-3">
-    <div class="card p-3">
-      <div>Processado</div>
-      <h3>{{ matched }}</h3>
-    </div>
-  </div>
-  <div class="col-md-3">
-    <div class="card p-3">
-      <div>Com Exceções</div>
-      <h3>{{ exceptions }}</h3>
-    </div>
-  </div>
-  <div class="col-md-3">
-    <div class="card p-3">
-      <div>Fornecedores</div>
-      <h3>{{ suppliers }}</h3>
-    </div>
-  </div>
+  <div class="col-md-3"><div class="card p-3"><div>Total de Documentos</div><h3>{{ total_docs }}</h3></div></div>
+  <div class="col-md-3"><div class="card p-3"><div>Processado</div><h3>{{ matched }}</h3></div></div>
+  <div class="col-md-3"><div class="card p-3"><div>Com Exceções</div><h3>{{ exceptions }}</h3></div></div>
+  <div class="col-md-3"><div class="card p-3"><div>Fornecedores</div><h3>{{ suppliers }}</h3></div></div>
 </div>
 
 <div class="row mt-4">
@@ -57,87 +43,51 @@
   <div class="d-flex justify-content-between align-items-center mb-3">
     <h5 class="mb-0">Últimos documentos</h5>
     <div class="d-flex gap-3 flex-wrap">
-      <small class="d-flex align-items-center gap-1">
-        <span class="badge bg-success">✓</span>
-        <span class="text-muted">Processado</span>
-      </small>
-      <small class="d-flex align-items-center gap-1">
-        <span class="badge bg-warning">!</span>
-        <span class="text-muted">Com exceções</span>
-      </small>
-      <small class="d-flex align-items-center gap-1">
-        <span class="badge bg-danger">✗</span>
-        <span class="text-muted">Erro</span>
-      </small>
-      <small class="d-flex align-items-center gap-1">
-        <span class="badge bg-secondary">-</span>
-        <span class="text-muted">Pendente</span>
-      </small>
+      <small class="d-flex align-items-center gap-1"><span class="badge bg-success">✓</span><span class="text-muted">Processado</span></small>
+      <small class="d-flex align-items-center gap-1"><span class="badge bg-warning">!</span><span class="text-muted">Com exceções</span></small>
+      <small class="d-flex align-items-center gap-1"><span class="badge bg-danger">✗</span><span class="text-muted">Erro</span></small>
+      <small class="d-flex align-items-center gap-1"><span class="badge bg-secondary">-</span><span class="text-muted">Pendente</span></small>
     </div>
   </div>
 
   {% for d in latest %}
   <div class="mb-3">
     <div class="row align-items-center">
-      <div class="col-md-2">
-        <small class="text-muted">{{ d.received_at|date:"d/m H:i" }}</small>
-      </div>
-      <div class="col-md-2">
-        <span class="text-muted">{{ d.supplier.name }}</span>
-      </div>
+      <div class="col-md-2"><small class="text-muted">{{ d.received_at|date:"d/m H:i" }}</small></div>
+      <div class="col-md-2"><span class="text-muted">{{ d.supplier.name }}</span></div>
       <div class="col-md-4">
         <a href="{% url 'inbound_detail' d.pk %}" class="btn-bizneo-document">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"
-            aria-hidden="true">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" stroke-width="2"
-              stroke-linecap="round" stroke-linejoin="round" />
-            <polyline points="14,2 14,8 20,8" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-              stroke-linejoin="round" />
-            <line x1="16" y1="13" x2="8" y2="13" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-              stroke-linejoin="round" />
-            <line x1="16" y1="17" x2="8" y2="17" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-              stroke-linejoin="round" />
-          </svg>
-          {{ d.get_doc_type_display }} {{ d.number }}
+          <i class="bi bi-file-earmark-text"></i> {{ d.get_doc_type_display }} {{ d.number }}
         </a>
       </div>
       <div class="col-md-1">
-        {% if d.po %}
-        <small class="text-muted">{{ d.po.number }}</small>
-        {% else %}
-        <small class="text-muted">-</small>
-        {% endif %}
+        {% if d.po %}<small class="text-muted">{{ d.po.number }}</small>{% else %}<small class="text-muted">-</small>{% endif %}
       </div>
       <div class="col-md-3 d-flex align-items-center gap-2">
         {% if d.match_result %}
-        {% if d.match_result.status == 'matched' %}
-        <span class="badge bg-success">✓</span>
-        {% elif d.match_result.status == 'exception' %}
-        <span class="badge bg-warning">!</span>
-        {% elif d.match_result.status == 'error' %}
-        <span class="badge bg-danger">✗</span>
+          {% if d.match_result.status == 'matched' %}
+            <span class="badge bg-success">✓</span>
+          {% elif d.match_result.status == 'exceptions' %}
+            <span class="badge bg-warning">!</span>
+          {% elif d.match_result.status == 'error' %}
+            <span class="badge bg-danger">✗</span>
+          {% else %}
+            <span class="badge bg-secondary">-</span>
+          {% endif %}
         {% else %}
-        <span class="badge bg-secondary">-</span>
+          <span class="badge bg-secondary">-</span>
         {% endif %}
-        {% else %}
-        <span class="badge bg-secondary">-</span>
-        {% endif %}
-        
-        <!-- Compact progress bar next to badge -->
+
         <div class="d-flex align-items-center gap-1 flex-grow-1">
           <div class="progress" style="height: 6px; width: 80px; background-color: #e9ecef;">
             {% if d.reading_percentage == 100 %}
-            <div class="progress-bar bg-success" role="progressbar" style="width: {{ d.reading_percentage }}%;" 
-                 aria-valuenow="{{ d.reading_percentage }}" aria-valuemin="0" aria-valuemax="100"></div>
+              <div class="progress-bar bg-success" role="progressbar" style="width: {{ d.reading_percentage }}%;"></div>
             {% elif d.reading_percentage >= 50 %}
-            <div class="progress-bar bg-warning" role="progressbar" style="width: {{ d.reading_percentage }}%;" 
-                 aria-valuenow="{{ d.reading_percentage }}" aria-valuemin="0" aria-valuemax="100"></div>
+              <div class="progress-bar bg-warning" role="progressbar" style="width: {{ d.reading_percentage }}%;"></div>
             {% elif d.reading_percentage > 0 %}
-            <div class="progress-bar bg-danger" role="progressbar" style="width: {{ d.reading_percentage }}%;" 
-                 aria-valuenow="{{ d.reading_percentage }}" aria-valuemin="0" aria-valuemax="100"></div>
+              <div class="progress-bar bg-danger" role="progressbar" style="width: {{ d.reading_percentage }}%;"></div>
             {% else %}
-            <div class="progress-bar bg-secondary" role="progressbar" style="width: 0%;" 
-                 aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+              <div class="progress-bar bg-secondary" role="progressbar" style="width: 0%;"></div>
             {% endif %}
           </div>
           <small class="text-muted" style="min-width: 35px; font-size: 0.75rem;">{{ d.reading_percentage }}%</small>
@@ -146,169 +96,34 @@
     </div>
   </div>
   {% empty %}
-  <div class="text-center py-4">
-    <p class="text-muted mb-0">Sem documentos ainda.</p>
-  </div>
+  <div class="text-center py-4"><p class="text-muted mb-0">Sem documentos ainda.</p></div>
   {% endfor %}
 </div>
 
-{# Garante que o Chart.js está carregado. Se já o incluis no base.html, podes remover a linha abaixo. #}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-<script>
-const ctx = document.getElementById('kpiChart');
-new Chart(ctx, {
-  type: 'doughnut',
-  data: {
-    labels: ['Processado', 'Com exceções', 'Erro', 'Pendente'],
-    datasets: [{
-      data: [{{ matched }}, {{ exceptions }}, {{ errors|default:0 }}, {{ pending|default:0 }}],
-      backgroundColor: [
-        '#198754',  // Verde (bg-success) - Processado
-        '#ffc107',  // Amarelo (bg-warning) - Com exceções
-        '#dc3545',  // Vermelho (bg-danger) - Erro
-        '#6c757d'   // Cinzento (bg-secondary) - Pendente
-      ],
-      borderColor: [
-        '#198754',
-        '#ffc107',
-        '#dc3545',
-        '#6c757d'
-      ],
-      borderWidth: 2
-    }]
-  },
-  options: {
-    responsive: true,
-    plugins: {
-      legend: {
-        labels: {
-          color: '#000000',
-          font: { size: 14, weight: 'normal' },
-          usePointStyle: true
-        }
-      },
-      tooltip: {
-        callbacks: {
-          label: function(context) {
-            const total = {{ total_docs|default:0 }};
-            const val = context.parsed;
-            const pct = total ? (val * 100 / total).toFixed(1) : 0;
-            return context.label + ': ' + val + ' (' + pct + '%)';
-          }
-        }
-      }
-    },
-    elements: { 
-      arc: { borderWidth: 3 } 
-    }
-  }
-});
-
-{% if latest_doc_stats.has_doc %}
-// Second chart - Line Reading Statistics
-const lineCtx = document.getElementById('lineReadingChart');
-new Chart(lineCtx, {
-  type: 'doughnut',
-  data: {
-    labels: ['Linhas Lidas', 'Linhas com Erro'],
-    datasets: [{
-      data: [{{ latest_doc_stats.lines_read }}, {{ latest_doc_stats.lines_error }}],
-      backgroundColor: [
-        '#198754',  // Verde para linhas lidas
-        '#dc3545'   // Vermelho para linhas com erro
-      ],
-      borderColor: [
-        '#198754',
-        '#dc3545'
-      ],
-      borderWidth: 2
-    }]
-  },
-  options: {
-    responsive: true,
-    plugins: {
-      legend: {
-        labels: {
-          color: '#000000',
-          font: { size: 14, weight: 'normal' },
-          usePointStyle: true
-        }
-      },
-      tooltip: {
-        callbacks: {
-          label: function(context) {
-            const total = {{ latest_doc_stats.total_lines }};
-            const val = context.parsed;
-            const pct = total ? (val * 100 / total).toFixed(1) : 0;
-            return context.label + ': ' + val + ' (' + pct + '%)';
-          }
-        }
-      }
-    },
-    elements: { 
-      arc: { borderWidth: 3 } 
-    },
-    onClick: function() {
-      showLineDetails();
-    }
-  }
-});
-
-// Function to show modal with line details
-function showLineDetails() {
-  const modal = new bootstrap.Modal(document.getElementById('lineDetailsModal'));
-  modal.show();
-}
-{% endif %}
-</script>
-
-<!-- Modal for Line Reading Details -->
+<!-- Modal Detalhes de Leitura -->
 <div class="modal fade" id="lineDetailsModal" tabindex="-1" aria-labelledby="lineDetailsModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
       <div class="modal-header" style="background-color: #FF6B35; color: white;">
         <h5 class="modal-title" id="lineDetailsModalLabel">Detalhes de Leitura do Documento</h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
       </div>
       <div class="modal-body">
         {% if latest_doc_stats.has_doc %}
         <div class="mb-3">
           <h6 class="text-muted mb-2">Informação do Documento</h6>
-          <div class="d-flex justify-content-between mb-1">
-            <span><strong>Tipo:</strong></span>
-            <span>{{ latest_doc_stats.doc_type }}</span>
-          </div>
-          <div class="d-flex justify-content-between mb-1">
-            <span><strong>Número:</strong></span>
-            <span>{{ latest_doc_stats.doc_number }}</span>
-          </div>
-          <div class="d-flex justify-content-between mb-1">
-            <span><strong>Fornecedor:</strong></span>
-            <span>{{ latest_doc_stats.supplier_name }}</span>
-          </div>
+          <div class="d-flex justify-content-between mb-1"><span><strong>Tipo:</strong></span><span>{{ latest_doc_stats.doc_type }}</span></div>
+          <div class="d-flex justify-content-between mb-1"><span><strong>Número:</strong></span><span>{{ latest_doc_stats.doc_number }}</span></div>
+          <div class="d-flex justify-content-between mb-1"><span><strong>Fornecedor:</strong></span><span>{{ latest_doc_stats.supplier_name }}</span></div>
         </div>
-        
         <hr>
-        
         <div class="mb-3">
           <h6 class="text-muted mb-2">Estatísticas de Leitura</h6>
-          <div class="d-flex justify-content-between mb-1">
-            <span><strong>Total de Linhas:</strong></span>
-            <span class="badge bg-secondary">{{ latest_doc_stats.total_lines }}</span>
-          </div>
-          <div class="d-flex justify-content-between mb-1">
-            <span><strong>Linhas Lidas com Sucesso:</strong></span>
-            <span class="badge bg-success">{{ latest_doc_stats.lines_read }}</span>
-          </div>
-          <div class="d-flex justify-content-between mb-1">
-            <span><strong>Linhas com Erro:</strong></span>
-            <span class="badge bg-danger">{{ latest_doc_stats.lines_error }}</span>
-          </div>
+          <div class="d-flex justify-content-between mb-1"><span><strong>Total de Linhas:</strong></span><span class="badge bg-secondary">{{ latest_doc_stats.total_lines }}</span></div>
+          <div class="d-flex justify-content-between mb-1"><span><strong>Linhas Lidas com Sucesso:</strong></span><span class="badge bg-success">{{ latest_doc_stats.lines_read }}</span></div>
+          <div class="d-flex justify-content-between mb-1"><span><strong>Linhas com Erro:</strong></span><span class="badge bg-danger">{{ latest_doc_stats.lines_error }}</span></div>
         </div>
-        
         <hr>
-        
         <div>
           <h6 class="text-muted mb-2">Posição no Documento</h6>
           {% if latest_doc_stats.last_line_read %}
@@ -316,17 +131,14 @@ function showLineDetails() {
             <i class="bi bi-check-circle"></i> Lido até linha: <strong>{{ latest_doc_stats.last_line_read }}</strong>
           </div>
           {% endif %}
-          
           {% if latest_doc_stats.first_error_line %}
           <div class="alert alert-danger mb-0" role="alert">
             <i class="bi bi-x-circle"></i> Erro a partir da linha: <strong>{{ latest_doc_stats.first_error_line }}</strong>
           </div>
-          {% else %}
-          {% if latest_doc_stats.lines_error > 0 %}
+          {% elif latest_doc_stats.lines_error > 0 %}
           <div class="alert alert-warning mb-0" role="alert">
             <i class="bi bi-exclamation-triangle"></i> Documento com exceções (linha de erro não identificada)
           </div>
-          {% endif %}
           {% endif %}
         </div>
         {% endif %}
@@ -337,5 +149,66 @@ function showLineDetails() {
     </div>
   </div>
 </div>
+{% endblock %}
 
+{% block page_scripts %}
+<script>
+(function(){
+  // KPI doughnut
+  const kpiCtx = document.getElementById('kpiChart');
+  new Chart(kpiCtx, {
+    type: 'doughnut',
+    data: {
+      labels: ['Processado', 'Com exceções', 'Erro', 'Pendente'],
+      datasets: [{
+        data: [{{ matched }}, {{ exceptions }}, {{ errors|default:0 }}, {{ pending|default:0 }}],
+        backgroundColor: ['#198754','#ffc107','#dc3545','#6c757d'],
+        borderColor: ['#198754','#ffc107','#dc3545','#6c757d'],
+        borderWidth: 2
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { labels: { color: '#e8eaed', usePointStyle: true } },
+        tooltip: {
+          callbacks: {
+            label: function(ctx) {
+              const total = {{ total_docs|default:0 }};
+              const val = ctx.parsed;
+              const pct = total ? (val * 100 / total).toFixed(1) : 0;
+              return ctx.label + ': ' + val + ' (' + pct + '%)';
+            }
+          }
+        }
+      }
+    }
+  });
+
+  // Último documento (se existir)
+  {% if latest_doc_stats.has_doc %}
+  const lineCtx = document.getElementById('lineReadingChart');
+  new Chart(lineCtx, {
+    type: 'doughnut',
+    data: {
+      labels: ['Linhas Lidas', 'Linhas com Erro'],
+      datasets: [{
+        data: [{{ latest_doc_stats.lines_read }}, {{ latest_doc_stats.lines_error }}],
+        backgroundColor: ['#198754','#dc3545'],
+        borderColor: ['#198754','#dc3545'],
+        borderWidth: 2
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { labels: { color: '#e8eaed', usePointStyle: true } } }
+    }
+  });
+  {% endif %}
+})();
+function showLineDetails(){
+  const modal = new bootstrap.Modal(document.getElementById('lineDetailsModal'));
+  modal.show();
+}
+</script>
 {% endblock %}
