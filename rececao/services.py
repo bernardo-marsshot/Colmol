@@ -126,30 +126,76 @@ def extract_text_from_pdf(file_path: str):
 
 
 def parse_qrcode_fiscal_pt(qr_data: str):
-    """Parse de QR code fiscal português (formato A:valor*B:valor*...)."""
+    """Parse de QR code fiscal português (formato A:valor*B:valor*...) com nomes descritivos."""
+    
+    # Mapeamento dos códigos para nomes descritivos (Especificações Técnicas AT)
+    FIELD_NAMES = {
+        "A": "nif_emitente",
+        "B": "nif_adquirente",
+        "C": "pais_adquirente",
+        "D": "tipo_documento",
+        "E": "estado_documento",
+        "F": "data_documento",
+        "G": "identificacao_documento",
+        "H": "atcud",
+        "I1": "espaco_fiscal",
+        "I2": "base_tributavel_isenta_iva",
+        "I3": "base_tributavel_taxa_reduzida",
+        "I4": "total_iva_taxa_reduzida",
+        "I5": "base_tributavel_taxa_intermedia",
+        "I6": "total_iva_taxa_intermedia",
+        "I7": "base_tributavel_taxa_normal",
+        "I8": "total_iva_taxa_normal",
+        "J1": "espaco_fiscal_2",
+        "J2": "base_tributavel_isenta_iva_2",
+        "J3": "base_tributavel_taxa_reduzida_2",
+        "J4": "total_iva_taxa_reduzida_2",
+        "J5": "base_tributavel_taxa_intermedia_2",
+        "J6": "total_iva_taxa_intermedia_2",
+        "J7": "base_tributavel_taxa_normal_2",
+        "J8": "total_iva_taxa_normal_2",
+        "K1": "espaco_fiscal_3",
+        "K2": "base_tributavel_isenta_iva_3",
+        "K3": "base_tributavel_taxa_reduzida_3",
+        "K4": "total_iva_taxa_reduzida_3",
+        "K5": "base_tributavel_taxa_intermedia_3",
+        "K6": "total_iva_taxa_intermedia_3",
+        "K7": "base_tributavel_taxa_normal_3",
+        "K8": "total_iva_taxa_normal_3",
+        "L": "nao_sujeito_iva",
+        "M": "imposto_selo",
+        "N": "total_impostos",
+        "O": "total_documento",
+        "P": "retencao_na_fonte",
+        "Q": "hash",
+        "R": "certificado",
+        "S": "outras_infos"
+    }
+    
     try:
         if not qr_data or "*" not in qr_data:
             return None
         
-        parsed = {}
+        parsed_raw = {}
         fields = qr_data.split("*")
         
         for field in fields:
             if ":" in field:
                 key, value = field.split(":", 1)
-                # Mantém como string (não converte para número)
-                parsed[key] = value
+                parsed_raw[key] = value
         
         # Valida se é realmente um QR fiscal português
-        # QR fiscal deve ter pelo menos os campos A (NIF emitente) e outros campos básicos
-        if not parsed or "A" not in parsed:
+        # QR fiscal deve ter pelo menos o campo A (NIF emitente)
+        if not parsed_raw or "A" not in parsed_raw:
             return None
         
-        # Verifica se tem campos típicos de QR fiscal PT (A, B, C, D, etc.)
-        fiscal_fields = set("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
-        has_fiscal_pattern = any(key in fiscal_fields for key in parsed.keys())
+        # Converte para nomes descritivos
+        parsed = {}
+        for code, value in parsed_raw.items():
+            field_name = FIELD_NAMES.get(code, code)
+            parsed[field_name] = value
         
-        return parsed if has_fiscal_pattern else None
+        return parsed if parsed else None
     except Exception as e:
         print(f"⚠️ Erro ao parsear QR fiscal: {e}")
         return None
