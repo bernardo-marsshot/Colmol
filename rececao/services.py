@@ -104,7 +104,18 @@ def extract_text_from_pdf(file_path: str):
 
         if text.strip() and len(text.strip()) > 50:
             print(f"✅ PDF text extraction: {len(text)} chars")
-            return text.strip(), []
+            # Mesmo com texto embutido, tenta detectar QR codes
+            qr_codes = []
+            if QR_CODE_ENABLED:
+                try:
+                    print("🔍 Procurando QR codes no PDF...")
+                    pages = convert_from_path(file_path, dpi=300)
+                    for page_num, page_img in enumerate(pages, start=1):
+                        page_qr = detect_and_read_qrcodes(page_img, page_number=page_num)
+                        qr_codes.extend(page_qr)
+                except Exception as e:
+                    print(f"⚠️ Erro ao buscar QR codes: {e}")
+            return text.strip(), qr_codes
 
         print("📄 PDF sem texto embutido—usar OCR…")
         return extract_text_from_pdf_with_ocr(file_path)
