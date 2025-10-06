@@ -856,19 +856,38 @@ def export_document_to_excel(inbound_id: int) -> HttpResponse:
         dimensoes = ""
         mini_codigo = ""
 
-        for payload_line in inbound.parsed_payload.get("lines", []):
-            if payload_line.get("supplier_code") == linha.supplier_code:
-                dims = payload_line.get("dimensoes", {})
-                if dims and any(dims.values()):
-                    larg = dims.get("largura", 0)
-                    comp = dims.get("comprimento", 0)
-                    esp = dims.get("espessura", 0)
-                    if larg and comp and esp:
-                        dimensoes = f"{larg}x{comp}x{esp}"
-                    elif larg and comp:
-                        dimensoes = f"{larg}x{comp}"
-                mini_codigo = payload_line.get("mini_codigo", "")
-                break
+        # Formato Guia de Remessa (novo): procura em 'produtos' usando article_code
+        if inbound.parsed_payload.get("produtos"):
+            for produto in inbound.parsed_payload.get("produtos", []):
+                # Match usando article_code (código do produto único)
+                if produto.get("artigo") == linha.article_code:
+                    dims = produto.get("dimensoes", {})
+                    if dims and any(dims.values()):
+                        larg = dims.get("largura", 0)
+                        comp = dims.get("comprimento", 0)
+                        esp = dims.get("espessura", 0)
+                        if larg and comp and esp:
+                            dimensoes = f"{larg}x{comp}x{esp}"
+                        elif larg and comp:
+                            dimensoes = f"{larg}x{comp}"
+                    mini_codigo = produto.get("mini_codigo", "")
+                    break
+        
+        # Formato antigo: procura em 'lines' usando supplier_code
+        else:
+            for payload_line in inbound.parsed_payload.get("lines", []):
+                if payload_line.get("supplier_code") == linha.supplier_code:
+                    dims = payload_line.get("dimensoes", {})
+                    if dims and any(dims.values()):
+                        larg = dims.get("largura", 0)
+                        comp = dims.get("comprimento", 0)
+                        esp = dims.get("espessura", 0)
+                        if larg and comp and esp:
+                            dimensoes = f"{larg}x{comp}x{esp}"
+                        elif larg and comp:
+                            dimensoes = f"{larg}x{comp}"
+                    mini_codigo = payload_line.get("mini_codigo", "")
+                    break
 
         ws.cell(row=row, column=1, value=numero_req)
         ws.cell(row=row,
