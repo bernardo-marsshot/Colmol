@@ -35,32 +35,33 @@ Successfully imported and configured for Replit environment on September 24, 202
 
 ## OCR Architecture
 
-### Sistema Híbrido Tesseract + Ollama Vision
-O sistema usa uma abordagem híbrida para extração de dados de documentos:
+### Sistema de Extração Inteligente
+O sistema oferece dois métodos de extração configuráveis:
 
-1. **Tesseract OCR** (Primário, Rápido):
-   - Extração inicial de texto e QR codes
+**1. Ollama Vision** (Recomendado - Visão Computacional):
+   - **Ativação**: Define `OLLAMA_API_URL` para usar como método primário
+   - Modelo LLaVA analisa imagem diretamente sem OCR intermediário
+   - Extrai dados estruturados em JSON via prompt otimizado
+   - Números sempre normalizados (sem separadores de milhares)
+   - Detecta QR codes automaticamente via OpenCV
+   - **Configuração**: `OLLAMA_API_URL=http://localhost:11434`
+   - **Modelo**: `OLLAMA_MODEL=llava:latest` (padrão)
+
+**2. Tesseract OCR** (Fallback Automático):
+   - Ativa quando Ollama não está configurado
+   - Extração de texto e QR codes via OCR tradicional
    - Parse estruturado de documentos portugueses
-   - Sistema de scoring de confiança (0-100%)
+   - Funciona sem configuração adicional
 
-2. **Ollama Vision** (Fallback Inteligente, Robusto):
-   - Ativa automaticamente quando confiança Tesseract < 60%
-   - Modelo LLaVA analisa imagem diretamente
-   - Prompt instruído para formato JSON estruturado
-   - Preserva QR codes detectados pelo Tesseract
-   - **Configuração**: Define `OLLAMA_API_URL` para ativar (ex: `http://localhost:11434`)
-
-3. **Normalização de Dados**:
+**Normalização de Dados**:
    - Schema garantido para ambos os métodos
    - Conversão segura de tipos numéricos
-   - Suporte a formatos europeus e americanos
-   - **Limitação conhecida**: Números amb\u00edguos como "2.333" (pode ser 2.333 ou 2333) são interpretados como milhares PT quando têm 3 dígitos após ponto e valor antes entre 1-999. Para precisão total, configure locale ou use Ollama que segue instruções de formatação.
+   - Ollama segue instruções do prompt para formato consistente
 
-4. **Metadados de Extração**:
+**Metadados de Extração**:
    - `_extraction_method`: "tesseract" ou "ollama_vision"
    - `_confidence_score`: 0-100%
    - Salvos em extracao.json e banco de dados
-
 ## Recent Changes
 
 ### October 6, 2025 (Sistema Híbrido)

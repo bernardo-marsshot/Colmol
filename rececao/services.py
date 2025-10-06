@@ -411,23 +411,79 @@ def save_extraction_to_json(data: dict, filename: str = "extracao.json"):
 
 def real_ocr_extract(file_path: str):
     """
-    Sistema HÍBRIDO de extração: Tesseract (rápido) + Ollama Vision (fallback robusto).
-    1. Tenta Tesseract OCR primeiro
-    2. Avalia confiança dos dados extraídos
-    3. Se confiança < 60%, usa Ollama Vision como fallback
+    Sistema de extração inteligente:
+    - Se OLLAMA configurado: usa APENAS Ollama Vision (visão computacional direta)
+    - Se não configurado: usa Tesseract OCR tradicional
     """
-    text_content = ""
-    qr_codes = []
     ext = os.path.splitext(file_path)[1].lower()
-    extraction_method = "tesseract"  # Track which method was used
-
-    # ========== FASE 1: TESSERACT OCR ==========
+    qr_codes = []
+    
+    # ========== OLLAMA VISION (MÉTODO PRIMÁRIO SE CONFIGURADO) ==========
+    if OLLAMA_ENABLED:
+        print("🤖 Usando Ollama Vision (método primário)...")
+        
+        # Detectar QR codes primeiro (Tesseract ainda é bom para isso)
+        if QR_CODE_ENABLED:
+            try:
+                if ext == ".pdf":
+                    pages = convert_from_path(file_path, dpi=300, first_page=1, last_page=1)
+                    if pages:
+                        qr_codes = detect_and_read_qrcodes(pages[0], page_number=1)
+                elif ext in [".jpg", ".jpeg", ".png", ".tiff", ".bmp"]:
+                    img = Image.open(file_path)
+                    qr_codes = detect_and_read_qrcodes(img, page_number=1)
+                
+                if qr_codes:
+                    print(f"✅ {len(qr_codes)} QR code(s) detectado(s)")
+            except Exception as e:
+                print(f"⚠️ Erro ao detectar QR codes: {e}")
+        
+        # Extrair dados com Ollama Vision
+        ollama_result = extract_with_ollama_vision(file_path)
+        
+        if ollama_result:
+            # Normalizar payload
+            result = normalize_ollama_payload(ollama_result, qr_codes)
+            confidence_score = calculate_confidence_score(result)
+            
+            result["_extraction_method"] = "ollama_vision"
+            result["_confidence_score"] = confidence_score
+            
+            print(f"✅ Extração via OLLAMA VISION (confiança: {confidence_score:.1f}%)")
+            save_extraction_to_json(result)
+            return result
+        else:
+            print("❌ Ollama Vision falhou")
+            error_result = {
+                "error": "Ollama Vision extraction failed",
+                "numero_requisicao": f"ERROR-{os.path.basename(file_path)}",
+                "document_number": "",
+                "po_number": "",
+                "supplier_name": "",
+                "delivery_date": "",
+                "qr_codes": qr_codes,
+                "produtos": [],
+                "lines": [],
+                "totals": {
+                    "total_lines": 0,
+                    "total_quantity": 0
+                },
+                "_extraction_method": "ollama_vision",
+                "_confidence_score": 0,
+            }
+            save_extraction_to_json(error_result)
+            return error_result
+    
+    # ========== TESSERACT OCR (FALLBACK SE OLLAMA NÃO CONFIGURADO) ==========
+    print("📄 Usando Tesseract OCR (Ollama não configurado)...")
+    
+    text_content = ""
     if ext == ".pdf":
         text_content, qr_codes = extract_text_from_pdf(file_path)
     elif ext in [".jpg", ".jpeg", ".png", ".tiff", ".bmp"]:
         text_content, qr_codes = extract_text_from_image(file_path)
 
-    # Pré-visualização (debug) para validação
+    # Pré-visualização
     if text_content:
         preview = "\n".join(text_content.splitlines()[:60])
         print("---- OCR PREVIEW (primeiras linhas) ----")
@@ -437,52 +493,10 @@ def real_ocr_extract(file_path: str):
     if qr_codes:
         print(f"✅ {len(qr_codes)} QR code(s) detectado(s)")
 
-    # Parse inicial com Tesseract
-    result = None
-    confidence_score = 0
-    
-    if text_content.strip():
-        result = parse_portuguese_document(text_content, qr_codes)
-        confidence_score = calculate_confidence_score(result)
-        print(f"📊 Confiança Tesseract: {confidence_score:.1f}%")
-    else:
+    if not text_content.strip():
         print("❌ Tesseract OCR vazio")
-        confidence_score = 0
-
-    # ========== FASE 2: FALLBACK OLLAMA VISION ==========
-    # Se confiança baixa (<60%) e Ollama disponível, tentar fallback
-    CONFIDENCE_THRESHOLD = 60.0
-    
-    if confidence_score < CONFIDENCE_THRESHOLD and OLLAMA_ENABLED:
-        print(f"⚠️ Confiança baixa ({confidence_score:.1f}%) - tentando Ollama Vision...")
-        
-        ollama_result = extract_with_ollama_vision(file_path)
-        
-        if ollama_result:
-            # Calcular confiança do Ollama
-            ollama_confidence = calculate_confidence_score(ollama_result)
-            print(f"📊 Confiança Ollama: {ollama_confidence:.1f}%")
-            
-            # Usar Ollama se for melhor
-            if ollama_confidence > confidence_score:
-                print(f"✅ Usando Ollama (melhor confiança: {ollama_confidence:.1f}% vs {confidence_score:.1f}%)")
-                
-                # Normalizar COMPLETAMENTE o payload do Ollama
-                result = normalize_ollama_payload(ollama_result, qr_codes)
-                confidence_score = ollama_confidence
-                extraction_method = "ollama_vision"
-            else:
-                print(f"⚠️ Ollama não melhorou ({ollama_confidence:.1f}% vs {confidence_score:.1f}%) - mantendo Tesseract")
-        else:
-            print("❌ Ollama falhou - mantendo resultado do Tesseract")
-    elif confidence_score < CONFIDENCE_THRESHOLD and not OLLAMA_ENABLED:
-        print(f"⚠️ Confiança baixa ({confidence_score:.1f}%) mas Ollama desabilitado")
-
-    # ========== RESULTADO FINAL ==========
-    if not result or confidence_score == 0:
-        print("❌ Extração falhou completamente")
         error_result = {
-            "error": "Extraction failed - no reliable data extracted",
+            "error": "OCR failed - no text extracted",
             "numero_requisicao": f"ERROR-{os.path.basename(file_path)}",
             "document_number": "",
             "po_number": "",
@@ -495,17 +509,19 @@ def real_ocr_extract(file_path: str):
                 "total_lines": 0,
                 "total_quantity": 0
             },
-            "_extraction_method": extraction_method,
-            "_confidence_score": confidence_score,
+            "_extraction_method": "tesseract",
+            "_confidence_score": 0,
         }
         save_extraction_to_json(error_result)
         return error_result
 
-    # Adicionar metadados de extração
-    result["_extraction_method"] = extraction_method
+    result = parse_portuguese_document(text_content, qr_codes)
+    confidence_score = calculate_confidence_score(result)
+    
+    result["_extraction_method"] = "tesseract"
     result["_confidence_score"] = confidence_score
     
-    print(f"✅ Extração completa via {extraction_method.upper()} (confiança: {confidence_score:.1f}%)")
+    print(f"✅ Extração via TESSERACT (confiança: {confidence_score:.1f}%)")
     save_extraction_to_json(result)
     return result
 
