@@ -764,7 +764,7 @@ def process_inbound(inbound: InboundDocument):
             if not mapping:
                 issues += 1
                 exceptions.append({
-                    "line": f"{r.article_code} ({r.supplier_code})",
+                    "line": r.article_code,
                     "issue": "Código não mapeado para SKU interno",
                     "suggested": "",
                 })
@@ -775,7 +775,7 @@ def process_inbound(inbound: InboundDocument):
             if float(r.qty_received) > qty_ordered:
                 issues += 1
                 exceptions.append({
-                    "line": f"{r.article_code} ({r.supplier_code})",
+                    "line": r.article_code,
                     "issue": f"Quantidade excedida (recebida {r.qty_received} vs encomendada {qty_ordered})",
                 })
                 continue
