@@ -14,7 +14,9 @@ Successfully imported and configured for Replit environment on September 24, 202
 - **Demo Data**: Pre-loaded using management command
 
 ## Current Configuration
-- **Development Server**: Running on 0.0.0.0:5000
+- **Django Server**: Running on 0.0.0.0:5000 (main application)
+- **Ollama Server**: Running on 0.0.0.0:8000 (internal)
+- **Node.js Proxy**: Running on 0.0.0.0:3000 (Ollama HTTP proxy with streaming)
 - **Host Settings**: ALLOWED_HOSTS = ["*"] (configured for Replit proxy)
 - **Static Files**: /static/ directory created
 - **Media Files**: /media/ directory for file uploads
@@ -29,9 +31,11 @@ Successfully imported and configured for Replit environment on September 24, 202
 - Admin interface for catalog management
 
 ## URLs
-- `/` - Dashboard homepage
-- `/upload/` - Document upload interface  
-- `/admin/` - Django admin interface
+- `/` - Dashboard homepage (Django - port 5000)
+- `/upload/` - Document upload interface (Django - port 5000)
+- `/admin/` - Django admin interface (Django - port 5000)
+- `http://localhost:3000/health` - Ollama proxy health check
+- `http://localhost:3000/generate` - Ollama proxy API endpoint
 
 ## OCR Architecture
 
@@ -44,8 +48,9 @@ O sistema oferece dois métodos de extração configuráveis:
    - Extrai dados estruturados em JSON via prompt otimizado
    - Números sempre normalizados (sem separadores de milhares)
    - Detecta QR codes automaticamente via OpenCV
-   - **Configuração**: `OLLAMA_API_URL=http://localhost:11434`
+   - **Configuração**: `OLLAMA_API_URL=http://localhost:8000` (direto) ou `http://localhost:3000` (via proxy)
    - **Modelo**: `OLLAMA_MODEL=llava:latest` (padrão)
+   - **Proxy Node.js**: Resolve timeouts de 60s com keepAlive=610s e streaming completo
 
 **2. Tesseract OCR** (Fallback Automático):
    - Ativa quando Ollama não está configurado
@@ -63,6 +68,18 @@ O sistema oferece dois métodos de extração configuráveis:
    - `_confidence_score`: 0-100%
    - Salvos em extracao.json e banco de dados
 ## Recent Changes
+
+### October 6, 2025 (Proxy Node.js para Ollama)
+- **Implementado proxy HTTP Express**: Resolve timeouts de 60s no Ollama com keepAliveTimeout=610s e headersTimeout=620s
+- **Streaming completo**: SSE/chunked sem buffer, retransmite tokens imediatamente ao cliente
+- **Seleção automática de modelos**: Sistema detecta presença de imagem e escolhe entre cheap_text (texto) e vision (multimodal)
+- **Upload de imagens via multipart**: Suporta form-data com conversão automática para base64
+- **Otimizado para CPU**: OLLAMA_NUM_PARALLEL=1, mmap ativado, batch_size reduzido
+- **Arquivos criados**: server.js, start.sh, package.json, models.json
+- **Node.js 20 instalado**: Com Express e Busboy para proxy HTTP
+- **Workflow integrado**: start.sh gerencia Ollama + Proxy simultaneamente na porta 3000
+- **CORS configurado**: Permite localhost e domínios Replit
+- **Health check**: Endpoint /health verifica status do Ollama
 
 ### October 6, 2025 (Sistema Híbrido)
 - **Implementado sistema híbrido Tesseract + Ollama Vision**: OCR robusto com fallback inteligente
