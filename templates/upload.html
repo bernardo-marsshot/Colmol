@@ -116,8 +116,9 @@
     overlay.classList.add('active');
     document.body.classList.add('processing');
     
-    // Desabilitar todos os inputs e botões
-    const inputs = document.querySelectorAll('input, button, select, textarea');
+    // Desabilitar inputs visíveis e botões (mantém todos os hidden fields intactos)
+    const form = document.getElementById('uploadForm');
+    const inputs = form.querySelectorAll('input:not([type="hidden"]), button, select, textarea');
     inputs.forEach(input => {
       input.disabled = true;
     });
