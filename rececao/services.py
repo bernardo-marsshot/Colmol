@@ -64,7 +64,7 @@ def real_ocr_extract(file_path: str):
     print("---- OCR PREVIEW (primeiras linhas) ----")
     print(preview)
     print("----------------------------------------")
-    
+
     if qr_codes:
         print(f"✅ {len(qr_codes)} QR code(s) detectado(s)")
 
@@ -111,7 +111,8 @@ def extract_text_from_pdf(file_path: str):
                     print("🔍 Procurando QR codes no PDF...")
                     pages = convert_from_path(file_path, dpi=300)
                     for page_num, page_img in enumerate(pages, start=1):
-                        page_qr = detect_and_read_qrcodes(page_img, page_number=page_num)
+                        page_qr = detect_and_read_qrcodes(page_img,
+                                                          page_number=page_num)
                         qr_codes.extend(page_qr)
                 except Exception as e:
                     print(f"⚠️ Erro ao buscar QR codes: {e}")
@@ -127,7 +128,7 @@ def extract_text_from_pdf(file_path: str):
 
 def parse_qrcode_fiscal_pt(qr_data: str):
     """Parse de QR code fiscal português (formato A:valor*B:valor*...) com nomes descritivos."""
-    
+
     # Mapeamento dos códigos para nomes descritivos (Especificações Técnicas AT)
     FIELD_NAMES = {
         "A": "nif_emitente",
@@ -171,30 +172,30 @@ def parse_qrcode_fiscal_pt(qr_data: str):
         "R": "certificado",
         "S": "outras_infos"
     }
-    
+
     try:
         if not qr_data or "*" not in qr_data:
             return None
-        
+
         parsed_raw = {}
         fields = qr_data.split("*")
-        
+
         for field in fields:
             if ":" in field:
                 key, value = field.split(":", 1)
                 parsed_raw[key] = value
-        
+
         # Valida se é realmente um QR fiscal português
         # QR fiscal deve ter pelo menos o campo A (NIF emitente)
         if not parsed_raw or "A" not in parsed_raw:
             return None
-        
+
         # Converte para nomes descritivos
         parsed = {}
         for code, value in parsed_raw.items():
             field_name = FIELD_NAMES.get(code, code)
             parsed[field_name] = value
-        
+
         return parsed if parsed else None
     except Exception as e:
         print(f"⚠️ Erro ao parsear QR fiscal: {e}")
@@ -212,32 +213,29 @@ def detect_and_read_qrcodes(image, page_number=None):
             arr = cv2.cvtColor(arr, cv2.COLOR_RGB2BGR)
         elif len(arr.shape) == 3 and arr.shape[2] == 4:
             arr = cv2.cvtColor(arr, cv2.COLOR_RGBA2BGR)
-        
+
         # Usa o detector de QR code do OpenCV
         detector = cv2.QRCodeDetector()
         data, vertices_array, _ = detector.detectAndDecode(arr)
-        
+
         result = []
         if vertices_array is not None and data:
             print(f"✅ QR: {data[:80]}…")
-            
+
             # Tenta parsear QR code fiscal português
             parsed = parse_qrcode_fiscal_pt(data)
             if parsed:
                 # Se parseou com sucesso, coloca os dados estruturados no campo "data"
-                qr_info = {
-                    "data": parsed,
-                    "raw_data": data
-                }
+                qr_info = {"data": parsed, "raw_data": data}
             else:
                 # Se não conseguiu parsear, mantém como string
                 qr_info = {"data": data}
-            
+
             if page_number is not None:
                 qr_info["page"] = page_number
-            
+
             result.append(qr_info)
-        
+
         # Tenta detectar múltiplos QR codes (OpenCV 4.5.4+)
         try:
             multi_data = detector.detectAndDecodeMulti(arr)
@@ -246,30 +244,28 @@ def detect_and_read_qrcodes(image, page_number=None):
                     # Verifica se já não foi adicionado
                     already_added = False
                     for existing in result:
-                        if existing.get("raw_data") == qr_data or existing.get("data") == qr_data:
+                        if existing.get("raw_data") == qr_data or existing.get(
+                                "data") == qr_data:
                             already_added = True
                             break
-                    
+
                     if qr_data and not already_added:
                         print(f"✅ QR: {qr_data[:80]}…")
-                        
+
                         # Tenta parsear QR code fiscal português
                         parsed = parse_qrcode_fiscal_pt(qr_data)
                         if parsed:
-                            qr_info = {
-                                "data": parsed,
-                                "raw_data": qr_data
-                            }
+                            qr_info = {"data": parsed, "raw_data": qr_data}
                         else:
                             qr_info = {"data": qr_data}
-                        
+
                         if page_number is not None:
                             qr_info["page"] = page_number
-                        
+
                         result.append(qr_info)
         except:
             pass  # Versão do OpenCV pode não suportar detectAndDecodeMulti
-        
+
         return result
     except Exception as e:
         print(f"⚠️ QR erro: {e}")
@@ -322,12 +318,14 @@ def extract_guia_remessa_products(text: str):
     """
     products = []
     lines = text.split("\n")
-    
+
     current_ref = ""
-    
+
     # Regex para detectar referências de ordem (mais flexível)
-    ref_pattern = re.compile(r"^\s*(\d[A-Z]{2,6}\s+N[oº°]\s*\d+[/\-]\d+[A-Z]{0,4}\s+de\s+\d{2}-\d{2}-\d{4})", re.IGNORECASE)
-    
+    ref_pattern = re.compile(
+        r"^\s*(\d[A-Z]{2,6}\s+N[oº°]\s*\d+[/\-]\d+[A-Z]{0,4}\s+de\s+\d{2}-\d{2}-\d{4})",
+        re.IGNORECASE)
+
     # Regex mais flexível para linha de produto
     # Formato: E0748001901  131,59 1  34,00 3,00 ML 3,99 23,00 5159-250602064 BALTIC fb, TOFFEE
     # Artigo: letras + números (mais flexível)
@@ -345,18 +343,17 @@ def extract_guia_remessa_products(text: str):
         r"([\d,\.]+)\s+"  # IVA
         r"([\w\-#]*)\s*"  # Lote (opcional, pode estar vazio)
         r"(.+?)\s*$",  # Descrição (resto da linha)
-        re.IGNORECASE
-    )
-    
+        re.IGNORECASE)
+
     for line in lines:
         stripped = line.strip()
-        
+
         # Verifica se é uma referência de ordem
         ref_match = ref_pattern.match(stripped)
         if ref_match:
             current_ref = ref_match.group(1).strip()
             continue
-        
+
         # Verifica se é uma linha de produto
         prod_match = product_pattern.match(stripped)
         if prod_match:
@@ -369,7 +366,7 @@ def extract_guia_remessa_products(text: str):
                     EN: 1,234.56 ou 1234.56 (ponto=decimal)
                     """
                     value = value.strip()
-                    
+
                     # Se tem vírgula, assume formato PT (vírgula é decimal)
                     if "," in value:
                         # Remove pontos (separadores de milhares)
@@ -380,9 +377,9 @@ def extract_guia_remessa_products(text: str):
                     # Remove apenas vírgulas que seriam separadores de milhares
                     else:
                         value = value.replace(",", "")
-                    
+
                     return float(value)
-                
+
                 artigo = prod_match.group(1).strip()
                 total = normalize_number(prod_match.group(2))
                 volume = normalize_number(prod_match.group(3))
@@ -391,13 +388,14 @@ def extract_guia_remessa_products(text: str):
                 unidade = prod_match.group(6).strip()
                 preco_un = normalize_number(prod_match.group(7))
                 iva = normalize_number(prod_match.group(8))
-                lote = prod_match.group(9).strip() if prod_match.group(9) else ""
+                lote = prod_match.group(9).strip() if prod_match.group(
+                    9) else ""
                 descricao = prod_match.group(10).strip()
-                
+
                 # Validações básicas
                 if not artigo or not descricao:
                     continue
-                
+
                 product = {
                     "referencia_ordem": current_ref if current_ref else None,
                     "artigo": artigo,
@@ -411,17 +409,19 @@ def extract_guia_remessa_products(text: str):
                     "iva": iva,
                     "total": total
                 }
-                
+
                 products.append(product)
             except (ValueError, IndexError) as e:
-                print(f"⚠️ Erro ao parsear linha de produto '{stripped[:50]}...': {e}")
+                print(
+                    f"⚠️ Erro ao parsear linha de produto '{stripped[:50]}...': {e}"
+                )
                 continue
-    
+
     if products:
         print(f"✅ Extraídos {len(products)} produtos da Guia de Remessa")
     else:
         print("⚠️ Nenhum produto encontrado no formato Guia de Remessa")
-    
+
     return products
 
 
@@ -429,7 +429,7 @@ def parse_portuguese_document(text: str, qr_codes=None):
     """Extrai cabeçalho (req/doc/fornecedor/data) e linhas de produto."""
     if qr_codes is None:
         qr_codes = []
-    
+
     lines = text.split("\n")
     result = {
         "numero_requisicao": "",
@@ -482,7 +482,8 @@ def parse_portuguese_document(text: str, qr_codes=None):
     if guia_products:
         result["produtos"] = guia_products
         result["totals"]["total_lines"] = len(guia_products)
-        result["totals"]["total_quantity"] = sum(p["quantidade"] for p in guia_products)
+        result["totals"]["total_quantity"] = sum(p["quantidade"]
+                                                 for p in guia_products)
     else:
         # Fallback: usa extração antiga se não encontrar produtos no novo formato
         product_lines = extract_product_lines(text)
@@ -500,7 +501,7 @@ def parse_portuguese_document(text: str, qr_codes=None):
         result["lines"] = legacy
         result["totals"]["total_lines"] = len(legacy)
         result["totals"]["total_quantity"] = sum(x["qty"] for x in legacy)
-    
+
     return result
 
 
@@ -658,18 +659,22 @@ def get_realistic_fallback():
 
 def map_supplier_codes(supplier, payload):
     mapped = []
-    
+
     # Suporta novo formato com 'produtos' (Guia de Remessa extraída)
     if "produtos" in payload and payload["produtos"]:
         for produto in payload["produtos"]:
-            supplier_code = produto.get("artigo")
+            supplier_code = produto.get("referencia_ordem").split(" ")[0]
             mapping = CodeMapping.objects.filter(
                 supplier=supplier, supplier_code=supplier_code).first()
             mapped.append({
-                "supplier_code": supplier_code,
-                "description": produto.get("descricao", ""),
-                "unit": produto.get("unidade", "UN"),
-                "qty": produto.get("quantidade", 0),
+                "supplier_code":
+                supplier_code,
+                "description":
+                produto.get("descricao", ""),
+                "unit":
+                produto.get("unidade", "UN"),
+                "qty":
+                produto.get("quantidade", 0),
                 "internal_sku": (mapping.internal_sku if mapping else None),
                 "confidence": (mapping.confidence if mapping else 0.0),
             })
@@ -684,7 +689,7 @@ def map_supplier_codes(supplier, payload):
                 "internal_sku": (mapping.internal_sku if mapping else None),
                 "confidence": (mapping.confidence if mapping else 0.0),
             })
-    
+
     return mapped
 
 
