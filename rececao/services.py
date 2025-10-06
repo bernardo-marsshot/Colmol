@@ -678,7 +678,7 @@ def map_supplier_codes(supplier, payload):
     # Suporta novo formato com 'produtos' (Guia de Remessa extraída)
     if "produtos" in payload and payload["produtos"]:
         for produto in payload["produtos"]:
-            supplier_code = produto.get("referencia_ordem").split(" ")[0]
+            supplier_code = produto.get("artigo")  # Artigo do produto, não referencia_ordem!
             mapping = CodeMapping.objects.filter(
                 supplier=supplier, supplier_code=supplier_code).first()
             mapped.append({
