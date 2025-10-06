@@ -116,9 +116,12 @@ Responde APENAS com o JSON, sem texto adicional."""
                 "model": OLLAMA_MODEL,
                 "prompt": prompt,
                 "images": [img_base64],
-                "stream": False
+                "stream": False,
+                "options": {
+                    "num_predict": 2048
+                }
             },
-            timeout=60
+            timeout=300
         )
         
         if response.status_code != 200:
