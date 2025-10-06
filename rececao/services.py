@@ -767,14 +767,14 @@ def process_inbound(inbound: InboundDocument):
                 continue
             
             # Verificar se quantidade recebida EXCEDE a quantidade encomendada (do CodeMapping)
-            if mapping.qty_ordered > 0:
-                if float(r.qty_received) > float(mapping.qty_ordered):
-                    issues += 1
-                    exceptions.append({
-                        "line": r.supplier_code,
-                        "issue": f"Quantidade excedida (recebida {r.qty_received} vs encomendada {mapping.qty_ordered})",
-                    })
-                    continue
+            qty_ordered = float(mapping.qty_ordered or 0)  # Proteção contra None
+            if float(r.qty_received) > qty_ordered:
+                issues += 1
+                exceptions.append({
+                    "line": r.supplier_code,
+                    "issue": f"Quantidade excedida (recebida {r.qty_received} vs encomendada {qty_ordered})",
+                })
+                continue
             
             ok += 1
     else:
