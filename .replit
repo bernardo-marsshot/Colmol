@@ -41,8 +41,8 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "ollama serve"
-waitForPort = 11434
+args = "OLLAMA_HOST=0.0.0.0:8000 ollama serve"
+waitForPort = 8000
 
 [workflows.workflow.metadata]
 outputType = "console"
@@ -54,6 +54,10 @@ externalPort = 80
 [[ports]]
 localPort = 35973
 externalPort = 3000
+
+[[ports]]
+localPort = 8000
+externalPort = 8000
 
 [deployment]
 deploymentTarget = "autoscale"
