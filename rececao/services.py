@@ -685,8 +685,11 @@ def map_supplier_codes(supplier, payload):
             # Artigo/SKU do produto
             article_code = produto.get("artigo", "")
             
+            # IMPORTANTE: Lookup usando article_code, não supplier_code!
+            # supplier_code (ex:"1ECWH") é igual para todas as linhas deste fornecedor
+            # article_code (ex:"E0748001901") é único por produto
             mapping = CodeMapping.objects.filter(
-                supplier=supplier, supplier_code=supplier_code).first()
+                supplier=supplier, supplier_code=article_code).first()
             mapped.append({
                 "supplier_code": supplier_code,
                 "article_code": article_code,
@@ -752,15 +755,16 @@ def process_inbound(inbound: InboundDocument):
     if inbound.po:
         for r in inbound.lines.all():
             # Verificar se código não está mapeado
+            # IMPORTANTE: Lookup usando article_code (SKU do produto), não supplier_code (referência da ordem)
             mapping = CodeMapping.objects.filter(
                 supplier=inbound.supplier,
-                supplier_code=r.supplier_code
+                supplier_code=r.article_code
             ).first()
             
             if not mapping:
                 issues += 1
                 exceptions.append({
-                    "line": r.supplier_code,
+                    "line": f"{r.article_code} ({r.supplier_code})",
                     "issue": "Código não mapeado para SKU interno",
                     "suggested": "",
                 })
@@ -771,7 +775,7 @@ def process_inbound(inbound: InboundDocument):
             if float(r.qty_received) > qty_ordered:
                 issues += 1
                 exceptions.append({
-                    "line": r.supplier_code,
+                    "line": f"{r.article_code} ({r.supplier_code})",
                     "issue": f"Quantidade excedida (recebida {r.qty_received} vs encomendada {qty_ordered})",
                 })
                 continue
