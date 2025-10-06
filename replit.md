@@ -33,9 +33,45 @@ Successfully imported and configured for Replit environment on September 24, 202
 - `/upload/` - Document upload interface  
 - `/admin/` - Django admin interface
 
+## OCR Architecture
+
+### Sistema Híbrido Tesseract + Ollama Vision
+O sistema usa uma abordagem híbrida para extração de dados de documentos:
+
+1. **Tesseract OCR** (Primário, Rápido):
+   - Extração inicial de texto e QR codes
+   - Parse estruturado de documentos portugueses
+   - Sistema de scoring de confiança (0-100%)
+
+2. **Ollama Vision** (Fallback Inteligente, Robusto):
+   - Ativa automaticamente quando confiança Tesseract < 60%
+   - Modelo LLaVA analisa imagem diretamente
+   - Prompt instruído para formato JSON estruturado
+   - Preserva QR codes detectados pelo Tesseract
+   - **Configuração**: Define `OLLAMA_API_URL` para ativar (ex: `http://localhost:11434`)
+
+3. **Normalização de Dados**:
+   - Schema garantido para ambos os métodos
+   - Conversão segura de tipos numéricos
+   - Suporte a formatos europeus e americanos
+   - **Limitação conhecida**: Números amb\u00edguos como "2.333" (pode ser 2.333 ou 2333) são interpretados como milhares PT quando têm 3 dígitos após ponto e valor antes entre 1-999. Para precisão total, configure locale ou use Ollama que segue instruções de formatação.
+
+4. **Metadados de Extração**:
+   - `_extraction_method`: "tesseract" ou "ollama_vision"
+   - `_confidence_score`: 0-100%
+   - Salvos em extracao.json e banco de dados
+
 ## Recent Changes
 
-### October 6, 2025
+### October 6, 2025 (Sistema Híbrido)
+- **Implementado sistema híbrido Tesseract + Ollama Vision**: OCR robusto com fallback inteligente
+- **Sistema de confiança**: Calcula score 0-100% baseado em completude dos dados extraídos
+- **Fallback automático**: Ollama Vision ativado quando confiança < 60%
+- **Normalização robusta**: Schema garantido, conversão segura de tipos, preservação de QR codes
+- **Prompt otimizado**: Ollama instruído para retornar números sem separadores de milhares
+- **Logs detalhados**: Rastreamento de método usado, confiança, e comparações
+
+### October 6, 2025 (Correções Anteriores)
 - **Fixed CodeMapping lookup bug**: System was using supplier_code from order reference (e.g., "1ECWH") instead of article_code (product SKU) for lookups, causing all lines to map to the same first result
 - **Improved validation logic**: Now uses `article_code` field for CodeMapping queries in both `map_supplier_codes()` and validation
 - **Enhanced exception messages**: Changed to show only article_code (e.g., "E0748001901") instead of article_code + supplier_code
