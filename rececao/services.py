@@ -111,7 +111,7 @@ Responde APENAS com o JSON, sem texto adicional."""
 
         # Chamar API do Ollama
         response = requests.post(
-            f"{OLLAMA_API_URL}/api/generate",
+            f"{OLLAMA_API_URL}/generate",
             json={
                 "model": OLLAMA_MODEL,
                 "prompt": prompt,
