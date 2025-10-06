@@ -22,7 +22,7 @@ def dashboard(request):
     latest_docs = (
         InboundDocument.objects
         .select_related('supplier', 'po', 'match_result')
-        .order_by('-received_at')[:10]
+        .order_by('-received_at')
     )
     
     # Calculate reading percentage for each document

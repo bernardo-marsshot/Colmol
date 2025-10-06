@@ -78,6 +78,7 @@
     </div>
   </div>
 
+  <div class="documents-list" style="max-height: 600px; overflow-y: auto; padding-right: 10px;">
   {% for d in latest %}
   <div class="document-item mb-3" data-status="{% if d.match_result %}{% if d.match_result.status == 'matched' %}matched{% elif d.match_result.status == 'exceptions' %}exceptions{% elif d.match_result.status == 'error' %}error{% else %}pending{% endif %}{% else %}pending{% endif %}">
     <div class="row align-items-center">
@@ -152,6 +153,7 @@
     <p class="text-muted mb-0">Sem documentos ainda.</p>
   </div>
   {% endfor %}
+  </div>
 </div>
 
 {# Garante que o Chart.js está carregado. Se já o incluis no base.html, podes remover a linha abaixo. #}
