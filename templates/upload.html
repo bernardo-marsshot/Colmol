@@ -1,101 +1,8 @@
 
 {% extends "base.html" %}
 {% block content %}
-<style>
-  .processing-overlay {
-    display: none;
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.85);
-    z-index: 9999;
-    justify-content: center;
-    align-items: center;
-    flex-direction: column;
-  }
-  
-  .processing-overlay.active {
-    display: flex;
-  }
-  
-  .processing-content {
-    text-align: center;
-    color: white;
-    max-width: 500px;
-    padding: 40px;
-  }
-  
-  .spinner {
-    width: 80px;
-    height: 80px;
-    margin: 0 auto 30px;
-    border: 8px solid rgba(255, 255, 255, 0.2);
-    border-top: 8px solid #4CAF50;
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-  }
-  
-  @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-  }
-  
-  .progress-bar-container {
-    width: 100%;
-    height: 8px;
-    background: rgba(255, 255, 255, 0.2);
-    border-radius: 4px;
-    overflow: hidden;
-    margin: 20px 0;
-  }
-  
-  .progress-bar {
-    height: 100%;
-    background: linear-gradient(90deg, #4CAF50, #81C784);
-    width: 0%;
-    animation: progress 60s ease-out forwards;
-  }
-  
-  @keyframes progress {
-    0% { width: 0%; }
-    50% { width: 70%; }
-    100% { width: 95%; }
-  }
-  
-  .processing-text {
-    font-size: 24px;
-    font-weight: 600;
-    margin-bottom: 10px;
-  }
-  
-  .processing-subtext {
-    font-size: 14px;
-    color: rgba(255, 255, 255, 0.7);
-    margin-top: 10px;
-  }
-  
-  body.processing {
-    overflow: hidden;
-  }
-</style>
-
-<!-- Overlay de processamento -->
-<div id="processingOverlay" class="processing-overlay">
-  <div class="processing-content">
-    <div class="spinner"></div>
-    <div class="processing-text">Processando Documento</div>
-    <div class="processing-subtext">A analisar com Ollama Vision...</div>
-    <div class="progress-bar-container">
-      <div class="progress-bar"></div>
-    </div>
-    <div class="processing-subtext">Por favor, aguarde. Isto pode demorar até 5 minutos.</div>
-  </div>
-</div>
-
 <h1>Carregar Guia / Fatura</h1>
-<form id="uploadForm" method="post" enctype="multipart/form-data" class="card p-4 mt-3">
+<form method="post" enctype="multipart/form-data" class="card p-4 mt-3">
   {% csrf_token %}
   {{ form.as_p }}
   <button type="submit" class="btn-bizneo-primary">
@@ -108,20 +15,4 @@
   </button>
 </form>
 <p class="mt-3">Aceita PDF/Imagem.</p>
-
-<script>
-  document.getElementById('uploadForm').addEventListener('submit', function(e) {
-    // Mostrar overlay
-    const overlay = document.getElementById('processingOverlay');
-    overlay.classList.add('active');
-    document.body.classList.add('processing');
-    
-    // Desabilitar inputs visíveis e botões (mantém todos os hidden fields intactos)
-    const form = document.getElementById('uploadForm');
-    const inputs = form.querySelectorAll('input:not([type="hidden"]), button, select, textarea');
-    inputs.forEach(input => {
-      input.disabled = true;
-    });
-  });
-</script>
 {% endblock %}
