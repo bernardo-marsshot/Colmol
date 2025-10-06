@@ -34,6 +34,7 @@ class CodeMapping(models.Model):
     supplier = models.ForeignKey(Supplier, on_delete=models.CASCADE, related_name='code_mappings')
     supplier_code = models.CharField(max_length=120)
     internal_sku = models.CharField(max_length=120)
+    qty_ordered = models.DecimalField(max_digits=12, decimal_places=3, default=0)
     confidence = models.FloatField(default=1.0)
 
     class Meta:

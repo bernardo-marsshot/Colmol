@@ -751,11 +751,13 @@ def process_inbound(inbound: InboundDocument):
     exceptions = []
     if inbound.po:
         for r in inbound.lines.all():
-            pol = None
-            if r.maybe_internal_sku:
-                pol = POLine.objects.filter(
-                    po=inbound.po, internal_sku=r.maybe_internal_sku).first()
-            if not pol:
+            # Verificar se código não está mapeado
+            mapping = CodeMapping.objects.filter(
+                supplier=inbound.supplier,
+                supplier_code=r.supplier_code
+            ).first()
+            
+            if not mapping:
                 issues += 1
                 exceptions.append({
                     "line": r.supplier_code,
@@ -763,17 +765,18 @@ def process_inbound(inbound: InboundDocument):
                     "suggested": "",
                 })
                 continue
-            diff = float(r.qty_received) - float(pol.qty_ordered)
-            if abs(diff) > float(pol.tolerance):
-                issues += 1
-                exceptions.append({
-                    "line":
-                    r.maybe_internal_sku,
-                    "issue":
-                    f"Quantidade divergente (recebida {r.qty_received} vs pedida {pol.qty_ordered} ± tol {pol.tolerance})",
-                })
-            else:
-                ok += 1
+            
+            # Verificar se quantidade recebida EXCEDE a quantidade encomendada (do CodeMapping)
+            if mapping.qty_ordered > 0:
+                if float(r.qty_received) > float(mapping.qty_ordered):
+                    issues += 1
+                    exceptions.append({
+                        "line": r.supplier_code,
+                        "issue": f"Quantidade excedida (recebida {r.qty_received} vs encomendada {mapping.qty_ordered})",
+                    })
+                    continue
+            
+            ok += 1
     else:
         for r in inbound.lines.all():
             issues += 1
