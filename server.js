@@ -62,40 +62,54 @@ function parseMultipart(req) {
     });
     
     const result = { prompt: '', images: [] };
-    const tempFiles = [];
+    const imageProcessingPromises = [];
 
     busboy.on('field', (fieldname, val) => {
-      if (fieldname === 'prompt' || fieldname === 'model' || fieldname === 'stream') {
+      if (fieldname === 'prompt' || fieldname === 'model') {
         result[fieldname] = val;
+      } else if (fieldname === 'stream') {
+        result[fieldname] = val === 'true' || val === true;
       }
     });
 
     busboy.on('file', (fieldname, file, info) => {
       if (fieldname === 'image') {
         const tempPath = join(tmpdir(), `upload-${Date.now()}-${info.filename}`);
-        tempFiles.push(tempPath);
         
         const writeStream = createWriteStream(tempPath);
         file.pipe(writeStream);
         
-        writeStream.on('finish', async () => {
-          try {
-            const buffer = await fs.readFile(tempPath);
-            const base64 = buffer.toString('base64');
-            const mimeType = info.mimeType || 'image/jpeg';
-            result.images.push(`data:${mimeType};base64,${base64}`);
-            await fs.unlink(tempPath);
-          } catch (err) {
-            console.error('Error processing image:', err);
-          }
+        const processPromise = new Promise((resolveFile, rejectFile) => {
+          writeStream.on('finish', async () => {
+            try {
+              const buffer = await fs.readFile(tempPath);
+              const base64 = buffer.toString('base64');
+              const mimeType = info.mimeType || 'image/jpeg';
+              result.images.push(`data:${mimeType};base64,${base64}`);
+              await fs.unlink(tempPath);
+              resolveFile();
+            } catch (err) {
+              console.error('Error processing image:', err);
+              rejectFile(err);
+            }
+          });
+          
+          writeStream.on('error', rejectFile);
         });
+        
+        imageProcessingPromises.push(processPromise);
       } else {
         file.resume();
       }
     });
 
-    busboy.on('finish', () => {
-      setTimeout(() => resolve(result), 100);
+    busboy.on('finish', async () => {
+      try {
+        await Promise.all(imageProcessingPromises);
+        resolve(result);
+      } catch (err) {
+        reject(err);
+      }
     });
 
     busboy.on('error', reject);

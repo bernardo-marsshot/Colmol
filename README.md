@@ -35,3 +35,78 @@ python manage.py runserver
 - PWA móvel para doca/QR e conferência física.
 - Export para PHC (CSV/Excel ou API/ODBC).
 - KPIs por fornecedor e ranking de qualidade documental.
+
+---
+
+# 🚀 Ollama Proxy Server (Novo)
+
+Proxy HTTP Express para Ollama com streaming completo, timeouts altos (>60s), e seleção automática de modelos.
+
+## Características
+
+- ✅ **Streaming completo** sem buffer (SSE/chunked)
+- ✅ **Timeouts altos**: keepAlive=610s, headers=620s (resolve timeout de 60s)
+- ✅ **Seleção automática**: cheap_text (texto) vs vision (imagens)
+- ✅ **Upload de imagens** via multipart/form-data
+- ✅ **CPU-only otimizado**: OLLAMA_NUM_PARALLEL=1, mmap ativado
+- ✅ **CORS configurado** para localhost e Replit
+
+## Endpoints
+
+### `GET /health`
+Verifica status do Ollama.
+
+```bash
+curl http://localhost:3000/health
+# Response: {"status":"ok","ollama":"ready","models":1}
+```
+
+### `POST /generate`
+
+**Texto simples (modelo cheap_text):**
+```bash
+curl -N http://localhost:3000/generate \
+  -H "content-type: application/json" \
+  -d '{"prompt":"Diz olá em 10 palavras.","stream":true}'
+```
+
+**Com imagem (modelo vision):**
+```bash
+curl -N http://localhost:3000/generate \
+  -F "prompt=Descreve esta imagem." \
+  -F "image=@exemplo.jpg"
+```
+
+## Configuração (models.json)
+
+```json
+{
+  "cheap_text": {
+    "model": "llava:latest",
+    "options": { "num_ctx": 1024, "batch_size": 256 }
+  },
+  "vision": {
+    "model": "llava:latest",
+    "options": { "num_ctx": 2048, "batch_size": 256 }
+  }
+}
+```
+
+## Iniciar Sistema Completo
+
+```bash
+bash start.sh
+```
+
+Isso inicia:
+1. Ollama Server (porta 8000) - CPU-only, parallel=1
+2. Node.js Proxy (porta 3000) - timeouts altos
+3. Django App (porta 5000) - aplicação principal
+
+## Otimização de Custos (CPU)
+
+- Modelos quantizados (Q4_0, Q3_K_M)
+- `num_ctx` baixo (1024-2048)
+- `OLLAMA_NUM_PARALLEL=1`
+- mmap ativado (sem `--no-mmap`)
+- Modelo cheap_text para texto, vision só quando necessário
