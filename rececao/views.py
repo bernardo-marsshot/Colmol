@@ -113,7 +113,23 @@ def upload_inbound(request):
 def inbound_detail(request, pk):
     inbound = get_object_or_404(InboundDocument, pk=pk)
     result = getattr(inbound, 'match_result', None)
-    return render(request, 'inbound_detail.html', {'inbound': inbound, 'result': result})
+    
+    # Calculate line statistics for this document
+    total_lines = inbound.lines.count()
+    lines_with_errors = inbound.exceptions.values('line_ref').distinct().count()
+    lines_read = total_lines - lines_with_errors
+    
+    line_stats = {
+        'total_lines': total_lines,
+        'lines_read': lines_read,
+        'lines_error': lines_with_errors,
+    }
+    
+    return render(request, 'inbound_detail.html', {
+        'inbound': inbound, 
+        'result': result,
+        'line_stats': line_stats
+    })
 
 def po_list(request):
     pos = PurchaseOrder.objects.all().order_by('-id')

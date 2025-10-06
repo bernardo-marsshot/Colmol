@@ -44,6 +44,8 @@ Successfully imported and configured for Replit environment on September 24, 202
 - **Dashboard interactive filter**: Added clickable chart on dashboard to filter documents by status (Processado, Com exceções, Erro, Pendente) - uses CSS classes with !important for reliable filtering
 - **Fixed status bug**: Corrected 'exception' to 'exceptions' throughout codebase to match MatchResult model definition
 - **Filter CSS fix**: Strengthened filter implementation with `.filtered-out` CSS class to ensure hidden elements stay hidden regardless of other styles
+- **Modal close fix**: Fixed popup/modal backdrop not closing completely - added JavaScript to remove leftover backdrops and reset body styles
+- **Detail page chart**: Added line reading statistics chart to individual document detail pages - shows document-specific breakdown of lines read vs lines with errors
 
 ### September 24, 2025
 - Installed Python 3.11 and Django 5.0.6

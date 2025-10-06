@@ -53,6 +53,23 @@
     </div>
   </div>
   <div class="col-md-5">
+    <div class="card p-3 mb-3">
+      <h5 class="mb-3">Leitura de Linhas</h5>
+      <div class="d-flex justify-content-center">
+        <canvas id="lineReadingChart" style="max-width: 250px; max-height: 250px;"></canvas>
+      </div>
+      <div class="mt-3 text-center">
+        <small class="d-flex align-items-center justify-content-center gap-2 mb-1">
+          <span class="badge bg-success">●</span>
+          <span class="text-muted">Linhas Lidas: {{ line_stats.lines_read }}</span>
+        </small>
+        <small class="d-flex align-items-center justify-content-center gap-2">
+          <span class="badge bg-danger">●</span>
+          <span class="text-muted">Linhas com Erro: {{ line_stats.lines_error }}</span>
+        </small>
+      </div>
+    </div>
+    
     <div class="card p-3">
       <h5>Resultado do Matching</h5>
       {% if result %}
@@ -106,4 +123,50 @@
   </div>
   {% endif %}
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// Line Reading Chart
+const lineCtx = document.getElementById('lineReadingChart');
+new Chart(lineCtx, {
+  type: 'doughnut',
+  data: {
+    labels: ['Linhas Lidas', 'Linhas com Erro'],
+    datasets: [{
+      data: [{{ line_stats.lines_read }}, {{ line_stats.lines_error }}],
+      backgroundColor: [
+        '#198754',  // Verde para linhas lidas
+        '#dc3545'   // Vermelho para linhas com erro
+      ],
+      borderColor: [
+        '#198754',
+        '#dc3545'
+      ],
+      borderWidth: 2
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: true,
+    plugins: {
+      legend: {
+        display: false
+      },
+      tooltip: {
+        callbacks: {
+          label: function(context) {
+            const total = {{ line_stats.total_lines }};
+            const val = context.parsed;
+            const pct = total ? (val * 100 / total).toFixed(1) : 0;
+            return context.label + ': ' + val + ' (' + pct + '%)';
+          }
+        }
+      }
+    },
+    elements: { 
+      arc: { borderWidth: 3 } 
+    }
+  }
+});
+</script>
 {% endblock %}
