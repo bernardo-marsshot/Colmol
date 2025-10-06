@@ -1,0 +1,17 @@
+{
+  "name": "ollama-proxy",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Express proxy for Ollama with streaming support and high timeouts",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "busboy": "^1.6.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
