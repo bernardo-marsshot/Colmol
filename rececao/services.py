@@ -495,10 +495,6 @@ def parse_portuguese_document(text: str, qr_codes=None):
                 if po_match:
                     result["po_number"] = po_match.group(1).upper()
                     break
-        
-        # Fallback: se ainda não tem po_number, usa document_number
-        if not result["po_number"] and result["document_number"]:
-            result["po_number"] = result["document_number"]
     else:
         # Fallback: usa extração antiga se não encontrar produtos no novo formato
         product_lines = extract_product_lines(text)
@@ -516,6 +512,10 @@ def parse_portuguese_document(text: str, qr_codes=None):
         result["lines"] = legacy
         result["totals"]["total_lines"] = len(legacy)
         result["totals"]["total_quantity"] = sum(x["qty"] for x in legacy)
+
+    # Fallback universal: se ainda não tem po_number, usa document_number
+    if not result["po_number"] and result["document_number"]:
+        result["po_number"] = result["document_number"]
 
     return result
 
