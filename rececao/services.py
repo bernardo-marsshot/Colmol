@@ -658,15 +658,33 @@ def get_realistic_fallback():
 
 def map_supplier_codes(supplier, payload):
     mapped = []
-    for l in payload.get("lines", []):
-        supplier_code = l.get("supplier_code")
-        mapping = CodeMapping.objects.filter(
-            supplier=supplier, supplier_code=supplier_code).first()
-        mapped.append({
-            **l,
-            "internal_sku": (mapping.internal_sku if mapping else None),
-            "confidence": (mapping.confidence if mapping else 0.0),
-        })
+    
+    # Suporta novo formato com 'produtos' (Guia de Remessa extraída)
+    if "produtos" in payload and payload["produtos"]:
+        for produto in payload["produtos"]:
+            supplier_code = produto.get("artigo")
+            mapping = CodeMapping.objects.filter(
+                supplier=supplier, supplier_code=supplier_code).first()
+            mapped.append({
+                "supplier_code": supplier_code,
+                "description": produto.get("descricao", ""),
+                "unit": produto.get("unidade", "UN"),
+                "qty": produto.get("quantidade", 0),
+                "internal_sku": (mapping.internal_sku if mapping else None),
+                "confidence": (mapping.confidence if mapping else 0.0),
+            })
+    # Formato antigo com 'lines'
+    elif "lines" in payload:
+        for l in payload.get("lines", []):
+            supplier_code = l.get("supplier_code")
+            mapping = CodeMapping.objects.filter(
+                supplier=supplier, supplier_code=supplier_code).first()
+            mapped.append({
+                **l,
+                "internal_sku": (mapping.internal_sku if mapping else None),
+                "confidence": (mapping.confidence if mapping else 0.0),
+            })
+    
     return mapped
 
 
@@ -741,13 +759,16 @@ def process_inbound(inbound: InboundDocument):
 
     res, _ = MatchResult.objects.get_or_create(inbound=inbound)
 
-    total_lines_in_doc = len(payload.get("lines", []))
+    # Suporta ambos os formatos (produtos ou lines)
+    doc_items = payload.get("produtos", payload.get("lines", []))
+    total_lines_in_doc = len(doc_items)
     lines_read_successfully = ok
     first_error_line = None
     if exceptions:
-        for idx, line in enumerate(payload.get("lines", []), 1):
-            line_code = line.get("supplier_code", "")
-            if any(line_code in ex.get("line", "") for ex in exceptions):
+        for idx, item in enumerate(doc_items, 1):
+            # Tenta ambos os campos (artigo para produtos, supplier_code para lines)
+            item_code = item.get("artigo", item.get("supplier_code", ""))
+            if any(item_code in ex.get("line", "") for ex in exceptions):
                 first_error_line = idx
                 break
 
