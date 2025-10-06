@@ -33,7 +33,16 @@ Successfully imported and configured for Replit environment on September 24, 202
 - `/upload/` - Document upload interface  
 - `/admin/` - Django admin interface
 
-## Recent Changes (Sept 24, 2025)
+## Recent Changes
+
+### October 6, 2025
+- **Fixed CodeMapping lookup bug**: System was using supplier_code from order reference (e.g., "1ECWH") instead of article_code (product SKU) for lookups, causing all lines to map to the same first result
+- **Improved validation logic**: Now uses `article_code` field for CodeMapping queries in both `map_supplier_codes()` and validation
+- **Enhanced exception messages**: Now display both article_code and supplier_code for clarity (e.g., "E0748001901 (1ECWH)")
+- **Quantity validation fix**: Added None-safety with `qty_ordered or 0` and removed conditional check - now always validates quantity even when qty_ordered=0
+- **Database schema updates**: Added `article_code` field to ReceiptLine model, added `qty_ordered` field to CodeMapping model
+
+### September 24, 2025
 - Installed Python 3.11 and Django 5.0.6
 - Created static and media directories
 - Loaded demo data successfully
