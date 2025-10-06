@@ -59,23 +59,38 @@ def extract_with_ollama_vision(file_path: str):
         return None
     
     try:
-        print("🤖 Tentando extração com Ollama Vision...")
+        import time
+        start_time = time.time()
+        
+        print("=" * 60)
+        print("🤖 OLLAMA VISION - INICIANDO EXTRAÇÃO")
+        print("=" * 60)
         
         # Converter primeira página do PDF ou imagem para base64
         ext = os.path.splitext(file_path)[1].lower()
+        print(f"📄 Tipo de ficheiro: {ext}")
+        
         if ext == '.pdf':
+            print("📑 Convertendo primeira página do PDF para imagem...")
             # Converter primeira página do PDF para imagem
             pages = convert_from_path(file_path, dpi=150, first_page=1, last_page=1)
             if not pages:
+                print("❌ Falha ao converter PDF")
                 return None
             img = pages[0]
+            print(f"✅ PDF convertido: {img.size[0]}x{img.size[1]} pixels")
         else:
+            print("🖼️  Carregando imagem...")
             img = Image.open(file_path)
+            print(f"✅ Imagem carregada: {img.size[0]}x{img.size[1]} pixels")
         
         # Converter para base64
+        print("🔄 Convertendo para base64...")
         buffered = BytesIO()
         img.save(buffered, format="JPEG")
         img_base64 = base64.b64encode(buffered.getvalue()).decode()
+        img_size_kb = len(img_base64) / 1024
+        print(f"✅ Base64 gerado: {img_size_kb:.1f} KB")
         
         # Prompt para extrair dados estruturados
         prompt = """Analisa esta Guia de Remessa portuguesa e extrai as seguintes informações em formato JSON:
@@ -110,6 +125,12 @@ IMPORTANTE:
 Responde APENAS com o JSON, sem texto adicional."""
 
         # Chamar API do Ollama
+        print(f"📡 Enviando requisição para {OLLAMA_API_URL}/generate")
+        print(f"🎯 Modelo: {OLLAMA_MODEL}")
+        print(f"⏱️  Timeout: 300s")
+        print("⏳ Aguardando resposta do Ollama...")
+        
+        request_start = time.time()
         response = requests.post(
             f"{OLLAMA_API_URL}/generate",
             json={
@@ -123,24 +144,42 @@ Responde APENAS com o JSON, sem texto adicional."""
             },
             timeout=300
         )
+        request_time = time.time() - request_start
+        print(f"✅ Resposta recebida em {request_time:.1f}s")
         
         if response.status_code != 200:
             print(f"❌ Ollama erro HTTP {response.status_code}")
+            print(f"❌ Resposta: {response.text[:200]}")
             return None
         
+        print("🔍 Processando resposta do Ollama...")
         result = response.json()
         response_text = result.get("response", "")
+        response_len = len(response_text)
+        print(f"📝 Tamanho da resposta: {response_len} caracteres")
         
         # Tentar extrair JSON da resposta
         try:
+            print("🔧 Extraindo JSON da resposta...")
             # Procurar por JSON na resposta (pode ter texto antes/depois)
             json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
             if json_match:
-                parsed_data = json.loads(json_match.group())
-                print(f"✅ Ollama extraiu {len(parsed_data.get('produtos', []))} produtos")
+                json_str = json_match.group()
+                print(f"✅ JSON encontrado ({len(json_str)} caracteres)")
+                parsed_data = json.loads(json_str)
+                num_produtos = len(parsed_data.get('produtos', []))
+                
+                total_time = time.time() - start_time
+                print("=" * 60)
+                print(f"✅ EXTRAÇÃO COMPLETA!")
+                print(f"   📦 Produtos extraídos: {num_produtos}")
+                print(f"   ⏱️  Tempo total: {total_time:.1f}s")
+                print("=" * 60)
+                
                 return parsed_data
             else:
                 print("⚠️ Ollama não retornou JSON válido")
+                print(f"Resposta completa: {response_text[:500]}")
                 return None
         except json.JSONDecodeError as e:
             print(f"❌ Erro ao parsear JSON do Ollama: {e}")
