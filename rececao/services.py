@@ -465,7 +465,7 @@ def parse_portuguese_document(text: str, qr_codes=None):
             m = re.search(patterns["doc"], low, re.IGNORECASE)
             if m:
                 result["document_number"] = m.group(1).upper()
-                result["po_number"] = result["document_number"]
+                # Não copiar para po_number aqui - será extraído depois
 
         if not result["delivery_date"]:
             m = re.search(patterns["data"], ln)
@@ -484,6 +484,21 @@ def parse_portuguese_document(text: str, qr_codes=None):
         result["totals"]["total_lines"] = len(guia_products)
         result["totals"]["total_quantity"] = sum(p["quantidade"]
                                                  for p in guia_products)
+        
+        # Tenta extrair po_number das referências de ordem (ex: "1ECWH Nº 10874/25EU")
+        if not result["po_number"] and guia_products:
+            # Procura padrão "CODIGO Nº" nas referências de ordem
+            for produto in guia_products:
+                ref = produto.get("referencia_ordem", "")
+                # Match: qualquer código alfanumérico seguido de "Nº" ou "N."
+                po_match = re.match(r'^([A-Z0-9]+)\s+[NnºN]', ref, re.IGNORECASE)
+                if po_match:
+                    result["po_number"] = po_match.group(1).upper()
+                    break
+        
+        # Fallback: se ainda não tem po_number, usa document_number
+        if not result["po_number"] and result["document_number"]:
+            result["po_number"] = result["document_number"]
     else:
         # Fallback: usa extração antiga se não encontrar produtos no novo formato
         product_lines = extract_product_lines(text)
