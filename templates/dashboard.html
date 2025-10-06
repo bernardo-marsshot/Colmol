@@ -312,8 +312,23 @@ new Chart(lineCtx, {
 
 // Function to show modal with line details
 function showLineDetails() {
-  const modal = new bootstrap.Modal(document.getElementById('lineDetailsModal'));
+  const modalElement = document.getElementById('lineDetailsModal');
+  const modal = new bootstrap.Modal(modalElement);
   modal.show();
+  
+  // Ensure modal closes completely and removes backdrop
+  modalElement.addEventListener('hidden.bs.modal', function () {
+    // Remove any leftover backdrops
+    const backdrops = document.querySelectorAll('.modal-backdrop');
+    backdrops.forEach(backdrop => backdrop.remove());
+    
+    // Remove modal-open class from body
+    document.body.classList.remove('modal-open');
+    
+    // Reset body style
+    document.body.style.overflow = '';
+    document.body.style.paddingRight = '';
+  }, { once: true });
 }
 {% endif %}
 </script>
