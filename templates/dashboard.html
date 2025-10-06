@@ -157,6 +157,12 @@
 {# Garante que o Chart.js está carregado. Se já o incluis no base.html, podes remover a linha abaixo. #}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
+<style>
+.filtered-out {
+  display: none !important;
+}
+</style>
+
 <script>
 // Filter documents by status
 function filterDocuments(status) {
@@ -172,10 +178,14 @@ function filterDocuments(status) {
   };
   
   documents.forEach(doc => {
-    if (status === 'all' || doc.dataset.status === status) {
-      doc.style.display = '';
+    const docStatus = doc.dataset.status;
+    const shouldShow = (status === 'all' || docStatus === status);
+    
+    if (shouldShow) {
+      doc.style.removeProperty('display');
+      doc.classList.remove('filtered-out');
     } else {
-      doc.style.display = 'none';
+      doc.classList.add('filtered-out');
     }
   });
   
