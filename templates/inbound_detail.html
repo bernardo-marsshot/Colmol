@@ -37,11 +37,12 @@
     <div class="card p-3">
       <h5>Linhas extraídas</h5>
       <table class="table table-sm align-middle">
-        <thead><tr><th>Código Fornecedor</th><th>Descrição</th><th>SKU Interno</th><th>Qtd</th></tr></thead>
+        <thead><tr><th>Código Fornecedor</th><th>SKU</th><th>Descrição</th><th>SKU Interno</th><th>Qtd</th></tr></thead>
         <tbody>
         {% for l in inbound.lines.all %}
           <tr>
             <td>{{ l.supplier_code }}</td>
+            <td>{{ l.article_code|default:"—" }}</td>
             <td>{{ l.description|default:"—" }}</td>
             <td>{{ l.maybe_internal_sku|default:"—" }}</td>
             <td>{{ l.qty_received }}</td>

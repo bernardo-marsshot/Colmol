@@ -678,22 +678,25 @@ def map_supplier_codes(supplier, payload):
     # Suporta novo formato com 'produtos' (Guia de Remessa extraída)
     if "produtos" in payload and payload["produtos"]:
         for produto in payload["produtos"]:
-            supplier_code = produto.get("artigo")  # Artigo do produto, não referencia_ordem!
+            # Extrair código do fornecedor da referência de ordem (ex: "1ECWH Nº 10874/25EU" -> "1ECWH")
+            referencia = produto.get("referencia_ordem", "")
+            supplier_code = referencia.split(" ")[0] if referencia else ""
+            
+            # Artigo/SKU do produto
+            article_code = produto.get("artigo", "")
+            
             mapping = CodeMapping.objects.filter(
                 supplier=supplier, supplier_code=supplier_code).first()
             mapped.append({
-                "supplier_code":
-                supplier_code,
-                "description":
-                produto.get("descricao", ""),
-                "unit":
-                produto.get("unidade", "UN"),
-                "qty":
-                produto.get("quantidade", 0),
+                "supplier_code": supplier_code,
+                "article_code": article_code,
+                "description": produto.get("descricao", ""),
+                "unit": produto.get("unidade", "UN"),
+                "qty": produto.get("quantidade", 0),
                 "internal_sku": (mapping.internal_sku if mapping else None),
                 "confidence": (mapping.confidence if mapping else 0.0),
             })
-    # Formato antigo com 'lines'
+    # Formato antigo com 'lines' (no formato antigo, supplier_code era o SKU do produto)
     elif "lines" in payload:
         for l in payload.get("lines", []):
             supplier_code = l.get("supplier_code")
@@ -701,6 +704,7 @@ def map_supplier_codes(supplier, payload):
                 supplier=supplier, supplier_code=supplier_code).first()
             mapped.append({
                 **l,
+                "article_code": supplier_code,  # No formato antigo, supplier_code era o artigo/SKU
                 "internal_sku": (mapping.internal_sku if mapping else None),
                 "confidence": (mapping.confidence if mapping else 0.0),
             })
@@ -728,6 +732,7 @@ def process_inbound(inbound: InboundDocument):
         ReceiptLine.objects.create(
             inbound=inbound,
             supplier_code=ml["supplier_code"],
+            article_code=ml.get("article_code", ""),
             maybe_internal_sku=ml.get("internal_sku") or "",
             description=ml.get("description", ""),
             unit=ml.get("unit", "UN"),

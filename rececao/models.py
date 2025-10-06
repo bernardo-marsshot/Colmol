@@ -61,6 +61,7 @@ class InboundDocument(models.Model):
 class ReceiptLine(models.Model):
     inbound = models.ForeignKey(InboundDocument, on_delete=models.CASCADE, related_name='lines')
     supplier_code = models.CharField(max_length=120)
+    article_code = models.CharField(max_length=120, blank=True)
     maybe_internal_sku = models.CharField(max_length=120, blank=True)  # resultado do mapping
     description = models.CharField(max_length=255, blank=True)
     unit = models.CharField(max_length=20, default='UN')
