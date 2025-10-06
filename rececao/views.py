@@ -9,7 +9,7 @@ def dashboard(request):
     # Contagens por estado
     total_docs = InboundDocument.objects.count()
     matched    = InboundDocument.objects.filter(match_result__status='matched').count()
-    exceptions = InboundDocument.objects.filter(match_result__status='exception').count()
+    exceptions = InboundDocument.objects.filter(match_result__status='exceptions').count()
     errors     = InboundDocument.objects.filter(match_result__status='error').count()
 
     # Pendente = tudo o que não tem resultado ainda (ou qualquer outro estado não coberto acima)

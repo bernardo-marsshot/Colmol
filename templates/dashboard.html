@@ -79,7 +79,7 @@
   </div>
 
   {% for d in latest %}
-  <div class="document-item mb-3" data-status="{% if d.match_result %}{% if d.match_result.status == 'matched' %}matched{% elif d.match_result.status == 'exception' %}exception{% elif d.match_result.status == 'error' %}error{% else %}pending{% endif %}{% else %}pending{% endif %}">
+  <div class="document-item mb-3" data-status="{% if d.match_result %}{% if d.match_result.status == 'matched' %}matched{% elif d.match_result.status == 'exceptions' %}exceptions{% elif d.match_result.status == 'error' %}error{% else %}pending{% endif %}{% else %}pending{% endif %}">
     <div class="row align-items-center">
       <div class="col-md-2">
         <small class="text-muted">{{ d.received_at|date:"d/m H:i" }}</small>
@@ -114,7 +114,7 @@
         {% if d.match_result %}
         {% if d.match_result.status == 'matched' %}
         <span class="badge bg-success">✓</span>
-        {% elif d.match_result.status == 'exception' %}
+        {% elif d.match_result.status == 'exceptions' %}
         <span class="badge bg-warning">!</span>
         {% elif d.match_result.status == 'error' %}
         <span class="badge bg-danger">✗</span>
@@ -166,7 +166,7 @@ function filterDocuments(status) {
   
   const labelTexts = {
     'matched': 'Processado',
-    'exception': 'Com exceções',
+    'exceptions': 'Com exceções',
     'error': 'Erro',
     'pending': 'Pendente'
   };
@@ -242,7 +242,7 @@ const kpiChart = new Chart(ctx, {
     onClick: (event, activeElements) => {
       if (activeElements.length > 0) {
         const index = activeElements[0].index;
-        const statusMap = ['matched', 'exception', 'error', 'pending'];
+        const statusMap = ['matched', 'exceptions', 'error', 'pending'];
         const selectedStatus = statusMap[index];
         filterDocuments(selectedStatus);
       }
