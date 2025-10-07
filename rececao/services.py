@@ -602,6 +602,71 @@ def parse_guia_colmol(text: str):
     return produtos
 
 
+def parse_guia_generica(text: str):
+    """
+    Parser genérico para extrair produtos de qualquer formato de guia de remessa.
+    Usa heurísticas para detectar tabelas com produtos.
+    """
+    produtos = []
+    lines = text.split("\n")
+    
+    pedido_atual = ""
+    
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        if not stripped or len(stripped) < 10:
+            continue
+        
+        pedido_match = re.search(r'(?:PEDIDO|ORDER|ENCOMENDA)\s*[:/]?\s*(\d+)', stripped, re.IGNORECASE)
+        if pedido_match:
+            pedido_atual = pedido_match.group(1)
+            continue
+        
+        produto_match = re.match(
+            r'^([A-Z0-9]{8,})\s+'
+            r'(.+?)\s+'
+            r'([\d,\.]+)\s+'
+            r'([A-Z]{2,4})(?:\s|$)',
+            stripped,
+            re.IGNORECASE
+        )
+        
+        if produto_match:
+            codigo = produto_match.group(1).strip()
+            descricao = produto_match.group(2).strip()
+            quantidade_str = produto_match.group(3).strip()
+            unidade = produto_match.group(4).strip().upper()
+            
+            try:
+                if ',' in quantidade_str:
+                    quantidade = float(quantidade_str.replace('.', '').replace(',', '.'))
+                else:
+                    quantidade = float(quantidade_str.replace(',', ''))
+            except ValueError:
+                continue
+            
+            dims = ""
+            dim_match = re.search(r'(\d{3,4})[xX×](\d{3,4})[xX×](\d{3,4})', descricao)
+            if dim_match:
+                dims = f"{float(dim_match.group(1))/1000:.2f}x{float(dim_match.group(2))/1000:.2f}x{float(dim_match.group(3))/1000:.2f}"
+            
+            produtos.append({
+                "referencia_ordem": pedido_atual or "",
+                "artigo": codigo,
+                "descricao": descricao,
+                "lote_producao": "",
+                "quantidade": quantidade,
+                "unidade": unidade,
+                "volume": 0,
+                "dimensoes": dims,
+                "peso": 0.0,
+                "iva": 23.0,
+                "total": 0.0
+            })
+    
+    return produtos
+
+
 def parse_portuguese_document(text: str, qr_codes=None):
     """Extrai cabeçalho (req/doc/fornecedor/data) e linhas de produto."""
     if qr_codes is None:
@@ -664,30 +729,49 @@ def parse_portuguese_document(text: str, qr_codes=None):
             result["produtos"] = produtos
             result["supplier_name"] = "Elastron Portugal, SA"
             print(f"✅ Extraídos {len(produtos)} produtos da Fatura Elastron")
+        else:
+            print("⚠️ Parser Elastron retornou 0 produtos, tentando parser genérico...")
+            produtos = parse_guia_generica(text)
+            if produtos:
+                result["produtos"] = produtos
+                print(f"✅ Extraídos {len(produtos)} produtos com parser genérico")
     elif doc_type == "GUIA_COLMOL":
         produtos = parse_guia_colmol(text)
         if produtos:
             result["produtos"] = produtos
             result["supplier_name"] = "Colmol - Colchões S.A"
             print(f"✅ Extraídos {len(produtos)} produtos da Guia Colmol")
-    else:
-        guia_products = extract_guia_remessa_products(text)
-        if guia_products:
-            result["produtos"] = guia_products
         else:
-            product_lines = extract_product_lines(text)
-            legacy = []
-            for p in product_lines:
-                legacy.append({
-                    "supplier_code": p["codigo_fornecedor"],
-                    "description": p["descricao"],
-                    "linha_raw": p["linha_raw"],
-                    "unit": p["unidade"],
-                    "qty": p["quantidade"],
-                    "mini_codigo": p["mini_codigo"],
-                    "dimensoes": p["dimensoes"],
-                })
-            result["lines"] = legacy
+            print("⚠️ Parser Colmol retornou 0 produtos, tentando parser genérico...")
+            produtos = parse_guia_generica(text)
+            if produtos:
+                result["produtos"] = produtos
+                print(f"✅ Extraídos {len(produtos)} produtos com parser genérico")
+    else:
+        if "GUIA" in doc_type:
+            produtos = parse_guia_generica(text)
+            if produtos:
+                result["produtos"] = produtos
+                print(f"✅ Extraídos {len(produtos)} produtos com parser genérico de guias")
+        
+        if not result.get("produtos"):
+            guia_products = extract_guia_remessa_products(text)
+            if guia_products:
+                result["produtos"] = guia_products
+            else:
+                product_lines = extract_product_lines(text)
+                legacy = []
+                for p in product_lines:
+                    legacy.append({
+                        "supplier_code": p["codigo_fornecedor"],
+                        "description": p["descricao"],
+                        "linha_raw": p["linha_raw"],
+                        "unit": p["unidade"],
+                        "qty": p["quantidade"],
+                        "mini_codigo": p["mini_codigo"],
+                        "dimensoes": p["dimensoes"],
+                    })
+                result["lines"] = legacy
 
     if result["produtos"]:
         result["totals"]["total_lines"] = len(result["produtos"])
