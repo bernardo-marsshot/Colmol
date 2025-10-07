@@ -1,11 +1,11 @@
-modules = ["web", "python-3.11", "postgresql-16", "nodejs-20"]
+modules = ["web", "python-3.11", "postgresql-16"]
 [agent]
 expertMode = true
 integrations = ["python_openai:1.0.0"]
 
 [nix]
 channel = "stable-25_05"
-packages = ["freetype", "hdf5", "lcms2", "libGL", "libGLU", "libimagequant", "libjpeg", "libtiff", "libwebp", "libxcrypt", "openjpeg", "poppler-utils", "poppler_utils", "tcl", "tesseract", "tk", "zbar", "zlib", "ollama"]
+packages = ["freetype", "hdf5", "lcms2", "libGL", "libGLU", "libimagequant", "libjpeg", "libtiff", "libwebp", "libxcrypt", "openjpeg", "poppler-utils", "poppler_utils", "tcl", "tesseract", "tk", "zbar", "zlib"]
 
 [workflows]
 runButton = "Project"
@@ -19,10 +19,6 @@ author = "agent"
 task = "workflow.run"
 args = "Django Server"
 
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Ollama + Proxy"
-
 [[workflows.workflow]]
 name = "Django Server"
 author = "agent"
@@ -34,18 +30,6 @@ waitForPort = 5000
 
 [workflows.workflow.metadata]
 outputType = "webview"
-
-[[workflows.workflow]]
-name = "Ollama + Proxy"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "bash start.sh"
-waitForPort = 3000
-
-[workflows.workflow.metadata]
-outputType = "console"
 
 [[ports]]
 localPort = 3000

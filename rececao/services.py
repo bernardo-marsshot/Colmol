@@ -3,8 +3,6 @@ import hashlib
 import json
 import os
 import re
-import base64
-import requests
 from io import BytesIO
 from PIL import Image
 
@@ -34,407 +32,6 @@ except ImportError:
 # Se precisares especificar o caminho do tesseract no Windows:
 # pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
-# --- Configuração Ollama ---
-OLLAMA_API_URL = os.environ.get("OLLAMA_API_URL", "")
-OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llava:latest")
-OLLAMA_ENABLED = bool(OLLAMA_API_URL)
-
-if OLLAMA_ENABLED:
-    print(f"✅ Ollama Vision habilitado: {OLLAMA_API_URL} (modelo: {OLLAMA_MODEL})")
-else:
-    print("⚠️ Ollama Vision desabilitado (defina OLLAMA_API_URL para ativar)")
-
-# ----------------- Ollama Vision -----------------
-
-def extract_with_ollama_vision(file_path: str):
-    """
-    Extrai dados de documento usando Ollama Vision como fallback.
-    Converte imagem/PDF em base64 e envia para modelo LLaVA.
-    
-    LIMITAÇÃO: PDFs multi-página - processa apenas a PRIMEIRA página.
-    Se dados críticos estiverem em páginas subsequentes, o fallback pode não recuperá-los.
-    """
-    if not OLLAMA_ENABLED:
-        print("⚠️ Ollama não disponível - fallback desabilitado")
-        return None
-    
-    try:
-        import time
-        start_time = time.time()
-        
-        print("=" * 60)
-        print("🤖 OLLAMA VISION - INICIANDO EXTRAÇÃO")
-        print("=" * 60)
-        
-        # Converter primeira página do PDF ou imagem para base64
-        ext = os.path.splitext(file_path)[1].lower()
-        print(f"📄 Tipo de ficheiro: {ext}")
-        
-        if ext == '.pdf':
-            print("📑 Convertendo primeira página do PDF para imagem...")
-            # Converter primeira página do PDF para imagem
-            pages = convert_from_path(file_path, dpi=150, first_page=1, last_page=1)
-            if not pages:
-                print("❌ Falha ao converter PDF")
-                return None
-            img = pages[0]
-            print(f"✅ PDF convertido: {img.size[0]}x{img.size[1]} pixels")
-        else:
-            print("🖼️  Carregando imagem...")
-            img = Image.open(file_path)
-            print(f"✅ Imagem carregada: {img.size[0]}x{img.size[1]} pixels")
-        
-        # Converter para base64
-        print("🔄 Convertendo para base64...")
-        buffered = BytesIO()
-        img.save(buffered, format="JPEG")
-        img_base64 = base64.b64encode(buffered.getvalue()).decode()
-        img_size_kb = len(img_base64) / 1024
-        print(f"✅ Base64 gerado: {img_size_kb:.1f} KB")
-        
-        # Prompt para extrair dados estruturados
-        prompt = """Analisa esta Guia de Remessa portuguesa e extrai as seguintes informações em formato JSON:
-
-{
-  "numero_requisicao": "número da requisição ou documento",
-  "document_number": "número do documento",
-  "supplier_name": "nome do fornecedor",
-  "delivery_date": "data de entrega (formato DD-MM-YYYY)",
-  "produtos": [
-    {
-      "artigo": "código do artigo/produto",
-      "descricao": "descrição do produto",
-      "quantidade": número (SEM separadores de milhares - ex: 1234 não 1.234),
-      "unidade": "unidade (ML, UN, etc)",
-      "preco_unitario": número (decimal com ponto - ex: 12.50 não 12,50),
-      "total": número (decimal com ponto - ex: 1234.56 não 1.234,56),
-      "dimensoes": {
-        "largura": número ou null,
-        "comprimento": número ou null,
-        "espessura": número ou null
-      }
-    }
-  ]
-}
-
-IMPORTANTE:
-- Números: use APENAS PONTO para decimais (12.50)
-- NÃO use separadores de milhares (escreva 1234 não 1.234)
-- NÃO use vírgulas em números (escreva 12.5 não 12,5)
-
-Responde APENAS com o JSON, sem texto adicional."""
-
-        # Chamar API do Ollama
-        print(f"📡 Enviando requisição para {OLLAMA_API_URL}/generate")
-        print(f"🎯 Modelo: {OLLAMA_MODEL}")
-        print(f"⏱️  Timeout: 300s")
-        print("⏳ Aguardando resposta do Ollama...")
-        
-        request_start = time.time()
-        response = requests.post(
-            f"{OLLAMA_API_URL}/generate",
-            json={
-                "model": OLLAMA_MODEL,
-                "prompt": prompt,
-                "images": [img_base64],
-                "stream": False,
-                "options": {
-                    "num_predict": 2048
-                }
-            },
-            timeout=300
-        )
-        request_time = time.time() - request_start
-        print(f"✅ Resposta recebida em {request_time:.1f}s")
-        
-        if response.status_code != 200:
-            print(f"❌ Ollama erro HTTP {response.status_code}")
-            print(f"❌ Resposta: {response.text[:200]}")
-            return None
-        
-        print("🔍 Processando resposta do Ollama...")
-        result = response.json()
-        response_text = result.get("response", "")
-        response_len = len(response_text)
-        print(f"📝 Tamanho da resposta: {response_len} caracteres")
-        
-        # Tentar extrair JSON da resposta
-        try:
-            print("🔧 Extraindo JSON da resposta...")
-            # Procurar por JSON na resposta (pode ter texto antes/depois)
-            json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
-            if json_match:
-                json_str = json_match.group()
-                print(f"✅ JSON encontrado ({len(json_str)} caracteres)")
-                parsed_data = json.loads(json_str)
-                num_produtos = len(parsed_data.get('produtos', []))
-                
-                total_time = time.time() - start_time
-                print("=" * 60)
-                print(f"✅ EXTRAÇÃO COMPLETA!")
-                print(f"   📦 Produtos extraídos: {num_produtos}")
-                print(f"   ⏱️  Tempo total: {total_time:.1f}s")
-                print("=" * 60)
-                
-                return parsed_data
-            else:
-                print("⚠️ Ollama não retornou JSON válido")
-                print(f"Resposta completa: {response_text[:500]}")
-                return None
-        except json.JSONDecodeError as e:
-            print(f"❌ Erro ao parsear JSON do Ollama: {e}")
-            print(f"Resposta: {response_text[:200]}")
-            return None
-            
-    except Exception as e:
-        print(f"❌ Erro no Ollama Vision: {e}")
-        return None
-
-
-def safe_numeric(value, default=0):
-    """
-    Converte valor para float/int de forma segura.
-    
-    DESIGN PRAGMÁTICO:
-    - Normaliza apenas formatos CLARAMENTE identificáveis
-    - Confia que Ollama Vision retorna valores já normalizados do documento
-    - Evita sobre-engenharia em casos ambíguos
-    
-    Casos claros:
-    - Ambos separadores: determina pela posição
-    - Múltiplos separadores: milhares
-    - Vírgula única: decimal europeu
-    - Ponto único: mantém como está (pode ser decimal ou já convertido)
-    """
-    if value is None:
-        return default
-    if isinstance(value, (int, float)):
-        return value
-    if isinstance(value, str):
-        try:
-            # Limpar moedas e espaços
-            cleaned = value.strip()
-            cleaned = re.sub(r'[€$£¥R\s]', '', cleaned)
-            
-            if not cleaned:
-                return default
-            
-            has_dot = '.' in cleaned
-            has_comma = ',' in cleaned
-            
-            # Caso 1: Ambos separadores → formato claro
-            if has_dot and has_comma:
-                dot_pos = cleaned.rfind('.')
-                comma_pos = cleaned.rfind(',')
-                if dot_pos > comma_pos:
-                    # Americano: 1,234.56
-                    cleaned = cleaned.replace(',', '')
-                else:
-                    # Europeu: 1.234,56
-                    cleaned = cleaned.replace('.', '').replace(',', '.')
-            
-            # Caso 2: Múltiplos separadores → milhares
-            elif cleaned.count('.') > 1:
-                cleaned = cleaned.replace('.', '')
-            elif cleaned.count(',') > 1:
-                cleaned = cleaned.replace(',', '')
-            
-            # Caso 3: Vírgula única → decimal europeu
-            elif cleaned.count(',') == 1:
-                cleaned = cleaned.replace(',', '.')
-            
-            # Caso 4: Ponto único → heurística balanceada
-            # LIMITAÇÃO CONHECIDA: casos ambíguos não têm solução perfeita sem locale
-            elif cleaned.count('.') == 1:
-                parts = cleaned.split('.')
-                before_str = parts[0].lstrip('-+')
-                after_str = parts[1] if len(parts) > 1 else ""
-                
-                # Heurística: milhares PT se 3 dígitos após E valor antes 1-999
-                # Cobre casos típicos: "1.234"→1234, "12.345"→12345
-                # Exclui: "0.333"→0.333, "1000.123"→1000.123 (já muito grande)
-                try:
-                    before_val = int(before_str) if before_str.isdigit() else 0
-                    if len(after_str) == 3 and 1 <= before_val <= 999:
-                        # Provavelmente milhares PT
-                        cleaned = cleaned.replace('.', '')
-                except (ValueError, AttributeError):
-                    pass  # Manter como está
-            
-            result = float(cleaned)
-            return int(result) if result.is_integer() else result
-            
-        except (ValueError, AttributeError):
-            return default
-    return default
-
-
-def normalize_ollama_payload(ollama_result: dict, tesseract_qr_codes: list) -> dict:
-    """
-    Normaliza completamente o payload retornado pelo Ollama Vision.
-    Garante schema consistente e conversão segura de todos os campos.
-    
-    Retorna estrutura normalizada compatível com downstream consumers.
-    """
-    normalized = {}
-    
-    # 1. Metadados básicos (strings)
-    normalized["numero_requisicao"] = ollama_result.get("numero_requisicao") or ""
-    normalized["document_number"] = ollama_result.get("document_number") or ""
-    normalized["po_number"] = ollama_result.get("po_number") or ""
-    normalized["supplier_name"] = ollama_result.get("supplier_name") or ""
-    normalized["delivery_date"] = ollama_result.get("delivery_date") or ""
-    
-    # 2. QR codes (sempre usar os detectados pelo Tesseract)
-    normalized["qr_codes"] = tesseract_qr_codes if tesseract_qr_codes else []
-    
-    # 3. Normalizar produtos (novo formato)
-    raw_produtos = ollama_result.get("produtos")
-    if raw_produtos and isinstance(raw_produtos, list):
-        normalized_produtos = []
-        for item in raw_produtos:
-            # Ignorar items que não são dicts
-            if not isinstance(item, dict):
-                continue
-            
-            # Normalizar campos do produto
-            produto = {
-                "artigo": item.get("artigo") or "",
-                "descricao": item.get("descricao") or "",
-                "quantidade": safe_numeric(item.get("quantidade"), 0),
-                "unidade": item.get("unidade") or "",
-                "preco_unitario": safe_numeric(item.get("preco_unitario"), 0),
-                "total": safe_numeric(item.get("total"), 0),
-            }
-            
-            # Dimensões (opcional)
-            dim = item.get("dimensoes")
-            if dim and isinstance(dim, dict):
-                produto["dimensoes"] = {
-                    "largura": safe_numeric(dim.get("largura")),
-                    "comprimento": safe_numeric(dim.get("comprimento")),
-                    "espessura": safe_numeric(dim.get("espessura")),
-                }
-            else:
-                produto["dimensoes"] = None
-            
-            normalized_produtos.append(produto)
-        
-        normalized["produtos"] = normalized_produtos
-    else:
-        normalized["produtos"] = []
-    
-    # 4. Normalizar lines (formato legado)
-    raw_lines = ollama_result.get("lines")
-    if raw_lines and isinstance(raw_lines, list):
-        normalized_lines = []
-        for item in raw_lines:
-            if not isinstance(item, dict):
-                continue
-            
-            line = {
-                "supplier_code": item.get("supplier_code") or "",
-                "description": item.get("description") or "",
-                "qty": safe_numeric(item.get("qty"), 0),
-                "unit": item.get("unit") or "",
-                "unit_price": safe_numeric(item.get("unit_price"), 0),
-                "total": safe_numeric(item.get("total"), 0),
-            }
-            normalized_lines.append(line)
-        
-        normalized["lines"] = normalized_lines
-    else:
-        normalized["lines"] = []
-    
-    # 5. SEMPRE recalcular totals (nunca confiar no LLM)
-    total_qty = 0
-    for p in normalized["produtos"]:
-        total_qty += p.get("quantidade", 0)
-    for l in normalized["lines"]:
-        total_qty += l.get("qty", 0)
-    
-    normalized["totals"] = {
-        "total_lines": len(normalized["produtos"]) + len(normalized["lines"]),
-        "total_quantity": total_qty
-    }
-    
-    return normalized
-
-
-def calculate_confidence_score(payload: dict) -> float:
-    """
-    Calcula score de confiança (0-100) dos dados extraídos.
-    Score alto = dados completos e válidos.
-    Score baixo = dados faltando ou suspeitos.
-    """
-    score = 0
-    max_score = 100
-    
-    # Documento tem número? (+10)
-    if payload.get("document_number") or payload.get("numero_requisicao"):
-        score += 10
-    
-    # Tem fornecedor? (+10)
-    if payload.get("supplier_name"):
-        score += 10
-    
-    # Tem data? (+5)
-    if payload.get("delivery_date"):
-        score += 5
-    
-    # Tem produtos/linhas? (+20)
-    produtos = payload.get("produtos", [])
-    lines = payload.get("lines", [])
-    if produtos or lines:
-        score += 20
-        
-        # Verificar qualidade dos produtos
-        items = produtos if produtos else lines
-        if len(items) > 0:
-            # Pelo menos 1 produto (+10)
-            score += 10
-            
-            # Produtos têm informação completa? (+20)
-            complete_items = 0
-            for item in items:
-                has_code = bool(item.get("artigo") or item.get("supplier_code"))
-                has_qty = bool(item.get("quantidade") or item.get("qty"))
-                has_desc = bool(item.get("descricao") or item.get("description"))
-                
-                if has_code and has_qty and has_desc:
-                    complete_items += 1
-            
-            # Percentagem de produtos completos
-            completeness = complete_items / len(items)
-            score += int(20 * completeness)
-            
-            # Bonus: Produtos têm dimensões? (+10)
-            has_dimensions = any(
-                item.get("dimensoes") for item in items
-            )
-            if has_dimensions:
-                score += 10
-            
-            # Bonus: Tem preços? (+5)
-            has_prices = any(
-                item.get("preco_unitario") or item.get("total") for item in items
-            )
-            if has_prices:
-                score += 5
-        else:
-            # Tem campo mas vazio = suspeito
-            score -= 10
-    
-    # Penalidade: Se não tem produtos/linhas é falha crítica
-    if not produtos and not lines:
-        score = min(score, 20)  # Cap no máximo 20%
-    
-    # Normalizar entre 0-100
-    score = max(0, min(100, score))
-    
-    return score
-
-
 # ----------------- OCR: PDF/Imagens -----------------
 
 
@@ -452,118 +49,45 @@ def save_extraction_to_json(data: dict, filename: str = "extracao.json"):
 
 
 def real_ocr_extract(file_path: str):
-    """
-    Sistema de extração inteligente:
-    - Se OLLAMA configurado: usa APENAS Ollama Vision (visão computacional direta)
-    - Se não configurado: usa Tesseract OCR tradicional
-    """
-    ext = os.path.splitext(file_path)[1].lower()
-    qr_codes = []
-    
-    # ========== OLLAMA VISION (MÉTODO PRIMÁRIO SE CONFIGURADO) ==========
-    if OLLAMA_ENABLED:
-        print("🤖 Usando Ollama Vision (método primário)...")
-        
-        # Detectar QR codes primeiro (Tesseract ainda é bom para isso)
-        if QR_CODE_ENABLED:
-            try:
-                if ext == ".pdf":
-                    pages = convert_from_path(file_path, dpi=300, first_page=1, last_page=1)
-                    if pages:
-                        qr_codes = detect_and_read_qrcodes(pages[0], page_number=1)
-                elif ext in [".jpg", ".jpeg", ".png", ".tiff", ".bmp"]:
-                    img = Image.open(file_path)
-                    qr_codes = detect_and_read_qrcodes(img, page_number=1)
-                
-                if qr_codes:
-                    print(f"✅ {len(qr_codes)} QR code(s) detectado(s)")
-            except Exception as e:
-                print(f"⚠️ Erro ao detectar QR codes: {e}")
-        
-        # Extrair dados com Ollama Vision
-        ollama_result = extract_with_ollama_vision(file_path)
-        
-        if ollama_result:
-            # Normalizar payload
-            result = normalize_ollama_payload(ollama_result, qr_codes)
-            confidence_score = calculate_confidence_score(result)
-            
-            result["_extraction_method"] = "ollama_vision"
-            result["_confidence_score"] = confidence_score
-            
-            print(f"✅ Extração via OLLAMA VISION (confiança: {confidence_score:.1f}%)")
-            save_extraction_to_json(result)
-            return result
-        else:
-            print("❌ Ollama Vision falhou")
-            error_result = {
-                "error": "Ollama Vision extraction failed",
-                "numero_requisicao": f"ERROR-{os.path.basename(file_path)}",
-                "document_number": "",
-                "po_number": "",
-                "supplier_name": "",
-                "delivery_date": "",
-                "qr_codes": qr_codes,
-                "produtos": [],
-                "lines": [],
-                "totals": {
-                    "total_lines": 0,
-                    "total_quantity": 0
-                },
-                "_extraction_method": "ollama_vision",
-                "_confidence_score": 0,
-            }
-            save_extraction_to_json(error_result)
-            return error_result
-    
-    # ========== TESSERACT OCR (FALLBACK SE OLLAMA NÃO CONFIGURADO) ==========
-    print("📄 Usando Tesseract OCR (Ollama não configurado)...")
-    
+    """OCR real (Tesseract). Extrai texto e faz parse para estrutura."""
     text_content = ""
+    qr_codes = []
+    ext = os.path.splitext(file_path)[1].lower()
+
     if ext == ".pdf":
         text_content, qr_codes = extract_text_from_pdf(file_path)
     elif ext in [".jpg", ".jpeg", ".png", ".tiff", ".bmp"]:
         text_content, qr_codes = extract_text_from_image(file_path)
 
-    # Pré-visualização
-    if text_content:
-        preview = "\n".join(text_content.splitlines()[:60])
-        print("---- OCR PREVIEW (primeiras linhas) ----")
-        print(preview)
-        print("----------------------------------------")
+    # Pré-visualização (debug) para validação
+    preview = "\n".join(text_content.splitlines()[:60])
+    print("---- OCR PREVIEW (primeiras linhas) ----")
+    print(preview)
+    print("----------------------------------------")
 
     if qr_codes:
         print(f"✅ {len(qr_codes)} QR code(s) detectado(s)")
 
     if not text_content.strip():
-        print("❌ Tesseract OCR vazio")
+        print("❌ OCR vazio")
         error_result = {
-            "error": "OCR failed - no text extracted",
+            "error": "OCR failed - no text extracted from document",
             "numero_requisicao": f"ERROR-{os.path.basename(file_path)}",
             "document_number": "",
             "po_number": "",
             "supplier_name": "",
             "delivery_date": "",
             "qr_codes": qr_codes,
-            "produtos": [],
             "lines": [],
             "totals": {
                 "total_lines": 0,
                 "total_quantity": 0
             },
-            "_extraction_method": "tesseract",
-            "_confidence_score": 0,
         }
         save_extraction_to_json(error_result)
         return error_result
 
     result = parse_portuguese_document(text_content, qr_codes)
-    confidence_score = calculate_confidence_score(result)
-    
-    result["_extraction_method"] = "tesseract"
-    result["_confidence_score"] = confidence_score
-    
-    print(f"✅ Extração via TESSERACT (confiança: {confidence_score:.1f}%)")
     save_extraction_to_json(result)
     return result
 
