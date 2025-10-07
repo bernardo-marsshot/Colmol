@@ -9,7 +9,7 @@
     {
       "referencia_ordem": "01-751444 / Req 4177",
       "artigo": "2D3198008800200",
-      "descricao": "ETER 2340AZ CX. 1980x0880×020",
+      "descricao": "ETER 2340AZ CX.1980x0880x020",
       "lote_producao": "",
       "quantidade": 29.0,
       "unidade": "UN",
@@ -20,9 +20,9 @@
       "total": 0.0
     },
     {
-      "referencia_ordem": "01-751477 / Req 4177",
+      "referencia_ordem": "01-751477 / Req 4217",
       "artigo": "2M2198001500800",
-      "descricao": "ETER 3051VD Cx.1980x0150x080",
+      "descricao": "ETER 3051VD CX.1980x0150x080",
       "lote_producao": "",
       "quantidade": 100.0,
       "unidade": "UN",
@@ -33,9 +33,9 @@
       "total": 0.0
     },
     {
-      "referencia_ordem": "01-751477 / Req 4177",
+      "referencia_ordem": "01-751482 / Req 4204",
       "artigo": "2JJ188014800400",
-      "descricao": "ETER 3820AZU CX. 1880×1480×040",
+      "descricao": "ETER 3820AZU CX.1880x1480x040",
       "lote_producao": "",
       "quantidade": 2.0,
       "unidade": "UN",
@@ -46,9 +46,9 @@
       "total": 0.0
     },
     {
-      "referencia_ordem": "01-751477 / Req 4177",
+      "referencia_ordem": "01-751482 / Req 4204",
       "artigo": "2JJ198014800400",
-      "descricao": "ETER 3820AZU CX. 1980x1480x040",
+      "descricao": "ETER 3820AZU CX.1980x1480x040",
       "lote_producao": "",
       "quantidade": 2.0,
       "unidade": "UN",
@@ -61,7 +61,7 @@
     {
       "referencia_ordem": "01-751540 / Req 4249",
       "artigo": "2JJ198015800400",
-      "descricao": "ETER 3820AZU CX. 1980x1580×040",
+      "descricao": "ETER 3820AZU CX.1980x1580x040",
       "lote_producao": "",
       "quantidade": 10.0,
       "unidade": "UN",
@@ -70,11 +70,24 @@
       "peso": 47.552,
       "iva": 23.0,
       "total": 0.0
+    },
+    {
+      "referencia_ordem": "01-751638 / Req 4299",
+      "artigo": "4C121000150",
+      "descricao": "ETER 1829BR RL.2100x015 5UN",
+      "lote_producao": "",
+      "quantidade": 350.0,
+      "unidade": "MT",
+      "volume": 0,
+      "dimensoes": "0.0x2.1x0.015",
+      "peso": 198.45,
+      "iva": 23.0,
+      "total": 0.0
     }
   ],
   "lines": [],
   "totals": {
-    "total_lines": 5,
-    "total_quantity": 143.0
+    "total_lines": 6,
+    "total_quantity": 493.0
   }
 }

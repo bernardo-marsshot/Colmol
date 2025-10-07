@@ -446,7 +446,7 @@ def detect_document_type(text: str):
 
 
 def parse_fatura_elastron(text: str):
-    """Parser específico para faturas Elastron com regex robusto."""
+    """Parser específico para faturas Elastron (compatível com Tesseract)."""
     produtos = []
     lines = text.split("\n")
     
@@ -462,49 +462,46 @@ def parse_fatura_elastron(text: str):
         if artigo_match:
             try:
                 artigo = artigo_match.group(1).replace('O', '0')
-                resto = artigo_match.group(2)
+                resto = artigo_match.group(2).strip()
                 
-                lote_match = re.search(r'(\d{4}-\d+(?:#)?)', resto)
-                if lote_match:
-                    lote = lote_match.group(1)
-                    descricao = resto[:lote_match.start()].strip()
-                    dados = resto[lote_match.end():].strip()
-                else:
-                    lote = ""
-                    descricao = resto.split()[0] if resto else ""
-                    dados = resto
-                
-                numeros = re.findall(r'\d+[.,]\d+|\d+', dados)
-                if len(numeros) < 4:
+                parts = resto.split()
+                if len(parts) < 6:
                     continue
                 
-                quantidade = float(numeros[0].replace(',', '.'))
+                # Tesseract format: TOTAL VOL QUANT DESC UNID PRECO IVA LOTE... DESCRICAO
+                # Encontrar unidade (ML, MT, UN)
+                unidade_idx = -1
+                unidade = "ML"
+                for idx, part in enumerate(parts):
+                    if part.upper() in ['ML', 'MT', 'UN', 'M²', 'M2']:
+                        unidade = part.upper()
+                        unidade_idx = idx
+                        break
                 
-                unidade_match = re.search(r'(ML|MT|UN|m²|m2)', dados, re.IGNORECASE)
-                unidade = unidade_match.group(1) if unidade_match else "ML"
+                if unidade_idx < 3:
+                    continue
                 
-                if unidade_match and len(numeros) >= 5:
-                    unidade_pos = dados.find(unidade_match.group(1))
-                    after_unit = dados[unidade_pos+len(unidade_match.group(1)):]
-                    unit_nums = re.findall(r'\d+[.,]\d+|\d+', after_unit)
-                    
-                    if len(unit_nums) >= 4:
-                        preco_un = float(unit_nums[0].replace(',', '.'))
-                        desconto = float(unit_nums[1].replace(',', '.'))
-                        iva = float(unit_nums[2].replace(',', '.'))
-                        total = float(unit_nums[3].replace(',', '.'))
+                # Campos antes da unidade: TOTAL VOL QUANT DESC
+                total = float(parts[0].replace(',', '.'))
+                volume = int(parts[1]) if parts[1].isdigit() else 1
+                quantidade = float(parts[2].replace(',', '.'))
+                desconto = float(parts[3].replace(',', '.'))
+                
+                # Campos depois da unidade: PRECO IVA LOTE ... DESCRICAO
+                preco_un = float(parts[unidade_idx + 1].replace(',', '.')) if unidade_idx + 1 < len(parts) else 0.0
+                iva = float(parts[unidade_idx + 2].replace(',', '.')) if unidade_idx + 2 < len(parts) else 23.0
+                
+                # Lote e descrição
+                lote = ""
+                descricao = ""
+                if unidade_idx + 3 < len(parts):
+                    remaining = ' '.join(parts[unidade_idx + 3:])
+                    lote_match = re.search(r'(\d{4}-\d+(?:#)?)', remaining)
+                    if lote_match:
+                        lote = lote_match.group(1)
+                        descricao = remaining[lote_match.end():].strip()
                     else:
-                        preco_un = float(numeros[1].replace(',', '.')) if len(numeros) > 1 else 0.0
-                        desconto = float(numeros[2].replace(',', '.')) if len(numeros) > 2 else 0.0
-                        iva = float(numeros[3].replace(',', '.')) if len(numeros) > 3 else 23.0
-                        total = float(numeros[4].replace(',', '.')) if len(numeros) > 4 else 0.0
-                else:
-                    preco_un = float(numeros[1].replace(',', '.')) if len(numeros) > 1 else 0.0
-                    desconto = float(numeros[2].replace(',', '.')) if len(numeros) > 2 else 0.0
-                    iva = float(numeros[3].replace(',', '.')) if len(numeros) > 3 else 23.0
-                    total = float(numeros[4].replace(',', '.')) if len(numeros) > 4 else 0.0
-                
-                volume = 1
+                        descricao = remaining
                 
                 produtos.append({
                     "referencia_ordem": current_ref,
