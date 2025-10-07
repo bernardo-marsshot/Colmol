@@ -624,6 +624,8 @@ def parse_portuguese_document(text: str, qr_codes=None):
             "total_lines": 0,
             "total_quantity": 0
         },
+        "tipo_documento": doc_type,
+        "texto_completo": text,
     }
 
     patterns = {
@@ -915,6 +917,30 @@ def process_inbound(inbound: InboundDocument):
 
     inbound.parsed_payload = payload
     inbound.save()
+
+    # Validar se ficheiro é ilegível
+    texto_extraido = payload.get("texto_completo", "")
+    produtos_extraidos = payload.get("produtos", [])
+    linhas_extraidas = payload.get("lines", [])
+    
+    # Considerar ficheiro ilegível se:
+    # - Texto muito curto (<100 chars)
+    # - Documento é guia/fatura mas 0 produtos extraídos
+    doc_type = payload.get("tipo_documento", "")
+    is_document_with_products = any(x in doc_type for x in ["FATURA", "GUIA"])
+    
+    if len(texto_extraido) < 100:
+        ExceptionTask.objects.create(
+            inbound=inbound,
+            line_ref="OCR",
+            issue="Ficheiro ilegível - texto extraído muito curto (menos de 100 caracteres)"
+        )
+    elif is_document_with_products and not produtos_extraidos and not linhas_extraidas:
+        ExceptionTask.objects.create(
+            inbound=inbound,
+            line_ref="OCR",
+            issue="Ficheiro ilegível - nenhum produto foi extraído do documento"
+        )
 
     # criar linhas de receção
     inbound.lines.all().delete()
