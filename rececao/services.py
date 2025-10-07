@@ -1049,8 +1049,11 @@ def export_document_to_excel(inbound_id: int) -> HttpResponse:
             for produto in inbound.parsed_payload.get("produtos", []):
                 # Match usando article_code (código do produto único)
                 if produto.get("artigo") == linha.article_code:
-                    dims = produto.get("dimensoes", {})
-                    if dims and any(dims.values()):
+                    dims = produto.get("dimensoes", "")
+                    # dimensoes pode ser string (Tesseract) ou dicionário (formato antigo)
+                    if isinstance(dims, str):
+                        dimensoes = dims
+                    elif isinstance(dims, dict) and any(dims.values()):
                         larg = dims.get("largura", 0)
                         comp = dims.get("comprimento", 0)
                         esp = dims.get("espessura", 0)
@@ -1065,8 +1068,11 @@ def export_document_to_excel(inbound_id: int) -> HttpResponse:
         else:
             for payload_line in inbound.parsed_payload.get("lines", []):
                 if payload_line.get("supplier_code") == linha.supplier_code:
-                    dims = payload_line.get("dimensoes", {})
-                    if dims and any(dims.values()):
+                    dims = payload_line.get("dimensoes", "")
+                    # dimensoes pode ser string (Tesseract) ou dicionário (formato antigo)
+                    if isinstance(dims, str):
+                        dimensoes = dims
+                    elif isinstance(dims, dict) and any(dims.values()):
                         larg = dims.get("largura", 0)
                         comp = dims.get("comprimento", 0)
                         esp = dims.get("espessura", 0)

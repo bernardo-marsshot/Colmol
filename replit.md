@@ -52,6 +52,7 @@ Successfully imported and configured for Replit environment on September 24, 202
   - Elastron invoices (13/13 products extracted)
   - Colmol delivery notes (7/7 products extracted)
 - **Offline Processing**: No external API dependencies, fully local OCR processing
+- **Excel Export Fix**: Updated `export_document_to_excel()` to handle dimensions as strings (Tesseract format) instead of dictionaries
 
 ### October 6, 2025
 - **Fixed CodeMapping lookup bug**: System was using supplier_code from order reference (e.g., "1ECWH") instead of article_code (product SKU) for lookups, causing all lines to map to the same first result
