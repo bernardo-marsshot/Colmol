@@ -39,7 +39,7 @@ Successfully imported and configured for Replit environment on September 24, 202
 
 ## Recent Changes
 
-### October 7, 2025 - Tesseract OCR Migration & Generic Parser
+### October 7, 2025 - Tesseract OCR Migration, Generic Parser & Advanced Validation
 - **Simplified to Tesseract Only**: Removed OCR.space dependency, now using only local Tesseract OCR
 - **Improved Elastron Parser**: Adapted for Tesseract output format - now extracts 13/13 products (100%)
 - **Fixed Colmol Parser**: Corrected dimension pattern detection - now extracts 7/7 products (100%)
@@ -49,9 +49,17 @@ Successfully imported and configured for Replit environment on September 24, 202
   - Supports PT (25,000) and EN (25.0) number formats
   - Extracts dimensions from descriptions (1980x0880x0020 → 1.98x0.88x0.02)
   - Automatic fallback: if specific parser fails, tries generic parser
-- **Illegible File Detection**: Automatic ExceptionTask creation when:
-  - Text extraction < 100 chars (file too damaged/corrupt)
-  - Invoice/delivery note with 0 products extracted (OCR failed)
+- **Advanced Illegible File Detection**: Multi-layer validation system with automatic ExceptionTask creation:
+  1. **Text length validation**: Text < 100 chars → "Ficheiro ilegível - texto muito curto"
+  2. **Product extraction validation**: Guia/Fatura with 0 products → "Ficheiro ilegível - nenhum produto extraído"
+  3. **Low quality detection**: pdfplumber text < 50 chars + no products → "Ficheiro ilegível - qualidade de imagem muito baixa"
+  4. **Product quality validation**: >50% invalid products (code <5 chars OR quantity ≤0) → "Ficheiro desformatado - X/Y produtos com dados inválidos"
+- **OCR Performance & Timeout Protection**:
+  - **DPI optimized**: Reduced from 300 to 200 DPI for faster processing with acceptable quality
+  - **Per-page timeout**: 15-second timeout per page prevents hanging on low-quality images
+  - **Graceful degradation**: Skips timed-out pages and continues processing
+  - **Performance tracking**: Logs conversion time and per-page processing time
+  - **Timeout handling**: Automatically detects and reports OCR timeout errors
 - **Format-Specific Parsers**: 
   - `parse_fatura_elastron()`: Handles Elastron invoices with Tesseract format (100% extraction rate)
   - `parse_guia_colmol()`: Processes Colmol delivery notes with encomenda/requisição tracking (100% extraction rate)
@@ -60,6 +68,7 @@ Successfully imported and configured for Replit environment on September 24, 202
   - Elastron invoices (13/13 products extracted)
   - Colmol delivery notes (7/7 products extracted)
   - Generic delivery notes from multiple suppliers
+  - Malformed/low-quality PDFs (automatic exception creation)
 - **Offline Processing**: No external API dependencies, fully local OCR processing
 - **Excel Export Fix**: Updated `export_document_to_excel()` to handle dimensions as strings (Tesseract format) instead of dictionaries
 
