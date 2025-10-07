@@ -6,6 +6,7 @@ import re
 import base64
 from io import BytesIO
 from PIL import Image
+import signal
 
 import PyPDF2
 import pytesseract
@@ -281,19 +282,48 @@ def detect_and_read_qrcodes(image, page_number=None):
 
 def extract_text_from_pdf_with_ocr(file_path: str):
     """Converte todas as páginas para imagem e aplica Tesseract."""
+    import time
     try:
         print("📄 Converter PDF → imagens (OCR)…")
-        pages = convert_from_path(file_path, dpi=300)
+        
+        # Converter PDF → imagens primeiro
+        start_time = time.time()
+        pages = convert_from_path(file_path, dpi=200)  # Reduzir DPI para 200 (mais rápido)
+        conversion_time = time.time() - start_time
+        
+        # Se conversão demorou muito (>20s), ficheiro pode ter problemas
+        if conversion_time > 20:
+            print(f"⚠️ Conversão PDF demorou {conversion_time:.1f}s - possível ficheiro problemático")
+        
         all_text = ""
         all_qr_codes = []
+        
         for i, page in enumerate(pages, 1):
             print(f"🔍 Página {i}/{len(pages)}")
+            
+            # Limite de tempo por página: 15 segundos
+            page_start = time.time()
+            
             qr_codes = detect_and_read_qrcodes(page, page_number=i)
             all_qr_codes.extend(qr_codes)
-            page_text = pytesseract.image_to_string(
-                page, config="--psm 6 --oem 3 -l por", lang="por")
-            if page_text.strip():
-                all_text += f"\n--- Página {i} ---\n{page_text}\n"
+            
+            # OCR da página
+            try:
+                page_text = pytesseract.image_to_string(
+                    page, config="--psm 6 --oem 3 -l por", lang="por", timeout=15)
+                if page_text.strip():
+                    all_text += f"\n--- Página {i} ---\n{page_text}\n"
+            except RuntimeError as e:
+                if "timeout" in str(e).lower():
+                    print(f"⚠️ Timeout OCR na página {i} - imagem de má qualidade")
+                    # Não adiciona texto desta página
+                else:
+                    raise
+            
+            page_time = time.time() - page_start
+            if page_time > 10:
+                print(f"⚠️ Página {i} demorou {page_time:.1f}s - qualidade baixa")
+        
         print(f"✅ OCR completo: {len(pages)} páginas")
         return all_text.strip(), all_qr_codes
     except Exception as e:
