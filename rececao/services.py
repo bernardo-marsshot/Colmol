@@ -95,29 +95,17 @@ def extract_text_with_ocrspace(file_path: str):
 
 
 def real_ocr_extract(file_path: str):
-    """OCR com OCR.space API (fallback para Tesseract). Extrai texto e faz parse para estrutura."""
+    """OCR usando Tesseract. Extrai texto e faz parse para estrutura."""
     text_content = ""
     qr_codes = []
     ext = os.path.splitext(file_path)[1].lower()
 
-    text_content = extract_text_with_ocrspace(file_path)
+    print(f"🔍 Processando com Tesseract: {os.path.basename(file_path)}")
     
-    if text_content is None or not text_content.strip():
-        print("⚠️ OCR.space falhou - usando fallback Tesseract...")
-        if ext == ".pdf":
-            text_content, qr_codes = extract_text_from_pdf(file_path)
-        elif ext in [".jpg", ".jpeg", ".png", ".tiff", ".bmp"]:
-            text_content, qr_codes = extract_text_from_image(file_path)
-    else:
-        if QR_CODE_ENABLED and ext == ".pdf":
-            try:
-                print("🔍 Procurando QR codes...")
-                pages = convert_from_path(file_path, dpi=300)
-                for page_num, page_img in enumerate(pages, start=1):
-                    page_qr = detect_and_read_qrcodes(page_img, page_number=page_num)
-                    qr_codes.extend(page_qr)
-            except Exception as e:
-                print(f"⚠️ Erro ao buscar QR codes: {e}")
+    if ext == ".pdf":
+        text_content, qr_codes = extract_text_from_pdf(file_path)
+    elif ext in [".jpg", ".jpeg", ".png", ".tiff", ".bmp"]:
+        text_content, qr_codes = extract_text_from_image(file_path)
 
     preview = "\n".join(text_content.splitlines()[:60])
     print("---- OCR PREVIEW (primeiras linhas) ----")
