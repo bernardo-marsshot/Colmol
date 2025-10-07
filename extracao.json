@@ -1,50 +1,106 @@
 {
-  "numero_requisicao": "",
-  "document_number": "AMA",
-  "po_number": "AMA",
-  "supplier_name": "",
-  "delivery_date": "01/10/2025",
-  "qr_codes": [
+  "numero_requisicao": "UISICAO",
+  "document_number": "DE",
+  "po_number": "DE",
+  "supplier_name": "Colmol - Colchões S.A",
+  "delivery_date": "25/09/10",
+  "qr_codes": [],
+  "produtos": [
     {
-      "data": {
-        "nif_emitente": "501400354",
-        "nif_adquirente": "500248800",
-        "pais_adquirente": "PT",
-        "tipo_documento": "FT",
-        "estado_documento": "N",
-        "data_documento": "20251001",
-        "identificacao_documento": "VIT 2025/2754",
-        "atcud": "JJWFDDF8-2754",
-        "espaco_fiscal": "PT",
-        "base_tributavel_taxa_normal": "3620.10",
-        "total_iva_taxa_normal": "832.62",
-        "total_impostos": "832.62",
-        "total_documento": "4452.72",
-        "hash": "fAKI",
-        "certificado": "993"
-      },
-      "raw_data": "A:501400354*B:500248800*C:PT*D:FT*E:N*F:20251001*G:VIT 2025/2754*H:JJWFDDF8-2754*I1:PT*I7:3620.10*I8:832.62*N:832.62*O:4452.72*Q:fAKI*R:993",
-      "page": 1
+      "referencia_ordem": "01-751444 / Req 4177",
+      "artigo": "2D7115001500700",
+      "descricao": "ETER 2354 LR CX.1150x0150x070",
+      "lote_producao": "",
+      "quantidade": 50.0,
+      "unidade": "UN",
+      "volume": 0,
+      "dimensoes": "1.15x0.15x0.07",
+      "peso": 13.886,
+      "iva": 23.0,
+      "total": 0.0
+    },
+    {
+      "referencia_ordem": "01-751444 / Req 4177",
+      "artigo": "2D3198008800200",
+      "descricao": "ETER 2340AZ CX.1980x0880x020",
+      "lote_producao": "",
+      "quantidade": 29.0,
+      "unidade": "UN",
+      "volume": 0,
+      "dimensoes": "1.98x0.88x0.02",
+      "peso": 23.244,
+      "iva": 23.0,
+      "total": 0.0
+    },
+    {
+      "referencia_ordem": "01-751477 / Req 4217",
+      "artigo": "2M2198001500800",
+      "descricao": "ETER 3051VD CX.1980x0150x080",
+      "lote_producao": "",
+      "quantidade": 100.0,
+      "unidade": "UN",
+      "volume": 0,
+      "dimensoes": "1.98x0.15x0.08",
+      "peso": 71.28,
+      "iva": 23.0,
+      "total": 0.0
+    },
+    {
+      "referencia_ordem": "01-751482 / Req 4204",
+      "artigo": "2JJ188014800400",
+      "descricao": "ETER 3820AZU CX.1880x1480x040",
+      "lote_producao": "",
+      "quantidade": 2.0,
+      "unidade": "UN",
+      "volume": 0,
+      "dimensoes": "1.88x1.48x0.04",
+      "peso": 8.458,
+      "iva": 23.0,
+      "total": 0.0
+    },
+    {
+      "referencia_ordem": "01-751482 / Req 4204",
+      "artigo": "2JJ198014800400",
+      "descricao": "ETER 3820AZU CX.1980x1480x040",
+      "lote_producao": "",
+      "quantidade": 2.0,
+      "unidade": "UN",
+      "volume": 0,
+      "dimensoes": "1.98x1.48x0.04",
+      "peso": 8.908,
+      "iva": 23.0,
+      "total": 0.0
+    },
+    {
+      "referencia_ordem": "01-751540 / Req 4249",
+      "artigo": "2JJ198015800400",
+      "descricao": "ETER 3820AZU CX.1980x1580x040",
+      "lote_producao": "",
+      "quantidade": 10.0,
+      "unidade": "UN",
+      "volume": 0,
+      "dimensoes": "1.98x1.58x0.04",
+      "peso": 47.552,
+      "iva": 23.0,
+      "total": 0.0
+    },
+    {
+      "referencia_ordem": "01-751638 / Req 4299",
+      "artigo": "4C121000150",
+      "descricao": "ETER 1829BR RL.2100x015 5UN",
+      "lote_producao": "",
+      "quantidade": 350.0,
+      "unidade": "MT",
+      "volume": 0,
+      "dimensoes": "0.0x2.1x0.015",
+      "peso": 198.45,
+      "iva": 23.0,
+      "total": 0.0
     }
   ],
-  "produtos": [],
-  "lines": [
-    {
-      "supplier_code": "ADA",
-      "description": "Local Carga: N/ Instalações Local Descarga: Direcção Indicada 3620,10 832,62",
-      "linha_raw": "Local Carga: N/ Instalações Local Descarga: Direcção Indicada 3620,10 832,62",
-      "unit": "UNI",
-      "qty": 2.0,
-      "mini_codigo": "10x832",
-      "dimensoes": {
-        "comprimento": 832,
-        "largura": 10,
-        "espessura": 0
-      }
-    }
-  ],
+  "lines": [],
   "totals": {
-    "total_lines": 1,
-    "total_quantity": 2.0
+    "total_lines": 7,
+    "total_quantity": 543.0
   }
 }
