@@ -1,0 +1,319 @@
+Objetivo: Implementar extração de dados de guias de remessa/faturas via OpenAI LLM (PT-PT), usando texto do PDF (sem OCR).
+Ação: Criar os ficheiros abaixo, instalar dependências, e expor um comando para ingestão:
+python run_llm_ingest.py inbound/GR_exemplo.pdf --settings=<o_teu_settings> --app=<o_teu_app_models>
+
+1) Dependências
+
+Cria requirements.txt (se não existir) com:
+
+openai>=1.40.0
+pdfplumber>=0.11.0
+pydantic>=2.7
+python-dotenv>=1.0
+
+
+No Shell:
+
+pip install -r requirements.txt
+
+2) Prompt do LLM
+
+Cria prompts/system.txt:
+
+You are a senior document-understanding model specialized in Portuguese (PT-PT) logistics documents (Guia de Remessa “GR”, Fatura “FT”).
+Your job: read raw textual content extracted from PDFs and return a STRICT JSON that matches the provided schema.
+Be robust to messy layouts, broken lines, repeated headers, and near-duplicates.
+
+Normalize:
+- doc_type: "GR" or "FT".
+- date: YYYY-MM-DD.
+- unit: default "UN" if missing.
+- qty fields: decimal with dot, 3 decimals; no thousands separators.
+
+Populate `extra` with any useful leftovers (addresses, ATCUD, weights, volumes, carrier, incoterms, customer codes).
+If unsure, leave fields null or "" rather than hallucinating.
+Output only the JSON (no prose).
+
+3) Cliente OpenAI
+
+Cria llm_client_openai.py:
+
+# llm_client_openai.py
+import os, json
+from openai import OpenAI
+
+def call_llm_openai(system_prompt: str, user_prompt: str, model: str = "gpt-4o-mini"):
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise RuntimeError("Falta OPENAI_API_KEY (define nas Secrets do Replit).")
+    client = OpenAI(api_key=api_key)
+    resp = client.chat.completions.create(
+        model=model,
+        temperature=0.0,
+        response_format={"type": "json_object"},
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user",   "content": user_prompt},
+        ],
+    )
+    return json.loads(resp.choices[0].message.content)
+
+4) Esquema + Persistência Django
+
+Nota: Ajusta from <APP>.models import ... para o nome do teu app (ex.: from core.models import ...).
+
+Cria llm_persist.py:
+
+# llm_persist.py
+from dataclasses import dataclass
+from typing import List, Optional, Dict, Any
+from decimal import Decimal, InvalidOperation
+import re
+from django.db import transaction
+from django.utils.text import slugify
+
+# ⇩⇩⇩  AJUSTA O NOME DO TEU APP AQUI  ⇩⇩⇩
+from core.models import Supplier, PurchaseOrder, InboundDocument, ReceiptLine, CodeMapping, MatchResult  # noqa
+
+@dataclass
+class LineDTO:
+    supplier_code: str
+    description: str
+    unit: str
+    qty_received: str
+    meta: Dict[str, Any]
+
+@dataclass
+class DocumentDTO:
+    doc_type: str
+    number: str
+    date: Optional[str]
+    supplier_name: Optional[str]
+    supplier_code: Optional[str]
+    supplier_vat: Optional[str]
+    po_number: Optional[str]
+    file_path: str
+    lines: List[LineDTO]
+    extra: Dict[str, Any]
+
+def _norm_qty(s: str) -> Decimal:
+    if not s:
+        return Decimal("0.000")
+    s = s.strip().replace(" ", "")
+    s = s.replace(".", "").replace(",", ".")
+    try:
+        return Decimal(s).quantize(Decimal("0.001"))
+    except InvalidOperation:
+        return Decimal("0.000")
+
+def _short_code_from_name(name: str) -> str:
+    base = slugify(name or "Fornecedor").upper().replace("-", "_")
+    return re.sub(r"[^A-Z0-9_]", "", base)[:16] or "SUPPLIER"
+
+def _suggest_internal_sku(supplier: Supplier, supplier_code: str) -> Optional[str]:
+    try:
+        m = CodeMapping.objects.get(supplier=supplier, supplier_code=supplier_code)
+        return m.internal_sku
+    except CodeMapping.DoesNotExist:
+        return None
+
+@transaction.atomic
+def persist_document(obj: Dict[str, Any]) -> InboundDocument:
+    # ---- validação leve + mapping p/ DTO
+    lines = [LineDTO(**ln) for ln in obj.get("lines", [])]
+    dto = DocumentDTO(
+        doc_type=(obj.get("doc_type") or "").strip(),
+        number=(obj.get("number") or "").strip(),
+        date=obj.get("date"),
+        supplier_name=obj.get("supplier_name"),
+        supplier_code=obj.get("supplier_code"),
+        supplier_vat=obj.get("supplier_vat"),
+        po_number=obj.get("po_number"),
+        file_path=obj.get("file_path") or "",
+        lines=lines,
+        extra=obj.get("extra") or {},
+    )
+
+    # ---- Supplier
+    supplier = None
+    if dto.supplier_code:
+        supplier = Supplier.objects.filter(code=dto.supplier_code).first()
+    if not supplier and dto.supplier_name:
+        supplier = Supplier.objects.filter(name__iexact=dto.supplier_name).first()
+    if not supplier:
+        code = dto.supplier_code or _short_code_from_name(dto.supplier_name)
+        supplier, _ = Supplier.objects.get_or_create(code=code, defaults={"name": dto.supplier_name or code})
+
+    # ---- PO (opcional)
+    po = None
+    if dto.po_number:
+        po, _ = PurchaseOrder.objects.get_or_create(number=dto.po_number, defaults={"supplier": supplier})
+        if po.supplier_id != supplier.id:
+            po = None  # não forçar se pertencer a outro supplier
+
+    # ---- InboundDocument idempotente
+    inbound, created = InboundDocument.objects.get_or_create(
+        supplier=supplier, doc_type=dto.doc_type, number=dto.number,
+        defaults={"file": dto.file_path, "po": po, "parsed_payload": dto.extra}
+    )
+    if not created:
+        merged = {**(inbound.parsed_payload or {}), **(dto.extra or {})}
+        inbound.parsed_payload = merged
+        if po and inbound.po_id is None:
+            inbound.po = po
+        if dto.file_path and not inbound.file:
+            inbound.file = dto.file_path
+        inbound.save()
+
+    # ---- Lines (evitar duplicados simples)
+    seen = set()
+    for idx, ln in enumerate(dto.lines):
+        key = (ln.supplier_code.strip(), (ln.description or "").strip(), (ln.unit or "UN").strip(), _norm_qty(ln.qty_received), idx)
+        if key in seen:
+            continue
+        seen.add(key)
+        maybe_internal = _suggest_internal_sku(supplier, ln.supplier_code.strip()) or ""
+        ReceiptLine.objects.get_or_create(
+            inbound=inbound,
+            supplier_code=ln.supplier_code.strip(),
+            description=(ln.description or "").strip(),
+            unit=(ln.unit or "UN").strip(),
+            qty_received=_norm_qty(ln.qty_received),
+            defaults={"article_code": "", "maybe_internal_sku": maybe_internal},
+        )
+
+    # ---- MatchResult simples
+    total = inbound.lines.count()
+    issues = inbound.lines.filter(unit__isnull=True).count()
+    status = "matched" if issues == 0 and total > 0 else ("pending" if total == 0 else "exceptions")
+    MatchResult.objects.update_or_create(
+        inbound=inbound,
+        defaults={"status": status, "summary": {"total_lines": total, "lines_with_issues": issues}}
+    )
+    return inbound
+
+5) Runner: PDF → texto → LLM → JSON → persistir
+
+Cria run_llm_ingest.py:
+
+# run_llm_ingest.py
+import os, sys, argparse, pdfplumber
+from dotenv import load_dotenv
+load_dotenv()
+
+def setup_django(settings_module: str):
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", settings_module)
+    import django
+    django.setup()
+
+def extract_text(pdf_path: str) -> str:
+    pages = []
+    with pdfplumber.open(pdf_path) as pdf:
+        for i, p in enumerate(pdf.pages):
+            txt = p.extract_text() or ""
+            pages.append(f"--- PAGE {i+1} ---\n{txt}")
+    return "\n\n".join(pages)
+
+def build_user_prompt(raw_text: str, file_path: str) -> str:
+    return f"""
+Contexto (modelos alvo):
+Supplier(code unique, name, email?)
+PurchaseOrder(number unique, supplier)
+InboundDocument(supplier, doc_type in {{GR, FT}}, number, file, parsed_payload, po?)
+ReceiptLine(inbound, supplier_code, article_code?, maybe_internal_sku?, description, unit, qty_received)
+
+Esquema JSON EXATO a devolver:
+{{
+  "doc_type": "GR or FT",
+  "number": "string",
+  "date": "YYYY-MM-DD or null",
+  "supplier_name": "string or null",
+  "supplier_code": "string or null",
+  "supplier_vat": "string or null",
+  "po_number": "string or null",
+  "file_path": "{file_path}",
+  "lines": [
+    {{
+      "supplier_code": "string",
+      "description": "string",
+      "unit": "string",
+      "qty_received": "string number with dot (e.g., 25.000)",
+      "meta": {{"order_ref": "string or null"}}
+    }}
+  ],
+  "extra": {{
+    "ship_to": {{"name": "", "vat_id": "", "address": ""}},
+    "carrier_info": {{"ref": "", "incoterms": "", "route": ""}},
+    "totals_footer": {{"nr_volumes": null, "gross_weight_kg": null, "net_weight_kg": null}},
+    "atcud": null,
+    "notes": ""
+  }}
+}}
+
+Regras:
+- Não inventes valores ausentes; mantém null/"".
+- Corrige datas e quantidades (1.711,220 → "1711.220").
+- Responde só com JSON válido.
+
+TEXTO:
+
+
+{raw_text}
+
+"""
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Ingestão via LLM (OpenAI) sem OCR.")
+    parser.add_argument("pdfs", nargs="+", help="Caminhos dos PDFs")
+    parser.add_argument("--settings", required=True, help="Ex.: myproject.settings")
+    parser.add_argument("--app", default="core", help="App onde estão os models (ex.: core)")
+    parser.add_argument("--model", default="gpt-4o-mini", help="Modelo OpenAI")
+    args = parser.parse_args()
+
+    # Django
+    setup_django(args.settings)
+
+    # Prompts
+    with open("prompts/system.txt", "r", encoding="utf-8") as f:
+        system_prompt = f.read()
+
+    from llm_client_openai import call_llm_openai
+    from llm_persist import persist_document
+
+    for path in args.pdfs:
+        raw = extract_text(path)
+        rel_file = f"inbound/{os.path.basename(path)}"
+        user_prompt = build_user_prompt(raw, file_path=rel_file)
+        obj = call_llm_openai(system_prompt, user_prompt, model=args.model)
+        inbound = persist_document(obj)
+        print(f"✔ Gravado: {inbound} | linhas={inbound.lines.count()}")
+
+6) Secrets (chave da OpenAI)
+
+No Replit, define:
+
+OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxx
+
+7) Como correr
+
+Garante que o Python encontra o teu projeto Django (o --settings aponta para o módulo de settings certo).
+
+Exemplo:
+
+python run_llm_ingest.py /home/runner/workspace/inbound/GR4_0245927.pdf \
+  --settings=portfolio_site.settings \
+  --app=core \
+  --model=gpt-4o-mini
+
+
+Se o import dos models falhar, abre llm_persist.py e ajusta:
+
+from core.models import ...   # troca "core" pelo teu app
+
+Dicas rápidas
+
+Isto não faz OCR: se o PDF for imagem pura (sem texto), pdfplumber devolve vazio e o LLM não terá conteúdo para analisar — nesses casos, ativa um pipeline de OCR (opcional) só para extrair texto.
+
+Para gastar pouco, usa gpt-4o-mini e mantém prompts curtos (apenas o texto necessário por documento).
+
+Se quiseres “dry-run” antes de gravar, imprime obj em JSON no run_llm_ingest.py e sai sem chamar persist_document
