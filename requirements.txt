@@ -7,3 +7,5 @@ pytesseract
 pdf2image
 opencv-python
 google-genai
+pdfplumber
+python-dotenv
