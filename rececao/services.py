@@ -551,10 +551,28 @@ def parse_guia_colmol(text: str):
                     
                     descricao_parts = []
                     j = 1
-                    while j < len(parts) and not re.match(r'^\d+([.,]\d+)?$', parts[j]):
-                        descricao_parts.append(parts[j])
+                    # Parar na descrição quando encontrar: número decimal, unidade (UN/MT/ML), ou padrão CX.
+                    while j < len(parts):
+                        part = parts[j]
+                        # Número decimal (quantidade)
+                        if re.match(r'^\d+[.,]\d+$', part):
+                            break
+                        # Unidades conhecidas (às vezes vem antes da quantidade)
+                        if part.upper() in ['UN', 'MT', 'ML', 'M²', 'M2']:
+                            break
+                        # Padrão de dimensões (CX.1150x...)
+                        if re.match(r'^CX\.\d', part, re.IGNORECASE):
+                            descricao_parts.append(part)
+                            j += 1
+                            break
+                        descricao_parts.append(part)
                         j += 1
+                    
                     descricao = ' '.join(descricao_parts)
+                    
+                    # Agora procurar quantidade (pode ter espaços antes)
+                    while j < len(parts) and not re.match(r'^\d+[.,]\d+$', parts[j]):
+                        j += 1
                     
                     quantidade = float(parts[j].replace(',', '.')) if j < len(parts) else 0.0
                     unidade = parts[j+1] if j+1 < len(parts) else "UN"

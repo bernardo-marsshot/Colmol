@@ -8,6 +8,19 @@
   "produtos": [
     {
       "referencia_ordem": "01-751444 / Req 4177",
+      "artigo": "2D7115001500700",
+      "descricao": "ETER 2354 LR CX.1150x0150x070",
+      "lote_producao": "",
+      "quantidade": 50.0,
+      "unidade": "UN",
+      "volume": 0,
+      "dimensoes": "1.15x0.15x0.07",
+      "peso": 13.886,
+      "iva": 23.0,
+      "total": 0.0
+    },
+    {
+      "referencia_ordem": "01-751444 / Req 4177",
       "artigo": "2D3198008800200",
       "descricao": "ETER 2340AZ CX.1980x0880x020",
       "lote_producao": "",
@@ -87,7 +100,7 @@
   ],
   "lines": [],
   "totals": {
-    "total_lines": 6,
-    "total_quantity": 493.0
+    "total_lines": 7,
+    "total_quantity": 543.0
   }
 }
