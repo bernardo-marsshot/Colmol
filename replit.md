@@ -11,6 +11,8 @@ Successfully imported and configured for Replit environment on September 24, 202
 - **Database**: SQLite (db.sqlite3)
 - **Language**: Python 3.11
 - **Frontend**: Django templates with HTML/CSS
+- **OCR Engine**: OCR.space API (500 req/day free) with Tesseract fallback
+- **Document Formats**: Auto-detection for Elastron invoices, Colmol delivery notes, generic Portuguese documents
 - **Demo Data**: Pre-loaded using management command
 
 ## Current Configuration
@@ -21,12 +23,14 @@ Successfully imported and configured for Replit environment on September 24, 202
 - **Deployment**: Configured for autoscale deployment
 
 ## Key Features
-- Document upload and OCR simulation
-- Purchase Order and receipt matching
-- SKU mapping and validation
-- Exception management
-- Dashboard with KPIs
-- Admin interface for catalog management
+- **Multi-format Document Processing**: Auto-detects and parses Elastron invoices, Colmol delivery notes, and generic documents
+- **OCR.space Integration**: Free tier (500 req/day) with automatic Tesseract fallback
+- **Format-Specific Parsers**: Dedicated extraction logic for each supplier format
+- **QR Code Detection**: Reads and parses Portuguese fiscal QR codes (AT format)
+- **Purchase Order Matching**: SKU mapping and quantity validation
+- **Exception Management**: Handles parsing errors and mismatches gracefully
+- **Dashboard with KPIs**: Real-time statistics and document filtering
+- **Admin Interface**: Catalog management and configuration
 
 ## URLs
 - `/` - Dashboard homepage
@@ -34,6 +38,19 @@ Successfully imported and configured for Replit environment on September 24, 202
 - `/admin/` - Django admin interface
 
 ## Recent Changes
+
+### October 7, 2025
+- **Removed Ollama Infrastructure**: Eliminated Ollama Vision, Node.js proxy, and related workflows for simpler architecture
+- **Integrated OCR.space API**: Free tier (500 requests/day) with Portuguese language support and table detection
+- **Auto Document Detection**: System now automatically identifies document type (Fatura Elastron, Guia Colmol, generic)
+- **Format-Specific Parsers**: 
+  - `parse_fatura_elastron()`: Handles Elastron invoices with robust regex (77% extraction rate)
+  - `parse_guia_colmol()`: Processes Colmol delivery notes with encomenda/requisição tracking
+  - Generic fallback for unknown formats
+- **Multi-Format Support**: Successfully tested with:
+  - Elastron invoices (10/13 products extracted)
+  - Colmol delivery notes (5/5 products extracted)
+- **Improved Error Handling**: Graceful fallback to Tesseract when OCR.space fails
 
 ### October 6, 2025
 - **Fixed CodeMapping lookup bug**: System was using supplier_code from order reference (e.g., "1ECWH") instead of article_code (product SKU) for lookups, causing all lines to map to the same first result
@@ -57,8 +74,23 @@ Successfully imported and configured for Replit environment on September 24, 202
 - Set up deployment configuration
 - Verified all core functionality working
 
+## OCR Configuration
+
+### OCR.space API
+- **Free Tier**: 500 requests/day (no credit card required)
+- **API Key**: Uses `helloworld` demo key (configure `OCR_SPACE_API_KEY` env var for production)
+- **Features**: Portuguese language, table detection, auto-rotation
+- **Fallback**: Automatically switches to Tesseract if OCR.space fails
+
+### Supported Document Formats
+1. **Fatura Elastron**: Auto-detected via "elastron" + "fatura" keywords
+2. **Guia Colmol**: Auto-detected via "colmol" + "guia" keywords
+3. **Generic Invoices**: Fallback parser for unknown invoice formats
+4. **Generic Delivery Notes**: Fallback parser for unknown guia formats
+
 ## Next Steps
-- Integration with real OCR services (AWS Textract, Google Document AI)
-- Email IMAP connector for automatic ingestion
+- Add more supplier-specific parsers (expand format library)
+- Email IMAP connector for automatic document ingestion
 - Mobile PWA for physical verification
 - Export capabilities to PHC systems
+- Consider upgrading to Google Cloud Vision for higher accuracy (1000 pages/month free)

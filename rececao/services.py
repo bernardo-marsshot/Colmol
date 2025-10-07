@@ -502,6 +502,148 @@ def detect_document_type(text: str):
         return "DOCUMENTO_GENERICO"
 
 
+def parse_fatura_elastron(text: str):
+    """Parser específico para faturas Elastron com regex robusto."""
+    produtos = []
+    lines = text.split("\n")
+    
+    current_ref = ""
+    for i, line in enumerate(lines):
+        line_stripped = line.strip()
+        
+        if re.match(r'^\d[A-Z]{4}\s+[NnºN]', line_stripped):
+            current_ref = line_stripped
+            continue
+        
+        artigo_match = re.match(r'^(E[O0]\d{9,10})\s+(.+)', line_stripped)
+        if artigo_match:
+            try:
+                artigo = artigo_match.group(1).replace('O', '0')
+                resto = artigo_match.group(2)
+                
+                lote_match = re.search(r'(\d{4}-\d+(?:#)?)', resto)
+                if lote_match:
+                    lote = lote_match.group(1)
+                    descricao = resto[:lote_match.start()].strip()
+                    dados = resto[lote_match.end():].strip()
+                else:
+                    lote = ""
+                    descricao = resto.split()[0] if resto else ""
+                    dados = resto
+                
+                numeros = re.findall(r'\d+[.,]\d+|\d+', dados)
+                if len(numeros) < 4:
+                    continue
+                
+                quantidade = float(numeros[0].replace(',', '.'))
+                
+                unidade_match = re.search(r'(ML|MT|UN|m²|m2)', dados, re.IGNORECASE)
+                unidade = unidade_match.group(1) if unidade_match else "ML"
+                
+                if unidade_match and len(numeros) >= 5:
+                    unidade_pos = dados.find(unidade_match.group(1))
+                    after_unit = dados[unidade_pos+len(unidade_match.group(1)):]
+                    unit_nums = re.findall(r'\d+[.,]\d+|\d+', after_unit)
+                    
+                    if len(unit_nums) >= 4:
+                        preco_un = float(unit_nums[0].replace(',', '.'))
+                        desconto = float(unit_nums[1].replace(',', '.'))
+                        iva = float(unit_nums[2].replace(',', '.'))
+                        total = float(unit_nums[3].replace(',', '.'))
+                    else:
+                        preco_un = float(numeros[1].replace(',', '.')) if len(numeros) > 1 else 0.0
+                        desconto = float(numeros[2].replace(',', '.')) if len(numeros) > 2 else 0.0
+                        iva = float(numeros[3].replace(',', '.')) if len(numeros) > 3 else 23.0
+                        total = float(numeros[4].replace(',', '.')) if len(numeros) > 4 else 0.0
+                else:
+                    preco_un = float(numeros[1].replace(',', '.')) if len(numeros) > 1 else 0.0
+                    desconto = float(numeros[2].replace(',', '.')) if len(numeros) > 2 else 0.0
+                    iva = float(numeros[3].replace(',', '.')) if len(numeros) > 3 else 23.0
+                    total = float(numeros[4].replace(',', '.')) if len(numeros) > 4 else 0.0
+                
+                volume = 1
+                
+                produtos.append({
+                    "referencia_ordem": current_ref,
+                    "artigo": artigo,
+                    "descricao": descricao,
+                    "lote_producao": lote,
+                    "quantidade": quantidade,
+                    "unidade": unidade,
+                    "volume": volume,
+                    "preco_unitario": preco_un,
+                    "desconto": desconto,
+                    "iva": iva,
+                    "total": total
+                })
+            except (ValueError, IndexError) as e:
+                print(f"⚠️ Erro ao parsear linha Elastron '{line_stripped[:60]}': {e}")
+                continue
+    
+    return produtos
+
+
+def parse_guia_colmol(text: str):
+    """Parser específico para Guias de Remessa Colmol."""
+    produtos = []
+    lines = text.split("\n")
+    
+    current_encomenda = ""
+    current_requisicao = ""
+    
+    for i, line in enumerate(lines):
+        line_stripped = line.strip()
+        
+        if "ENCOMENDA Nº" in line_stripped:
+            encomenda_match = re.search(r'ENCOMENDA Nº\.?\s*(\d+-\d+)', line_stripped)
+            requisicao_match = re.search(r'REQUISICAO Nº\.?\s*(\d+)', line_stripped)
+            if encomenda_match:
+                current_encomenda = encomenda_match.group(1)
+            if requisicao_match:
+                current_requisicao = requisicao_match.group(1)
+            continue
+        
+        if re.match(r'^[A-Z0-9]{10,}', line_stripped):
+            parts = line_stripped.split()
+            if len(parts) >= 8:
+                try:
+                    codigo = parts[0]
+                    
+                    descricao_parts = []
+                    j = 1
+                    while j < len(parts) and not re.match(r'^\d+([.,]\d+)?$', parts[j]):
+                        descricao_parts.append(parts[j])
+                        j += 1
+                    descricao = ' '.join(descricao_parts)
+                    
+                    quantidade = float(parts[j].replace(',', '.')) if j < len(parts) else 0.0
+                    unidade = parts[j+1] if j+1 < len(parts) else "UN"
+                    med1 = float(parts[j+2].replace(',', '.')) if j+2 < len(parts) else 0.0
+                    med2 = float(parts[j+3].replace(',', '.')) if j+3 < len(parts) else 0.0
+                    med3 = float(parts[j+4].replace(',', '.')) if j+4 < len(parts) else 0.0
+                    peso = float(parts[j+5].replace(',', '.')) if j+5 < len(parts) else 0.0
+                    iva = float(parts[j+6].replace(',', '.')) if j+6 < len(parts) else 23.0
+                    
+                    produtos.append({
+                        "referencia_ordem": f"{current_encomenda} / Req {current_requisicao}",
+                        "artigo": codigo,
+                        "descricao": descricao,
+                        "lote_producao": "",
+                        "quantidade": quantidade,
+                        "unidade": unidade,
+                        "volume": 0,
+                        "dimensoes": f"{med1}x{med2}x{med3}",
+                        "peso": peso,
+                        "iva": iva,
+                        "total": 0.0
+                    })
+                except (ValueError, IndexError) as e:
+                    print(f"⚠️ Erro ao parsear linha Colmol: {e}")
+                    continue
+    
+    return produtos
+
+
 def parse_portuguese_document(text: str, qr_codes=None):
     """Extrai cabeçalho (req/doc/fornecedor/data) e linhas de produto."""
     if qr_codes is None:
@@ -518,7 +660,7 @@ def parse_portuguese_document(text: str, qr_codes=None):
         "supplier_name": "",
         "delivery_date": "",
         "qr_codes": qr_codes,
-        "produtos": [],  # Nova estrutura para produtos da guia de remessa
+        "produtos": [],
         "lines": [],
         "totals": {
             "total_lines": 0,
@@ -528,7 +670,7 @@ def parse_portuguese_document(text: str, qr_codes=None):
 
     patterns = {
         "req": r"(?:req|requisição)\.?\s*n?[oº]?\s*:?\s*([A-Z0-9\-/]+)",
-        "doc": r"(?:guia|gr|documento)\.?\s*n?[oº]?\s*:?\s*([A-Z0-9\-/]+)",
+        "doc": r"(?:guia|gr|documento|fatura)\.?\s*n?[oº]?\s*:?\s*([A-Z0-9\-/]+)",
         "data": r"(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})",
         "fornecedor": r"(?:fornecedor|empresa)\.?\s*:?\s*([^\n]+)",
     }
@@ -545,7 +687,6 @@ def parse_portuguese_document(text: str, qr_codes=None):
             m = re.search(patterns["doc"], low, re.IGNORECASE)
             if m:
                 result["document_number"] = m.group(1).upper()
-                # Não copiar para po_number aqui - será extraído depois
 
         if not result["delivery_date"]:
             m = re.search(patterns["data"], ln)
@@ -557,43 +698,52 @@ def parse_portuguese_document(text: str, qr_codes=None):
             if m:
                 result["supplier_name"] = m.group(1).title()
 
-    # Extrai produtos da Guia de Remessa (novo formato)
-    guia_products = extract_guia_remessa_products(text)
-    if guia_products:
-        result["produtos"] = guia_products
-        result["totals"]["total_lines"] = len(guia_products)
-        result["totals"]["total_quantity"] = sum(p["quantidade"]
-                                                 for p in guia_products)
+    if doc_type == "FATURA_ELASTRON":
+        produtos = parse_fatura_elastron(text)
+        if produtos:
+            result["produtos"] = produtos
+            result["supplier_name"] = "Elastron Portugal, SA"
+            print(f"✅ Extraídos {len(produtos)} produtos da Fatura Elastron")
+    elif doc_type == "GUIA_COLMOL":
+        produtos = parse_guia_colmol(text)
+        if produtos:
+            result["produtos"] = produtos
+            result["supplier_name"] = "Colmol - Colchões S.A"
+            print(f"✅ Extraídos {len(produtos)} produtos da Guia Colmol")
+    else:
+        guia_products = extract_guia_remessa_products(text)
+        if guia_products:
+            result["produtos"] = guia_products
+        else:
+            product_lines = extract_product_lines(text)
+            legacy = []
+            for p in product_lines:
+                legacy.append({
+                    "supplier_code": p["codigo_fornecedor"],
+                    "description": p["descricao"],
+                    "linha_raw": p["linha_raw"],
+                    "unit": p["unidade"],
+                    "qty": p["quantidade"],
+                    "mini_codigo": p["mini_codigo"],
+                    "dimensoes": p["dimensoes"],
+                })
+            result["lines"] = legacy
+
+    if result["produtos"]:
+        result["totals"]["total_lines"] = len(result["produtos"])
+        result["totals"]["total_quantity"] = sum(p.get("quantidade", 0) for p in result["produtos"])
         
-        # Tenta extrair po_number das referências de ordem (ex: "1ECWH Nº 10874/25EU")
-        if not result["po_number"] and guia_products:
-            # Procura padrão "CODIGO Nº" nas referências de ordem
-            for produto in guia_products:
+        if not result["po_number"] and result["produtos"]:
+            for produto in result["produtos"]:
                 ref = produto.get("referencia_ordem", "")
-                # Match: qualquer código alfanumérico seguido de "Nº" ou "N."
                 po_match = re.match(r'^([A-Z0-9]+)\s+[NnºN]', ref, re.IGNORECASE)
                 if po_match:
                     result["po_number"] = po_match.group(1).upper()
                     break
-    else:
-        # Fallback: usa extração antiga se não encontrar produtos no novo formato
-        product_lines = extract_product_lines(text)
-        legacy = []
-        for p in product_lines:
-            legacy.append({
-                "supplier_code": p["codigo_fornecedor"],
-                "description": p["descricao"],
-                "linha_raw": p["linha_raw"],
-                "unit": p["unidade"],
-                "qty": p["quantidade"],
-                "mini_codigo": p["mini_codigo"],
-                "dimensoes": p["dimensoes"],
-            })
-        result["lines"] = legacy
-        result["totals"]["total_lines"] = len(legacy)
-        result["totals"]["total_quantity"] = sum(x["qty"] for x in legacy)
+    elif result["lines"]:
+        result["totals"]["total_lines"] = len(result["lines"])
+        result["totals"]["total_quantity"] = sum(x["qty"] for x in result["lines"])
 
-    # Fallback universal: se ainda não tem po_number, usa document_number
     if not result["po_number"] and result["document_number"]:
         result["po_number"] = result["document_number"]
 
