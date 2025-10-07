@@ -1025,6 +1025,29 @@ def process_inbound(inbound: InboundDocument):
             line_ref="OCR",
             issue="Ficheiro ilegível - nenhum produto foi extraído do documento"
         )
+    
+    # Validar qualidade dos produtos extraídos
+    if produtos_extraidos:
+        # Verificar se produtos têm dados válidos
+        produtos_invalidos = 0
+        for produto in produtos_extraidos:
+            codigo = produto.get('artigo', '')
+            quantidade = produto.get('quantidade', 0)
+            
+            # Produto inválido se:
+            # - Código muito curto (<5 chars) ou vazio
+            # - Quantidade = 0 ou inválida
+            if len(codigo) < 5 or quantidade <= 0:
+                produtos_invalidos += 1
+        
+        # Se >50% dos produtos são inválidos, ficheiro está desformatado
+        taxa_invalidos = produtos_invalidos / len(produtos_extraidos)
+        if taxa_invalidos > 0.5:
+            ExceptionTask.objects.create(
+                inbound=inbound,
+                line_ref="OCR",
+                issue=f"Ficheiro desformatado - {produtos_invalidos}/{len(produtos_extraidos)} produtos com dados inválidos (códigos curtos ou quantidades zero)"
+            )
 
     # criar linhas de receção
     inbound.lines.all().delete()
