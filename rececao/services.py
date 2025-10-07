@@ -33,15 +33,18 @@ except ImportError:
 # --- PaddleOCR como motor primário ---
 try:
     from paddleocr import PaddleOCR
+    import os as paddle_os
+    # Desativa logs do PaddleOCR via variável de ambiente
+    paddle_os.environ['FLAGS_stderrthreshold'] = '3'
     # Inicializa PaddleOCR com português e detecção de ângulo
-    paddle_ocr = PaddleOCR(use_angle_cls=True, lang='pt', show_log=False)
+    paddle_ocr = PaddleOCR(use_angle_cls=True, lang='pt')
     OCR_ENABLED = True
     OCR_ENGINE = "PaddleOCR"
     print("✅ PaddleOCR inicializado (português, 30% mais preciso)")
-except ImportError:
+except Exception as e:
     OCR_ENABLED = False
     OCR_ENGINE = "None"
-    print("❌ PaddleOCR não disponível - instale: pip install paddleocr paddlepaddle")
+    print(f"❌ Erro ao inicializar PaddleOCR: {type(e).__name__}: {e}")
 
 # ----------------- OCR: PDF/Imagens -----------------
 
