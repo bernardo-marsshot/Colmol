@@ -3,6 +3,8 @@ import hashlib
 import json
 import os
 import re
+import requests
+import base64
 from io import BytesIO
 from PIL import Image
 
@@ -48,18 +50,75 @@ def save_extraction_to_json(data: dict, filename: str = "extracao.json"):
         return None
 
 
+def extract_text_with_ocrspace(file_path: str):
+    """Extrai texto usando OCR.space API (gratuito 500 req/dia)."""
+    OCR_API_KEY = os.getenv('OCR_SPACE_API_KEY', 'helloworld')
+    OCR_API_URL = 'https://api.ocr.space/parse/image'
+    
+    try:
+        print(f"🔍 Processando com OCR.space: {os.path.basename(file_path)}")
+        
+        with open(file_path, 'rb') as f:
+            payload = {
+                'apikey': OCR_API_KEY,
+                'language': 'por',
+                'isOverlayRequired': False,
+                'detectOrientation': True,
+                'scale': True,
+                'OCREngine': 2,
+                'isTable': True
+            }
+            files = {'file': f}
+            
+            response = requests.post(OCR_API_URL, data=payload, files=files, timeout=60)
+            result = response.json()
+            
+            if result.get('OCRExitCode') == 1:
+                parsed_text = result.get('ParsedResults', [{}])[0].get('ParsedText', '')
+                if parsed_text:
+                    print(f"✅ OCR.space: {len(parsed_text)} caracteres extraídos")
+                    return parsed_text.strip()
+                else:
+                    print("⚠️ OCR.space retornou texto vazio")
+                    return ""
+            else:
+                error_msg = result.get('ErrorMessage', ['Unknown error'])[0]
+                print(f"❌ OCR.space erro: {error_msg}")
+                return ""
+                
+    except requests.Timeout:
+        print("⏱️ OCR.space timeout - tentando fallback Tesseract...")
+        return None
+    except Exception as e:
+        print(f"❌ Erro OCR.space: {e}")
+        return None
+
+
 def real_ocr_extract(file_path: str):
-    """OCR real (Tesseract). Extrai texto e faz parse para estrutura."""
+    """OCR com OCR.space API (fallback para Tesseract). Extrai texto e faz parse para estrutura."""
     text_content = ""
     qr_codes = []
     ext = os.path.splitext(file_path)[1].lower()
 
-    if ext == ".pdf":
-        text_content, qr_codes = extract_text_from_pdf(file_path)
-    elif ext in [".jpg", ".jpeg", ".png", ".tiff", ".bmp"]:
-        text_content, qr_codes = extract_text_from_image(file_path)
+    text_content = extract_text_with_ocrspace(file_path)
+    
+    if text_content is None or not text_content.strip():
+        print("⚠️ OCR.space falhou - usando fallback Tesseract...")
+        if ext == ".pdf":
+            text_content, qr_codes = extract_text_from_pdf(file_path)
+        elif ext in [".jpg", ".jpeg", ".png", ".tiff", ".bmp"]:
+            text_content, qr_codes = extract_text_from_image(file_path)
+    else:
+        if QR_CODE_ENABLED and ext == ".pdf":
+            try:
+                print("🔍 Procurando QR codes...")
+                pages = convert_from_path(file_path, dpi=300)
+                for page_num, page_img in enumerate(pages, start=1):
+                    page_qr = detect_and_read_qrcodes(page_img, page_number=page_num)
+                    qr_codes.extend(page_qr)
+            except Exception as e:
+                print(f"⚠️ Erro ao buscar QR codes: {e}")
 
-    # Pré-visualização (debug) para validação
     preview = "\n".join(text_content.splitlines()[:60])
     print("---- OCR PREVIEW (primeiras linhas) ----")
     print(preview)
