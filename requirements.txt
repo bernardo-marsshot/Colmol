@@ -9,3 +9,5 @@ opencv-python
 google-genai
 pdfplumber
 python-dotenv
+paddleocr
+paddlepaddle
