@@ -62,6 +62,11 @@ def real_ocr_extract(file_path: str):
     elif ext in [".jpg", ".jpeg", ".png", ".tiff", ".bmp"]:
         text_content, qr_codes = extract_text_from_image(file_path)
 
+    # Validação antecipada: se texto muito curto, pode ser ficheiro ilegível/desformatado
+    texto_pdfplumber_curto = len(text_content) < 50
+    if texto_pdfplumber_curto:
+        print(f"⚠️ Texto pdfplumber muito curto ({len(text_content)} chars) - possível ficheiro ilegível")
+
     preview = "\n".join(text_content.splitlines()[:60])
     print("---- OCR PREVIEW (primeiras linhas) ----")
     print(preview)
@@ -89,7 +94,7 @@ def real_ocr_extract(file_path: str):
         save_extraction_to_json(error_result)
         return error_result
 
-    result = parse_portuguese_document(text_content, qr_codes)
+    result = parse_portuguese_document(text_content, qr_codes, texto_pdfplumber_curto)
     save_extraction_to_json(result)
     return result
 
@@ -667,7 +672,7 @@ def parse_guia_generica(text: str):
     return produtos
 
 
-def parse_portuguese_document(text: str, qr_codes=None):
+def parse_portuguese_document(text: str, qr_codes=None, texto_pdfplumber_curto=False):
     """Extrai cabeçalho (req/doc/fornecedor/data) e linhas de produto."""
     if qr_codes is None:
         qr_codes = []
@@ -691,6 +696,7 @@ def parse_portuguese_document(text: str, qr_codes=None):
         },
         "tipo_documento": doc_type,
         "texto_completo": text,
+        "baixa_qualidade_texto": texto_pdfplumber_curto,
     }
 
     patterns = {
@@ -1024,6 +1030,14 @@ def process_inbound(inbound: InboundDocument):
             inbound=inbound,
             line_ref="OCR",
             issue="Ficheiro ilegível - nenhum produto foi extraído do documento"
+        )
+    
+    # Se texto pdfplumber era curto E nenhum produto foi extraído → ficheiro ilegível
+    if payload.get("baixa_qualidade_texto") and not produtos_extraidos and not linhas_extraidas:
+        ExceptionTask.objects.create(
+            inbound=inbound,
+            line_ref="OCR",
+            issue="Ficheiro ilegível - qualidade de imagem muito baixa (texto quase vazio mesmo após OCR)"
         )
     
     # Validar qualidade dos produtos extraídos
