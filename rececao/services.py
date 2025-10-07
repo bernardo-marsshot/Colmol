@@ -484,10 +484,31 @@ def extract_guia_remessa_products(text: str):
     return products
 
 
+def detect_document_type(text: str):
+    """Detecta automaticamente o tipo de documento português."""
+    text_lower = text.lower()
+    
+    if "elastron" in text_lower and "fatura" in text_lower:
+        return "FATURA_ELASTRON"
+    elif "colmol" in text_lower and ("guia" in text_lower or "comunicação de saída" in text_lower):
+        return "GUIA_COLMOL"
+    elif "fatura" in text_lower or "ft" in text_lower:
+        return "FATURA_GENERICA"
+    elif "guia de remessa" in text_lower or "guia remessa" in text_lower:
+        return "GUIA_GENERICA"
+    elif "recibo" in text_lower or "receipt" in text_lower:
+        return "RECIBO"
+    else:
+        return "DOCUMENTO_GENERICO"
+
+
 def parse_portuguese_document(text: str, qr_codes=None):
     """Extrai cabeçalho (req/doc/fornecedor/data) e linhas de produto."""
     if qr_codes is None:
         qr_codes = []
+    
+    doc_type = detect_document_type(text)
+    print(f"📄 Tipo de documento detectado: {doc_type}")
 
     lines = text.split("\n")
     result = {
