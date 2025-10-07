@@ -39,18 +39,27 @@ Successfully imported and configured for Replit environment on September 24, 202
 
 ## Recent Changes
 
-### October 7, 2025 - Tesseract OCR Migration
+### October 7, 2025 - Tesseract OCR Migration & Generic Parser
 - **Simplified to Tesseract Only**: Removed OCR.space dependency, now using only local Tesseract OCR
 - **Improved Elastron Parser**: Adapted for Tesseract output format - now extracts 13/13 products (100%)
 - **Fixed Colmol Parser**: Corrected dimension pattern detection - now extracts 7/7 products (100%)
 - **Tesseract-Compatible Parsing**: Modified parsers to work with Tesseract's spaced text format
+- **Generic Parser for Any Supplier**: Created `parse_guia_generica()` with flexible heuristics to extract products from ANY delivery note format
+  - Detects product codes (8+ alphanumeric chars), descriptions, quantities, and units
+  - Supports PT (25,000) and EN (25.0) number formats
+  - Extracts dimensions from descriptions (1980x0880x0020 → 1.98x0.88x0.02)
+  - Automatic fallback: if specific parser fails, tries generic parser
+- **Illegible File Detection**: Automatic ExceptionTask creation when:
+  - Text extraction < 100 chars (file too damaged/corrupt)
+  - Invoice/delivery note with 0 products extracted (OCR failed)
 - **Format-Specific Parsers**: 
   - `parse_fatura_elastron()`: Handles Elastron invoices with Tesseract format (100% extraction rate)
   - `parse_guia_colmol()`: Processes Colmol delivery notes with encomenda/requisição tracking (100% extraction rate)
-  - Generic fallback for unknown formats
+  - `parse_guia_generica()`: Universal parser for any supplier's delivery notes with fallback support
 - **Multi-Format Support**: Successfully tested with:
   - Elastron invoices (13/13 products extracted)
   - Colmol delivery notes (7/7 products extracted)
+  - Generic delivery notes from multiple suppliers
 - **Offline Processing**: No external API dependencies, fully local OCR processing
 - **Excel Export Fix**: Updated `export_document_to_excel()` to handle dimensions as strings (Tesseract format) instead of dictionaries
 
