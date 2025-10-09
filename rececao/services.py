@@ -34,6 +34,22 @@ except ImportError:
 # Se precisares especificar o caminho do tesseract no Windows:
 # pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
+# --- PaddleOCR (lazy loading para evitar problemas no startup) ---
+_paddle_ocr_instance = None
+
+def get_paddle_ocr():
+    """Inicializa PaddleOCR lazy - só quando necessário."""
+    global _paddle_ocr_instance
+    if _paddle_ocr_instance is None:
+        try:
+            from paddleocr import PaddleOCR
+            _paddle_ocr_instance = PaddleOCR(use_angle_cls=True, lang='pt')
+            print("✅ PaddleOCR inicializado (português)")
+        except Exception as e:
+            print(f"⚠️ PaddleOCR não disponível: {e}")
+            _paddle_ocr_instance = False
+    return _paddle_ocr_instance if _paddle_ocr_instance is not False else None
+
 # ----------------- OCR: PDF/Imagens -----------------
 
 
@@ -281,10 +297,15 @@ def detect_and_read_qrcodes(image, page_number=None):
 
 
 def extract_text_from_pdf_with_ocr(file_path: str):
-    """Converte todas as páginas para imagem e aplica Tesseract."""
+    """Converte todas as páginas para imagem e aplica PaddleOCR (ou Tesseract como fallback)."""
     import time
+    import numpy as np
     try:
-        print("📄 Converter PDF → imagens (OCR)…")
+        # Tenta usar PaddleOCR primeiro
+        paddle_ocr = get_paddle_ocr()
+        ocr_engine = "PaddleOCR" if paddle_ocr else "Tesseract"
+        
+        print(f"📄 Converter PDF → imagens (OCR com {ocr_engine})…")
         
         # Converter PDF → imagens primeiro
         start_time = time.time()
@@ -299,7 +320,7 @@ def extract_text_from_pdf_with_ocr(file_path: str):
         all_qr_codes = []
         
         for i, page in enumerate(pages, 1):
-            print(f"🔍 Página {i}/{len(pages)}")
+            print(f"🔍 Página {i}/{len(pages)} - {ocr_engine}")
             
             # Limite de tempo por página: 15 segundos
             page_start = time.time()
@@ -308,17 +329,47 @@ def extract_text_from_pdf_with_ocr(file_path: str):
             all_qr_codes.extend(qr_codes)
             
             # OCR da página
+            page_text = ""
+            paddle_failed = False
+            
             try:
-                page_text = pytesseract.image_to_string(
-                    page, config="--psm 6 --oem 3 -l por", lang="por", timeout=15)
+                if paddle_ocr:
+                    # Tenta PaddleOCR primeiro
+                    try:
+                        img_array = np.array(page)
+                        result = paddle_ocr.ocr(img_array, cls=True)
+                        
+                        if result and result[0]:
+                            for line in result[0]:
+                                if line and len(line) >= 2:
+                                    text = line[1][0]
+                                    confidence = line[1][1]
+                                    if confidence > 0.5:
+                                        page_text += text + "\n"
+                        
+                        # Se PaddleOCR não extraiu texto, marca como falho
+                        if not page_text.strip():
+                            paddle_failed = True
+                            print(f"⚠️ PaddleOCR não extraiu texto da página {i}, tentando Tesseract...")
+                    except Exception as paddle_error:
+                        paddle_failed = True
+                        print(f"⚠️ PaddleOCR falhou na página {i}: {paddle_error}, tentando Tesseract...")
+                
+                # Fallback para Tesseract se PaddleOCR não disponível ou falhou
+                if not paddle_ocr or paddle_failed:
+                    page_text = pytesseract.image_to_string(
+                        page, config="--psm 6 --oem 3 -l por", lang="por", timeout=15)
+                
                 if page_text.strip():
                     all_text += f"\n--- Página {i} ---\n{page_text}\n"
+                    
             except RuntimeError as e:
                 if "timeout" in str(e).lower():
                     print(f"⚠️ Timeout OCR na página {i} - imagem de má qualidade")
-                    # Não adiciona texto desta página
                 else:
                     raise
+            except Exception as e:
+                print(f"⚠️ Erro OCR na página {i}: {e}")
             
             page_time = time.time() - page_start
             if page_time > 10:
@@ -332,13 +383,45 @@ def extract_text_from_pdf_with_ocr(file_path: str):
 
 
 def extract_text_from_image(file_path: str):
-    """OCR para imagem ( + leitura de QR)."""
+    """OCR para imagem com PaddleOCR (ou Tesseract como fallback) + leitura de QR."""
+    import numpy as np
     try:
         img = Image.open(file_path)
         qr_codes = detect_and_read_qrcodes(img)
-        ocr_text = pytesseract.image_to_string(img,
-                                               config="--psm 6 --oem 3 -l por",
-                                               lang="por")
+        
+        # Tenta usar PaddleOCR primeiro
+        paddle_ocr = get_paddle_ocr()
+        ocr_text = ""
+        paddle_failed = False
+        
+        if paddle_ocr:
+            # Tenta PaddleOCR primeiro
+            try:
+                img_array = np.array(img)
+                result = paddle_ocr.ocr(img_array, cls=True)
+                
+                if result and result[0]:
+                    for line in result[0]:
+                        if line and len(line) >= 2:
+                            text = line[1][0]
+                            confidence = line[1][1]
+                            if confidence > 0.5:
+                                ocr_text += text + "\n"
+                
+                # Se PaddleOCR não extraiu texto, marca como falho
+                if not ocr_text.strip():
+                    paddle_failed = True
+                    print(f"⚠️ PaddleOCR não extraiu texto da imagem, tentando Tesseract...")
+            except Exception as paddle_error:
+                paddle_failed = True
+                print(f"⚠️ PaddleOCR falhou: {paddle_error}, tentando Tesseract...")
+        
+        # Fallback para Tesseract se PaddleOCR não disponível ou falhou
+        if not paddle_ocr or paddle_failed:
+            ocr_text = pytesseract.image_to_string(img,
+                                                   config="--psm 6 --oem 3 -l por",
+                                                   lang="por")
+        
         return ocr_text.strip(), qr_codes
     except Exception as e:
         print(f"❌ OCR imagem erro: {e}")
