@@ -9,6 +9,7 @@ from PIL import Image
 import signal
 
 import PyPDF2
+import pytesseract
 from pdf2image import convert_from_path
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill
@@ -30,21 +31,8 @@ except ImportError:
     QR_CODE_ENABLED = False
     print("⚠️ QR code não disponível (instale opencv-python para ativar)")
 
-# --- PaddleOCR como motor primário ---
-try:
-    from paddleocr import PaddleOCR
-    import os as paddle_os
-    # Desativa logs do PaddleOCR via variável de ambiente
-    paddle_os.environ['FLAGS_stderrthreshold'] = '3'
-    # Inicializa PaddleOCR com português e detecção de ângulo
-    paddle_ocr = PaddleOCR(use_angle_cls=True, lang='pt')
-    OCR_ENABLED = True
-    OCR_ENGINE = "PaddleOCR"
-    print("✅ PaddleOCR inicializado (português, 30% mais preciso)")
-except Exception as e:
-    OCR_ENABLED = False
-    OCR_ENGINE = "None"
-    print(f"❌ Erro ao inicializar PaddleOCR: {type(e).__name__}: {e}")
+# Se precisares especificar o caminho do tesseract no Windows:
+# pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
 # ----------------- OCR: PDF/Imagens -----------------
 
@@ -63,12 +51,12 @@ def save_extraction_to_json(data: dict, filename: str = "extracao.json"):
 
 
 def real_ocr_extract(file_path: str):
-    """OCR usando PaddleOCR. Extrai texto e faz parse para estrutura."""
+    """OCR usando Tesseract. Extrai texto e faz parse para estrutura."""
     text_content = ""
     qr_codes = []
     ext = os.path.splitext(file_path)[1].lower()
 
-    print(f"🔍 Processando com {OCR_ENGINE}: {os.path.basename(file_path)}")
+    print(f"🔍 Processando com Tesseract: {os.path.basename(file_path)}")
     
     if ext == ".pdf":
         text_content, qr_codes = extract_text_from_pdf(file_path)
@@ -293,18 +281,14 @@ def detect_and_read_qrcodes(image, page_number=None):
 
 
 def extract_text_from_pdf_with_ocr(file_path: str):
-    """Converte todas as páginas para imagem e aplica PaddleOCR."""
+    """Converte todas as páginas para imagem e aplica Tesseract."""
     import time
     try:
-        if not OCR_ENABLED:
-            print("❌ OCR não disponível")
-            return "", []
-            
-        print("📄 Converter PDF → imagens (OCR com PaddleOCR)…")
+        print("📄 Converter PDF → imagens (OCR)…")
         
         # Converter PDF → imagens primeiro
         start_time = time.time()
-        pages = convert_from_path(file_path, dpi=200)  # 200 DPI para velocidade
+        pages = convert_from_path(file_path, dpi=200)  # Reduzir DPI para 200 (mais rápido)
         conversion_time = time.time() - start_time
         
         # Se conversão demorou muito (>20s), ficheiro pode ter problemas
@@ -323,36 +307,24 @@ def extract_text_from_pdf_with_ocr(file_path: str):
             qr_codes = detect_and_read_qrcodes(page, page_number=i)
             all_qr_codes.extend(qr_codes)
             
-            # OCR da página com PaddleOCR
+            # OCR da página
             try:
-                # Converte PIL Image para array numpy
-                import numpy as np
-                img_array = np.array(page)
-                
-                # PaddleOCR extrai texto
-                result = paddle_ocr.ocr(img_array, cls=True)
-                
-                # Processa resultado do PaddleOCR
-                page_text = ""
-                if result and result[0]:
-                    for line in result[0]:
-                        if line and len(line) >= 2:
-                            text = line[1][0]  # Texto extraído
-                            confidence = line[1][1]  # Confiança
-                            if confidence > 0.5:  # Filtro de confiança mínima
-                                page_text += text + "\n"
-                
+                page_text = pytesseract.image_to_string(
+                    page, config="--psm 6 --oem 3 -l por", lang="por", timeout=15)
                 if page_text.strip():
                     all_text += f"\n--- Página {i} ---\n{page_text}\n"
-                    
-            except Exception as e:
-                print(f"⚠️ Erro OCR na página {i}: {e}")
+            except RuntimeError as e:
+                if "timeout" in str(e).lower():
+                    print(f"⚠️ Timeout OCR na página {i} - imagem de má qualidade")
+                    # Não adiciona texto desta página
+                else:
+                    raise
             
             page_time = time.time() - page_start
             if page_time > 10:
                 print(f"⚠️ Página {i} demorou {page_time:.1f}s - qualidade baixa")
         
-        print(f"✅ OCR PaddleOCR completo: {len(pages)} páginas")
+        print(f"✅ OCR completo: {len(pages)} páginas")
         return all_text.strip(), all_qr_codes
     except Exception as e:
         print(f"❌ OCR PDF erro: {e}")
@@ -360,30 +332,13 @@ def extract_text_from_pdf_with_ocr(file_path: str):
 
 
 def extract_text_from_image(file_path: str):
-    """OCR para imagem com PaddleOCR ( + leitura de QR)."""
+    """OCR para imagem ( + leitura de QR)."""
     try:
-        if not OCR_ENABLED:
-            print("❌ OCR não disponível")
-            return "", []
-            
         img = Image.open(file_path)
         qr_codes = detect_and_read_qrcodes(img)
-        
-        # PaddleOCR extrai texto da imagem
-        import numpy as np
-        img_array = np.array(img)
-        result = paddle_ocr.ocr(img_array, cls=True)
-        
-        # Processa resultado do PaddleOCR
-        ocr_text = ""
-        if result and result[0]:
-            for line in result[0]:
-                if line and len(line) >= 2:
-                    text = line[1][0]  # Texto extraído
-                    confidence = line[1][1]  # Confiança
-                    if confidence > 0.5:  # Filtro de confiança mínima
-                        ocr_text += text + "\n"
-        
+        ocr_text = pytesseract.image_to_string(img,
+                                               config="--psm 6 --oem 3 -l por",
+                                               lang="por")
         return ocr_text.strip(), qr_codes
     except Exception as e:
         print(f"❌ OCR imagem erro: {e}")
