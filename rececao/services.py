@@ -455,83 +455,9 @@ def is_valid_ocr_text(text: str, min_length: int = 50) -> bool:
 def tesseract_high_quality(image_path: str) -> tuple:
     """
     Estratégia 1: Tesseract Alta Qualidade
-    - DPI: 300 (melhor qualidade)
+    - DPI: 200 (balanceamento qualidade/velocidade)
     - PSM: 3 (segmentação automática de página completa)
     - Melhor para: documentos digitalizados com boa qualidade
-    """
-    try:
-        from pdf2image import convert_from_path
-        
-        if image_path.endswith('.pdf'):
-            pages = convert_from_path(image_path, dpi=300)
-            all_text = ""
-            for i, page in enumerate(pages, 1):
-                page_text = pytesseract.image_to_string(
-                    page, 
-                    config="--psm 3 --oem 3", 
-                    lang="por",
-                    timeout=60
-                )
-                if page_text.strip():
-                    all_text += f"\n--- Página {i} ---\n{page_text}\n"
-            return all_text.strip(), []
-        else:
-            img = Image.open(image_path)
-            text = pytesseract.image_to_string(
-                img, 
-                config="--psm 3 --oem 3", 
-                lang="por",
-                timeout=60
-            )
-            return text.strip(), []
-    except Exception as e:
-        print(f"⚠️ Tesseract Alta Qualidade falhou: {e}")
-        return "", []
-
-
-def tesseract_table_mode(image_path: str) -> tuple:
-    """
-    Estratégia 2: Tesseract Modo Tabela
-    - DPI: 300
-    - PSM: 6 (bloco uniforme de texto - melhor para tabelas)
-    - Melhor para: documentos com tabelas e layouts estruturados
-    """
-    try:
-        from pdf2image import convert_from_path
-        
-        if image_path.endswith('.pdf'):
-            pages = convert_from_path(image_path, dpi=300)
-            all_text = ""
-            for i, page in enumerate(pages, 1):
-                page_text = pytesseract.image_to_string(
-                    page, 
-                    config="--psm 6 --oem 3", 
-                    lang="por",
-                    timeout=60
-                )
-                if page_text.strip():
-                    all_text += f"\n--- Página {i} ---\n{page_text}\n"
-            return all_text.strip(), []
-        else:
-            img = Image.open(image_path)
-            text = pytesseract.image_to_string(
-                img, 
-                config="--psm 6 --oem 3", 
-                lang="por",
-                timeout=60
-            )
-            return text.strip(), []
-    except Exception as e:
-        print(f"⚠️ Tesseract Modo Tabela falhou: {e}")
-        return "", []
-
-
-def tesseract_line_mode(image_path: str) -> tuple:
-    """
-    Estratégia 3: Tesseract Linha a Linha
-    - DPI: 200 (mais rápido)
-    - PSM: 7 (linha única de texto)
-    - Melhor para: documentos simples com texto linear
     """
     try:
         from pdf2image import convert_from_path
@@ -542,9 +468,83 @@ def tesseract_line_mode(image_path: str) -> tuple:
             for i, page in enumerate(pages, 1):
                 page_text = pytesseract.image_to_string(
                     page, 
+                    config="--psm 3 --oem 3", 
+                    lang="por",
+                    timeout=15
+                )
+                if page_text.strip():
+                    all_text += f"\n--- Página {i} ---\n{page_text}\n"
+            return all_text.strip(), []
+        else:
+            img = Image.open(image_path)
+            text = pytesseract.image_to_string(
+                img, 
+                config="--psm 3 --oem 3", 
+                lang="por",
+                timeout=15
+            )
+            return text.strip(), []
+    except Exception as e:
+        print(f"⚠️ Tesseract Alta Qualidade falhou: {e}")
+        return "", []
+
+
+def tesseract_table_mode(image_path: str) -> tuple:
+    """
+    Estratégia 2: Tesseract Modo Tabela
+    - DPI: 200
+    - PSM: 6 (bloco uniforme de texto - melhor para tabelas)
+    - Melhor para: documentos com tabelas e layouts estruturados
+    """
+    try:
+        from pdf2image import convert_from_path
+        
+        if image_path.endswith('.pdf'):
+            pages = convert_from_path(image_path, dpi=200)
+            all_text = ""
+            for i, page in enumerate(pages, 1):
+                page_text = pytesseract.image_to_string(
+                    page, 
+                    config="--psm 6 --oem 3", 
+                    lang="por",
+                    timeout=15
+                )
+                if page_text.strip():
+                    all_text += f"\n--- Página {i} ---\n{page_text}\n"
+            return all_text.strip(), []
+        else:
+            img = Image.open(image_path)
+            text = pytesseract.image_to_string(
+                img, 
+                config="--psm 6 --oem 3", 
+                lang="por",
+                timeout=15
+            )
+            return text.strip(), []
+    except Exception as e:
+        print(f"⚠️ Tesseract Modo Tabela falhou: {e}")
+        return "", []
+
+
+def tesseract_line_mode(image_path: str) -> tuple:
+    """
+    Estratégia 3: Tesseract Linha a Linha
+    - DPI: 150 (mais rápido)
+    - PSM: 7 (linha única de texto)
+    - Melhor para: documentos simples com texto linear
+    """
+    try:
+        from pdf2image import convert_from_path
+        
+        if image_path.endswith('.pdf'):
+            pages = convert_from_path(image_path, dpi=150)
+            all_text = ""
+            for i, page in enumerate(pages, 1):
+                page_text = pytesseract.image_to_string(
+                    page, 
                     config="--psm 7 --oem 3", 
                     lang="por",
-                    timeout=60
+                    timeout=10
                 )
                 if page_text.strip():
                     all_text += f"\n--- Página {i} ---\n{page_text}\n"
@@ -555,7 +555,7 @@ def tesseract_line_mode(image_path: str) -> tuple:
                 img, 
                 config="--psm 7 --oem 3", 
                 lang="por",
-                timeout=60
+                timeout=10
             )
             return text.strip(), []
     except Exception as e:
@@ -597,7 +597,7 @@ def tesseract_with_preprocessing(image_path: str) -> tuple:
             return Image.fromarray(denoised)
         
         if image_path.endswith('.pdf'):
-            pages = convert_from_path(image_path, dpi=300)
+            pages = convert_from_path(image_path, dpi=200)
             all_text = ""
             for i, page in enumerate(pages, 1):
                 processed_page = preprocess_image(page)
@@ -605,7 +605,7 @@ def tesseract_with_preprocessing(image_path: str) -> tuple:
                     processed_page, 
                     config="--psm 3 --oem 3", 
                     lang="por",
-                    timeout=60
+                    timeout=15
                 )
                 if page_text.strip():
                     all_text += f"\n--- Página {i} ---\n{page_text}\n"
@@ -617,7 +617,7 @@ def tesseract_with_preprocessing(image_path: str) -> tuple:
                 processed_img, 
                 config="--psm 3 --oem 3", 
                 lang="por",
-                timeout=60
+                timeout=15
             )
             return text.strip(), []
     except Exception as e:
@@ -639,11 +639,11 @@ def extract_with_fallback(file_path: str) -> dict:
     Retorna o primeiro resultado válido (>50 chars).
     """
     strategies = [
-        ("PaddleOCR", lambda: extract_text_from_pdf_with_ocr(file_path) if file_path.endswith('.pdf') else extract_text_from_image(file_path)),
         ("Tesseract Alta Qualidade (DPI 300, PSM 3)", lambda: tesseract_high_quality(file_path)),
         ("Tesseract Modo Tabela (DPI 300, PSM 6)", lambda: tesseract_table_mode(file_path)),
         ("Tesseract com Preprocessing", lambda: tesseract_with_preprocessing(file_path)),
         ("Tesseract Linha a Linha (DPI 200, PSM 7)", lambda: tesseract_line_mode(file_path)),
+        ("PaddleOCR", lambda: extract_text_from_pdf_with_ocr(file_path) if file_path.endswith('.pdf') else extract_text_from_image(file_path)),
     ]
     
     print(f"\n🔄 Sistema Multi-OCR: testando {len(strategies)} estratégias...")
