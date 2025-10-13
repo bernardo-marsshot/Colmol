@@ -223,7 +223,7 @@ def real_ocr_extract(file_path: str):
         save_extraction_to_json(error_result)
         return error_result
 
-    result = parse_portuguese_document(text_content, qr_codes, texto_pdfplumber_curto)
+    result = parse_portuguese_document(text_content, qr_codes, texto_pdfplumber_curto, file_path=file_path)
     save_extraction_to_json(result)
     return result
 
@@ -1656,8 +1656,11 @@ def parse_generic_document(text: str, file_path: str = None):
     return {'produtos': produtos, 'metadata': metadata}
 
 
-def parse_portuguese_document(text: str, qr_codes=None, texto_pdfplumber_curto=False):
-    """Extrai cabeçalho (req/doc/fornecedor/data) e linhas de produto."""
+def parse_portuguese_document(text: str, qr_codes=None, texto_pdfplumber_curto=False, file_path=None):
+    """
+    Extrai cabeçalho (req/doc/fornecedor/data) e linhas de produto.
+    Usa fallback universal (fuzzy matching + table extraction) se parsers específicos falharem.
+    """
     if qr_codes is None:
         qr_codes = []
     
@@ -1807,6 +1810,27 @@ def parse_portuguese_document(text: str, qr_codes=None, texto_pdfplumber_curto=F
                         "dimensoes": p["dimensoes"],
                     })
                 result["lines"] = legacy
+
+    # FALLBACK UNIVERSAL: Se nenhum parser específico extraiu produtos, usa extração universal
+    if not result["produtos"] and file_path:
+        print("🔄 Nenhum parser específico funcionou - tentando extração universal...")
+        generic_result = parse_generic_document(text, file_path)
+        
+        if generic_result.get('produtos'):
+            result["produtos"] = generic_result['produtos']
+            print(f"✅ Extração universal bem-sucedida: {len(result['produtos'])} produtos")
+            
+            # Atualiza metadados se disponível
+            if generic_result.get('metadata'):
+                metadata = generic_result['metadata']
+                if not result["supplier_name"] and metadata.get('fornecedor'):
+                    result["supplier_name"] = metadata['fornecedor']
+                if not result["document_number"] and metadata.get('documento'):
+                    result["document_number"] = metadata['documento']
+                if not result["delivery_date"] and metadata.get('data'):
+                    result["delivery_date"] = metadata['data']
+                if not result["po_number"] and metadata.get('encomenda'):
+                    result["po_number"] = metadata['encomenda']
 
     if result["produtos"]:
         result["totals"]["total_lines"] = len(result["produtos"])
