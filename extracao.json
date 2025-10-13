@@ -2,43 +2,43 @@
   "numero_requisicao": "",
   "document_number": "",
   "po_number": "",
-  "supplier_name": "",
-  "delivery_date": "09/10/2025",
+  "supplier_name": "Contribuinte Data Página",
+  "delivery_date": "25-10-08",
   "qr_codes": [],
   "produtos": [],
   "lines": [
     {
-      "supplier_code": "X190",
-      "description": "COLCHON TOP VISCO 2019 135X190",
-      "linha_raw": "COLCHON TOP VISCO 2019 135X190",
+      "supplier_code": "MOL",
+      "description": "26.100145 COLCHAO 1,95X1,40=27\"SPA CHERRY VISCO\"COLMOL 1.000 UN 2025-10-17",
+      "linha_raw": "26.100145 COLCHAO 1,95X1,40=27\"SPA CHERRY VISCO\"COLMOL 1.000 UN 2025-10-17",
       "unit": "UNI",
-      "qty": 0.0,
-      "mini_codigo": "35x190",
+      "qty": 7.0,
+      "mini_codigo": "10x17",
       "dimensoes": {
-        "comprimento": 190,
-        "largura": 35,
+        "comprimento": 17,
+        "largura": 10,
         "espessura": 0
       }
     },
     {
-      "supplier_code": "X190",
-      "description": "COLCHON TOP VISCO 2019 150X190",
-      "linha_raw": "COLCHON TOP VISCO 2019 150X190",
+      "supplier_code": "MOL",
+      "description": "26.100100 COLCHAO 1,83X1,33=24Cm ORTOPEDICO\"KOLUNA \"COLMOL 3.000 UN 2025-10-17",
+      "linha_raw": "26.100100 COLCHAO 1,83X1,33=24Cm ORTOPEDICO\"KOLUNA \"COLMOL 3.000 UN 2025-10-17",
       "unit": "UNI",
-      "qty": 0.0,
-      "mini_codigo": "50x190",
+      "qty": 7.0,
+      "mini_codigo": "10x17",
       "dimensoes": {
-        "comprimento": 190,
-        "largura": 50,
+        "comprimento": 17,
+        "largura": 10,
         "espessura": 0
       }
     }
   ],
   "totals": {
     "total_lines": 2,
-    "total_quantity": 0.0
+    "total_quantity": 14.0
   },
   "tipo_documento": "DOCUMENTO_GENERICO",
-  "texto_completo": "Fecha\nPedido nº\nProveedor\nN.I.F.\nPag.\nAtendido por\n1\nPT500248800\n0000292\nPC5/0005051\n09/10/2025\nADMINISTRA\nPEDIDO\nCOSGUI D.M. S.L.\nB39031059\nPOLIGONO INDUTRIAL MORERO, NAVE 1 10\n39611\nGUARNIZO \n942252861\nNIF.\nfacturacion@cosgui.com\nCOLMOL COLCHOES SA\nZONA INDUSTRIAL DAS CAVADAS APART 119 RUA DO PROGR\n3721-\nVILA DE CUCUJAES\n4,00\nCOLCHON TOP VISCO 2019 135X190\nLUSTOPVS135190\n4,00\nCOLCHON TOP VISCO 2019 150X190\nLUSTOPVS150190\nDescripción\nCantidad\nCódigo\nSu Referencia\nNotas :",
+  "texto_completo": "--- Página 1 ---\nE CaARIEENRUA To S Tiape\nArmazém de Utilidades Porlar, Lda. COLMOL - COLCHOES, SA\nZONA INDUSTRIAL CAVADAS\nAlga\n3040958 Ouíribra 3721-908 VILA CUCUJAES\nTelef.: 239802670 - Tim.: 917594110 PORTUGAL\nWeb: www.catalogosantosefernandes.pt\nContribuinte nº 501931414\nSociedade por Quotas - Capital Social: 399.038,31 Euros\nMatriculada na C.R.C. Coimbra sob o nº 4781\nORIGINAL\nORDEM COMPRA Nº OC250000525\nFORNECEDOR CONTRIBUINTE DATA PÁGINA\n00072 500248800 2025-10-08 o 1\nREFERÊNCIA — DESCRIÇÃO \" QUANTIDADE — P.UNITARIO — DESC. LIQUIDO ENTREGA\n26.100145 COLCHAO 1,95X1,40=27\"SPA CHERRY VISCO\"COLMOL 1.000 UN 2025-10-17\n26.100100 COLCHAO 1,83X1,33=24Cm ORTOPEDICO\"KOLUNA \"COLMOL 3.000 UN 2025-10-17\n=\nÀ\n-\na\n= o ES R N :\n8\n&\n8\ns\n$\nLOCALDEENTREGA: ||ÀÀ\n“ ODep.Compras —",
   "baixa_qualidade_texto": false
 }
