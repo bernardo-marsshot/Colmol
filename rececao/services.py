@@ -550,8 +550,8 @@ def detect_document_type(text: str):
     text_lower = text.lower()
     
     # Documentos espanhóis
-    if ("pedido" in text_lower and "españa" in text_lower) or \
-       ("pedido" in text_lower and any(kw in text_lower for kw in ["artículo", "descripción", "unidades"])):
+    if ("pedido" in text_lower and ("españa" in text_lower or "spain" in text_lower)) or \
+       ("pedido" in text_lower and any(kw in text_lower for kw in ["artículo", "articulo", "descripción", "descripcion", "unidades", "cantidad"])):
         return "PEDIDO_ESPANHOL"
     
     # Documentos franceses
