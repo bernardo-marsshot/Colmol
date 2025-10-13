@@ -39,30 +39,6 @@ Successfully imported and configured for Replit environment on September 24, 202
 
 ## Recent Changes
 
-### October 13, 2025 - Novos Métodos de Leitura de Documentos
-- **Suporte Multi-Formato**: Sistema agora suporta PDF, imagens, Excel (.xlsx, .xls) e CSV
-- **Método Inteligente (smart_ocr_extract)**: Escolhe automaticamente a melhor estratégia de extração:
-  1. **Excel/CSV**: Parser direto com detecção automática de colunas (artigo, descrição, quantidade, unidade)
-  2. **PDF com Tabelas**: Extração com Camelot-py (lattice e stream modes) para tabelas bem definidas
-  3. **Parser LLM (Opcional)**: Usa OpenAI GPT-4o-mini ou Gemini 2.5-flash para documentos complexos
-  4. **OCR Tradicional**: Fallback para PaddleOCR/Tesseract
-- **Novos Parsers Implementados**:
-  - `extract_from_excel()`: Lê múltiplas sheets, detecta colunas automaticamente (case-insensitive)
-  - `extract_from_csv()`: Detecção automática de delimitador (`;`, `,`, `\t`, `|`)
-  - `extract_tables_with_camelot()`: Extração de tabelas estruturadas de PDFs
-  - `extract_with_llm()`: Parser com IA para documentos sem padrão fixo
-- **Detecção Inteligente de Colunas**: 
-  - Artigo: 'artigo', 'código', 'codigo', 'ref', 'referencia', 'sku'
-  - Quantidade: 'quantidade', 'qtd', 'qty', 'quant'
-  - Unidade: 'unidade', 'un', 'unit', 'und'
-  - Descrição: 'descrição', 'descricao', 'description', 'desc', 'produto'
-- **Normalização de Números**: Suporta formatos PT (1.000,50) e EN (1,000.50)
-- **LLM Opcional**: Funciona sem API keys (usa OCR tradicional), mas oferece extração avançada se configurado
-- **Fallbacks Inteligentes**: Sistema tenta múltiplas estratégias até conseguir extrair dados
-- **Aplicável a**: Guias de Remessa e Guias de Encomenda (Notas de Encomenda)
-
-## Recent Changes
-
 ### October 13, 2025 - ORDEM_COMPRA Parser for Multi-Line Product Formats
 - **New Document Type**: Added "ORDEM_COMPRA" detection and dedicated parser for purchase order documents
 - **Multi-Line Product Parsing**: Parser handles separated reference and quantity lines:

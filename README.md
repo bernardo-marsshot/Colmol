@@ -29,28 +29,9 @@ python manage.py runserver
 3. Veja o **matching** na página do documento, incluindo exceções e certificação.
 4. Explore o **Dashboard** inicial em `/`.
 
-## Novos Métodos de Leitura (Outubro 2025)
-
-O sistema agora suporta **múltiplos formatos** e **estratégias inteligentes** de extração:
-
-### Formatos Suportados
-- **PDF** (texto embutido + OCR)
-- **Imagens** (JPG, PNG, TIFF, BMP)
-- **Excel** (.xlsx, .xls)
-- **CSV** (detecção automática de delimitador)
-
-### Métodos de Extração
-1. **Excel/CSV Parser**: Detecção automática de colunas e normalização
-2. **Camelot (Tabelas PDF)**: Extração estruturada de tabelas em PDFs
-3. **LLM Parser (Opcional)**: OpenAI/Gemini para documentos complexos
-4. **OCR Tradicional**: PaddleOCR + Tesseract (sempre disponível)
-
-### Sistema Inteligente
-A função `smart_ocr_extract()` escolhe automaticamente o melhor método baseado no tipo de arquivo e qualidade do resultado. Múltiplos fallbacks garantem extração mesmo em documentos difíceis.
-
 ## Próximos passos
-- Adicionar mais parsers específicos por fornecedor
-- Conector de email IMAP para ingestão automática
-- PWA móvel para doca/QR e conferência física
-- Export para PHC (CSV/Excel ou API/ODBC)
-- KPIs por fornecedor e ranking de qualidade documental
+- Trocar o `fake_ocr_extract` por integração real (Textract/Document AI).
+- Conector de email IMAP para ingestão automática.
+- PWA móvel para doca/QR e conferência física.
+- Export para PHC (CSV/Excel ou API/ODBC).
+- KPIs por fornecedor e ranking de qualidade documental.
