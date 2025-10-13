@@ -11,3 +11,6 @@ pdfplumber
 python-dotenv
 paddleocr
 paddlepaddle
+camelot-py[cv]
+pandas
+tabula-py
