@@ -69,8 +69,8 @@ def save_extraction_to_json(data: dict, filename: str = "extracao.json"):
 def real_ocr_extract(file_path: str):
     """
     Sistema Multi-OCR: Tenta múltiplas estratégias de extração até conseguir texto válido.
-    Fallback em cascata: PaddleOCR → Tesseract Alta Qualidade → Tesseract Modo Tabela → 
-                         Tesseract Preprocessing → Tesseract Linha a Linha
+    Fallback em cascata: Tesseract Alta Qualidade → Tesseract Modo Tabela → 
+                         Tesseract Preprocessing → Tesseract Linha a Linha → PaddleOCR (final)
     """
     ext = os.path.splitext(file_path)[1].lower()
     
@@ -528,7 +528,7 @@ def tesseract_table_mode(image_path: str) -> tuple:
 
 def tesseract_line_mode(image_path: str) -> tuple:
     """
-    Estratégia 3: Tesseract Linha a Linha
+    Estratégia 4: Tesseract Linha a Linha
     - DPI: 150 (mais rápido)
     - PSM: 7 (linha única de texto)
     - Melhor para: documentos simples com texto linear
@@ -565,7 +565,7 @@ def tesseract_line_mode(image_path: str) -> tuple:
 
 def tesseract_with_preprocessing(image_path: str) -> tuple:
     """
-    Estratégia 4: Tesseract com Pré-processamento de Imagem
+    Estratégia 3: Tesseract com Pré-processamento de Imagem
     - Binarização (preto e branco)
     - Remoção de ruído
     - Melhor para: imagens de baixa qualidade ou com muito ruído
@@ -630,20 +630,20 @@ def extract_with_fallback(file_path: str) -> dict:
     Sistema Multi-OCR com Fallback em Cascata.
     
     Tenta múltiplas estratégias de extração até conseguir texto válido:
-    1. PaddleOCR (se disponível) - melhor precisão
-    2. Tesseract Alta Qualidade - documentos digitalizados
-    3. Tesseract Modo Tabela - documentos com tabelas
-    4. Tesseract com Preprocessing - imagens de baixa qualidade
-    5. Tesseract Linha a Linha - fallback final
+    1. Tesseract Alta Qualidade (DPI 200, PSM 3) - documentos digitalizados
+    2. Tesseract Modo Tabela (DPI 200, PSM 6) - documentos com tabelas
+    3. Tesseract com Preprocessing (binarização + denoising) - imagens de baixa qualidade
+    4. Tesseract Linha a Linha (DPI 150, PSM 7) - documentos simples
+    5. PaddleOCR (fallback final) - se todas as estratégias Tesseract falharem
     
-    Retorna o primeiro resultado válido (>50 chars).
+    Retorna o primeiro resultado válido (>50 chars com 5+ palavras).
     """
     strategies = [
-        ("Tesseract Alta Qualidade (DPI 300, PSM 3)", lambda: tesseract_high_quality(file_path)),
-        ("Tesseract Modo Tabela (DPI 300, PSM 6)", lambda: tesseract_table_mode(file_path)),
-        ("Tesseract com Preprocessing", lambda: tesseract_with_preprocessing(file_path)),
-        ("Tesseract Linha a Linha (DPI 200, PSM 7)", lambda: tesseract_line_mode(file_path)),
-        ("PaddleOCR", lambda: extract_text_from_pdf_with_ocr(file_path) if file_path.endswith('.pdf') else extract_text_from_image(file_path)),
+        ("Tesseract Alta Qualidade (DPI 200, PSM 3)", lambda: tesseract_high_quality(file_path)),
+        ("Tesseract Modo Tabela (DPI 200, PSM 6)", lambda: tesseract_table_mode(file_path)),
+        ("Tesseract com Preprocessing (DPI 200)", lambda: tesseract_with_preprocessing(file_path)),
+        ("Tesseract Linha a Linha (DPI 150, PSM 7)", lambda: tesseract_line_mode(file_path)),
+        ("PaddleOCR (fallback final)", lambda: extract_text_from_pdf_with_ocr(file_path) if file_path.endswith('.pdf') else extract_text_from_image(file_path)),
     ]
     
     print(f"\n🔄 Sistema Multi-OCR: testando {len(strategies)} estratégias...")

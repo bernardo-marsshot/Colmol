@@ -39,6 +39,20 @@ Successfully imported and configured for Replit environment on September 24, 202
 
 ## Recent Changes
 
+### October 13, 2025 - Sistema Multi-OCR com Fallback em Cascata
+- **5 Estratégias de Extração**: Implementado sistema multi-OCR com fallback automático para máxima taxa de sucesso:
+  1. **Tesseract Alta Qualidade** (DPI 200, PSM 3) - Documentos digitalizados
+  2. **Tesseract Modo Tabela** (DPI 200, PSM 6) - Layouts estruturados com tabelas
+  3. **Tesseract com Preprocessing** (Binarização + denoising) - Imagens de baixa qualidade
+  4. **Tesseract Linha a Linha** (DPI 150, PSM 7) - Documentos simples com texto linear
+  5. **PaddleOCR** (Fallback final) - Se todas as estratégias Tesseract falharem
+- **Validação Automática**: Sistema testa cada estratégia sequencialmente até obter texto válido (>50 chars com 5+ palavras)
+- **Logging Detalhado**: Cada documento mostra qual estratégia OCR foi utilizada com sucesso
+- **Otimização de Performance**: Timeouts ajustados (10-15s por página) e DPI otimizados para balancear velocidade/qualidade
+- **Zero Instalação**: Todas as estratégias usam bibliotecas já instaladas, sem dependências extras ou consumo de disco
+- **Fallback Inteligente**: Se uma estratégia falha ou retorna texto insuficiente, tenta próxima automaticamente
+- **Resultado Rastreável**: Campo `strategy_used` adicionado ao resultado JSON para debugging e análise
+
 ### October 13, 2025 - ORDEM_COMPRA Parser for Multi-Line Product Formats
 - **New Document Type**: Added "ORDEM_COMPRA" detection and dedicated parser for purchase order documents
 - **Multi-Line Product Parsing**: Parser handles separated reference and quantity lines:
