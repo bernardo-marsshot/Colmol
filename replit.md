@@ -39,6 +39,20 @@ Successfully imported and configured for Replit environment on September 24, 202
 
 ## Recent Changes
 
+### October 13, 2025 - BON DE COMMANDE Parser for French Purchase Orders
+- **New Document Type**: Added "BON_COMMANDE" detection and dedicated parser for French purchase order documents
+- **French Format Support**: Parser handles French "Bon de Commande" format with European pricing (€)
+- **Product Extraction**: Extracts designation, quantity, unit price, and line total from tabular format
+- **Metadata Extraction**: 
+  - Client: ADRESSE DE LIVRAISON section
+  - Date: DATE field (DD.MM.YY format)
+  - Contremarque: Reference code for stock tracking
+- **Dimension Detection**: Automatically extracts product dimensions from descriptions (e.g., "140x190")
+- **Regex Pattern**: `^(.+?)\s+(\d+)\s+([\d,\.]+)\s*€\s+([\d,\.]+)\s*€` for product lines
+- **Successfully Tested**: Processed French document with 4 products (MATELAS SAN REMO, RIVIERA), total €1924.00
+- **IVA Rate**: Defaults to 20% (French VAT standard rate)
+- **Integration**: Seamlessly integrated into existing OCR pipeline without modifying other parsers
+
 ### October 13, 2025 - ORDEM_COMPRA Parser for Multi-Line Product Formats
 - **New Document Type**: Added "ORDEM_COMPRA" detection and dedicated parser for purchase order documents
 - **Multi-Line Product Parsing**: Parser handles separated reference and quantity lines:
