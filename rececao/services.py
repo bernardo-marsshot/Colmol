@@ -309,7 +309,7 @@ def extract_text_from_pdf_with_ocr(file_path: str):
         
         # Converter PDF → imagens primeiro
         start_time = time.time()
-        pages = convert_from_path(file_path, dpi=200)  # Reduzir DPI para 200 (mais rápido)
+        pages = convert_from_path(file_path, dpi=300)  # DPI 300 para melhor qualidade
         conversion_time = time.time() - start_time
         
         # Se conversão demorou muito (>20s), ficheiro pode ter problemas
@@ -358,7 +358,7 @@ def extract_text_from_pdf_with_ocr(file_path: str):
                 # Fallback para Tesseract se PaddleOCR não disponível ou falhou
                 if not paddle_ocr or paddle_failed:
                     page_text = pytesseract.image_to_string(
-                        page, config="--psm 6 --oem 3 -l por", lang="por", timeout=15)
+                        page, config="--psm 3 --oem 3 -l por", lang="por", timeout=60)
                 
                 if page_text.strip():
                     all_text += f"\n--- Página {i} ---\n{page_text}\n"
