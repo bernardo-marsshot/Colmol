@@ -11,5 +11,3 @@ pdfplumber
 python-dotenv
 paddleocr
 paddlepaddle
-easyocr
-python-doctr[torch]

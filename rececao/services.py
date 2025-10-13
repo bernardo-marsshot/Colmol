@@ -67,29 +67,22 @@ def save_extraction_to_json(data: dict, filename: str = "extracao.json"):
 
 
 def real_ocr_extract(file_path: str):
-    """
-    Sistema Multi-OCR: Tenta múltiplas estratégias de extração até conseguir texto válido.
-    Fallback em cascata: Tesseract Alta Qualidade → Tesseract Modo Tabela → 
-                         Tesseract Preprocessing → Tesseract Linha a Linha → PaddleOCR (final)
-    """
+    """OCR usando Tesseract. Extrai texto e faz parse para estrutura."""
+    text_content = ""
+    qr_codes = []
     ext = os.path.splitext(file_path)[1].lower()
+
+    print(f"🔍 Processando com Tesseract: {os.path.basename(file_path)}")
     
-    print(f"🔍 Iniciando extração multi-OCR: {os.path.basename(file_path)}")
-    
-    # Usa sistema multi-OCR com fallback automático
-    ocr_result = extract_with_fallback(file_path)
-    
-    text_content = ocr_result.get("text", "")
-    qr_codes = ocr_result.get("qr_codes", [])
-    strategy_used = ocr_result.get("strategy_used", "Desconhecida")
-    
-    # Log da estratégia utilizada
-    print(f"\n🎯 Estratégia utilizada: {strategy_used}")
-    
+    if ext == ".pdf":
+        text_content, qr_codes = extract_text_from_pdf(file_path)
+    elif ext in [".jpg", ".jpeg", ".png", ".tiff", ".bmp"]:
+        text_content, qr_codes = extract_text_from_image(file_path)
+
     # Validação antecipada: se texto muito curto, pode ser ficheiro ilegível/desformatado
     texto_pdfplumber_curto = len(text_content) < 50
     if texto_pdfplumber_curto:
-        print(f"⚠️ Texto extraído muito curto ({len(text_content)} chars) - possível ficheiro ilegível")
+        print(f"⚠️ Texto pdfplumber muito curto ({len(text_content)} chars) - possível ficheiro ilegível")
 
     preview = "\n".join(text_content.splitlines()[:60])
     print("---- OCR PREVIEW (primeiras linhas) ----")
@@ -100,9 +93,9 @@ def real_ocr_extract(file_path: str):
         print(f"✅ {len(qr_codes)} QR code(s) detectado(s)")
 
     if not text_content.strip():
-        print("❌ Todas as estratégias OCR falharam")
+        print("❌ OCR vazio")
         error_result = {
-            "error": f"OCR failed - {ocr_result.get('error', 'no text extracted from document')}",
+            "error": "OCR failed - no text extracted from document",
             "numero_requisicao": f"ERROR-{os.path.basename(file_path)}",
             "document_number": "",
             "po_number": "",
@@ -114,13 +107,11 @@ def real_ocr_extract(file_path: str):
                 "total_lines": 0,
                 "total_quantity": 0
             },
-            "strategy_used": strategy_used
         }
         save_extraction_to_json(error_result)
         return error_result
 
     result = parse_portuguese_document(text_content, qr_codes, texto_pdfplumber_curto)
-    result["strategy_used"] = strategy_used  # Adiciona info da estratégia ao resultado
     save_extraction_to_json(result)
     return result
 
@@ -435,247 +426,6 @@ def extract_text_from_image(file_path: str):
     except Exception as e:
         print(f"❌ OCR imagem erro: {e}")
         return "", []
-
-
-# ----------------- ESTRATÉGIAS DE EXTRAÇÃO MULTI-OCR -----------------
-
-def is_valid_ocr_text(text: str, min_length: int = 50) -> bool:
-    """Verifica se o texto extraído é válido e tem qualidade mínima."""
-    if not text or not text.strip():
-        return False
-    if len(text.strip()) < min_length:
-        return False
-    # Verifica se tem pelo menos algumas palavras reconhecíveis
-    words = text.split()
-    if len(words) < 5:
-        return False
-    return True
-
-
-def tesseract_high_quality(image_path: str) -> tuple:
-    """
-    Estratégia 1: Tesseract Alta Qualidade
-    - DPI: 200 (balanceamento qualidade/velocidade)
-    - PSM: 3 (segmentação automática de página completa)
-    - Melhor para: documentos digitalizados com boa qualidade
-    """
-    try:
-        from pdf2image import convert_from_path
-        
-        if image_path.endswith('.pdf'):
-            pages = convert_from_path(image_path, dpi=200)
-            all_text = ""
-            for i, page in enumerate(pages, 1):
-                page_text = pytesseract.image_to_string(
-                    page, 
-                    config="--psm 3 --oem 3", 
-                    lang="por",
-                    timeout=15
-                )
-                if page_text.strip():
-                    all_text += f"\n--- Página {i} ---\n{page_text}\n"
-            return all_text.strip(), []
-        else:
-            img = Image.open(image_path)
-            text = pytesseract.image_to_string(
-                img, 
-                config="--psm 3 --oem 3", 
-                lang="por",
-                timeout=15
-            )
-            return text.strip(), []
-    except Exception as e:
-        print(f"⚠️ Tesseract Alta Qualidade falhou: {e}")
-        return "", []
-
-
-def tesseract_table_mode(image_path: str) -> tuple:
-    """
-    Estratégia 2: Tesseract Modo Tabela
-    - DPI: 200
-    - PSM: 6 (bloco uniforme de texto - melhor para tabelas)
-    - Melhor para: documentos com tabelas e layouts estruturados
-    """
-    try:
-        from pdf2image import convert_from_path
-        
-        if image_path.endswith('.pdf'):
-            pages = convert_from_path(image_path, dpi=200)
-            all_text = ""
-            for i, page in enumerate(pages, 1):
-                page_text = pytesseract.image_to_string(
-                    page, 
-                    config="--psm 6 --oem 3", 
-                    lang="por",
-                    timeout=15
-                )
-                if page_text.strip():
-                    all_text += f"\n--- Página {i} ---\n{page_text}\n"
-            return all_text.strip(), []
-        else:
-            img = Image.open(image_path)
-            text = pytesseract.image_to_string(
-                img, 
-                config="--psm 6 --oem 3", 
-                lang="por",
-                timeout=15
-            )
-            return text.strip(), []
-    except Exception as e:
-        print(f"⚠️ Tesseract Modo Tabela falhou: {e}")
-        return "", []
-
-
-def tesseract_line_mode(image_path: str) -> tuple:
-    """
-    Estratégia 4: Tesseract Linha a Linha
-    - DPI: 150 (mais rápido)
-    - PSM: 7 (linha única de texto)
-    - Melhor para: documentos simples com texto linear
-    """
-    try:
-        from pdf2image import convert_from_path
-        
-        if image_path.endswith('.pdf'):
-            pages = convert_from_path(image_path, dpi=150)
-            all_text = ""
-            for i, page in enumerate(pages, 1):
-                page_text = pytesseract.image_to_string(
-                    page, 
-                    config="--psm 7 --oem 3", 
-                    lang="por",
-                    timeout=10
-                )
-                if page_text.strip():
-                    all_text += f"\n--- Página {i} ---\n{page_text}\n"
-            return all_text.strip(), []
-        else:
-            img = Image.open(image_path)
-            text = pytesseract.image_to_string(
-                img, 
-                config="--psm 7 --oem 3", 
-                lang="por",
-                timeout=10
-            )
-            return text.strip(), []
-    except Exception as e:
-        print(f"⚠️ Tesseract Linha a Linha falhou: {e}")
-        return "", []
-
-
-def tesseract_with_preprocessing(image_path: str) -> tuple:
-    """
-    Estratégia 3: Tesseract com Pré-processamento de Imagem
-    - Binarização (preto e branco)
-    - Remoção de ruído
-    - Melhor para: imagens de baixa qualidade ou com muito ruído
-    """
-    try:
-        from pdf2image import convert_from_path
-        import cv2
-        import numpy as np
-        
-        def preprocess_image(img):
-            """Aplica preprocessing para melhorar OCR"""
-            # Converter para array numpy
-            img_array = np.array(img)
-            
-            # Converter para escala de cinza
-            if len(img_array.shape) == 3:
-                gray = cv2.cvtColor(img_array, cv2.COLOR_RGB2GRAY)
-            else:
-                gray = img_array
-            
-            # Binarização com threshold adaptativo
-            binary = cv2.adaptiveThreshold(
-                gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2
-            )
-            
-            # Remoção de ruído
-            denoised = cv2.fastNlMeansDenoising(binary, None, 10, 7, 21)
-            
-            return Image.fromarray(denoised)
-        
-        if image_path.endswith('.pdf'):
-            pages = convert_from_path(image_path, dpi=200)
-            all_text = ""
-            for i, page in enumerate(pages, 1):
-                processed_page = preprocess_image(page)
-                page_text = pytesseract.image_to_string(
-                    processed_page, 
-                    config="--psm 3 --oem 3", 
-                    lang="por",
-                    timeout=15
-                )
-                if page_text.strip():
-                    all_text += f"\n--- Página {i} ---\n{page_text}\n"
-            return all_text.strip(), []
-        else:
-            img = Image.open(image_path)
-            processed_img = preprocess_image(img)
-            text = pytesseract.image_to_string(
-                processed_img, 
-                config="--psm 3 --oem 3", 
-                lang="por",
-                timeout=15
-            )
-            return text.strip(), []
-    except Exception as e:
-        print(f"⚠️ Tesseract com Preprocessing falhou: {e}")
-        return "", []
-
-
-def extract_with_fallback(file_path: str) -> dict:
-    """
-    Sistema Multi-OCR com Fallback em Cascata.
-    
-    Tenta múltiplas estratégias de extração até conseguir texto válido:
-    1. Tesseract Alta Qualidade (DPI 200, PSM 3) - documentos digitalizados
-    2. Tesseract Modo Tabela (DPI 200, PSM 6) - documentos com tabelas
-    3. Tesseract com Preprocessing (binarização + denoising) - imagens de baixa qualidade
-    4. Tesseract Linha a Linha (DPI 150, PSM 7) - documentos simples
-    5. PaddleOCR (fallback final) - se todas as estratégias Tesseract falharem
-    
-    Retorna o primeiro resultado válido (>50 chars com 5+ palavras).
-    """
-    strategies = [
-        ("Tesseract Alta Qualidade (DPI 200, PSM 3)", lambda: tesseract_high_quality(file_path)),
-        ("Tesseract Modo Tabela (DPI 200, PSM 6)", lambda: tesseract_table_mode(file_path)),
-        ("Tesseract com Preprocessing (DPI 200)", lambda: tesseract_with_preprocessing(file_path)),
-        ("Tesseract Linha a Linha (DPI 150, PSM 7)", lambda: tesseract_line_mode(file_path)),
-        ("PaddleOCR (fallback final)", lambda: extract_text_from_pdf_with_ocr(file_path) if file_path.endswith('.pdf') else extract_text_from_image(file_path)),
-    ]
-    
-    print(f"\n🔄 Sistema Multi-OCR: testando {len(strategies)} estratégias...")
-    
-    for strategy_name, strategy_func in strategies:
-        print(f"\n📌 Tentando: {strategy_name}")
-        try:
-            text, qr_codes = strategy_func()
-            
-            if is_valid_ocr_text(text, min_length=50):
-                print(f"✅ SUCESSO com {strategy_name}! Texto extraído: {len(text)} caracteres")
-                return {
-                    "text": text,
-                    "qr_codes": qr_codes,
-                    "strategy_used": strategy_name,
-                    "success": True
-                }
-            else:
-                print(f"⚠️ {strategy_name} retornou texto insuficiente ({len(text) if text else 0} chars)")
-        except Exception as e:
-            print(f"❌ {strategy_name} falhou: {e}")
-            continue
-    
-    # Se todas as estratégias falharam
-    print(f"❌ Todas as {len(strategies)} estratégias falharam!")
-    return {
-        "text": "",
-        "qr_codes": [],
-        "strategy_used": "Nenhuma (todas falharam)",
-        "success": False,
-        "error": "Nenhuma estratégia OCR conseguiu extrair texto válido"
-    }
 
 
 # ----------------- PARSE: heurísticas PT -----------------
