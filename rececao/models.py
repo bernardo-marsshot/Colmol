@@ -46,7 +46,7 @@ class CodeMapping(models.Model):
 class InboundDocument(models.Model):
     DOC_TYPES = (
         ('GR','Guia de Remessa'),
-        ('FT','Fatura'),
+        ('FT','Nota de Encomenda'),
     )
     supplier = models.ForeignKey(Supplier, on_delete=models.CASCADE, related_name='inbound_docs')
     doc_type = models.CharField(max_length=2, choices=DOC_TYPES, default='GR')

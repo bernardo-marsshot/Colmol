@@ -1,7 +1,7 @@
 
 {% extends "base.html" %}
 {% block content %}
-<h1>Carregar Guia / Fatura</h1>
+<h1>Carregar Documento</h1>
 <form method="post" enctype="multipart/form-data" class="card p-4 mt-3">
   {% csrf_token %}
   {{ form.as_p }}
