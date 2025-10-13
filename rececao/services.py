@@ -546,9 +546,14 @@ def extract_guia_remessa_products(text: str):
 
 
 def detect_document_type(text: str):
-    """Detecta automaticamente o tipo de documento português."""
+    """Detecta automaticamente o tipo de documento português e francês."""
     text_lower = text.lower()
     
+    # Documentos franceses
+    if "bon de commande" in text_lower or ("commande" in text_lower and "désignation" in text_lower):
+        return "BON_COMMANDE"
+    
+    # Documentos portugueses
     if "ordem compra" in text_lower or "ordem de compra" in text_lower:
         return "ORDEM_COMPRA"
     elif "elastron" in text_lower and "fatura" in text_lower:
@@ -891,6 +896,116 @@ def parse_ordem_compra(text: str):
     return produtos
 
 
+def parse_bon_commande(text: str):
+    """
+    Parser dedicado para BON DE COMMANDE (Notas de Encomenda francesas).
+    
+    Formato esperado:
+    Désignation  Quantité  Prix unitaire  Montant
+    MATELAS SAN REMO 140x190  2 202.00€ 404.00€
+    
+    Extrai:
+    - Referência/Designação do produto
+    - Quantidade
+    - Preço unitário
+    - Total da linha
+    """
+    produtos = []
+    lines = text.split("\n")
+    
+    # Buscar cliente
+    cliente = ""
+    cliente_match = re.search(r'ADRESSE DE LIVRAISON\s+([^\n]+)', text, re.IGNORECASE)
+    if cliente_match:
+        cliente = cliente_match.group(1).strip()
+    
+    # Buscar data
+    data = ""
+    data_match = re.search(r'DATE\s*:\s*(\d{2}\.\d{2}\.\d{2})', text, re.IGNORECASE)
+    if data_match:
+        data = data_match.group(1)
+    
+    # Buscar contremarque
+    contremarque = ""
+    cm_match = re.search(r'CONTREMARQUE\s*:\s*([^\n]+)', text, re.IGNORECASE)
+    if cm_match:
+        contremarque = cm_match.group(1).strip()
+    
+    in_product_section = False
+    
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            continue
+        
+        # Detectar início da seção de produtos
+        if re.search(r'Désignation.*Quantité.*Prix', stripped, re.IGNORECASE):
+            in_product_section = True
+            continue
+        
+        # Detectar fim da seção (TOTAL ou endereço)
+        if re.search(r'^TOTAL|^ADRESSE|^BON DE COMMANDE', stripped, re.IGNORECASE):
+            in_product_section = False
+            continue
+        
+        if in_product_section:
+            # Formato: MATELAS SAN REMO 140x190  2 202.00€ 404.00€
+            # Produto pode ter dimensões (140x190, 180x200, etc)
+            # Quantidade é número inteiro
+            # Preços em formato europeu (202.00€)
+            
+            # Padrão: [PRODUTO com possíveis dimensões] [QTY] [PREÇO€] [TOTAL€]
+            match = re.match(
+                r'^(.+?)\s+(\d+)\s+([\d,\.]+)\s*€\s+([\d,\.]+)\s*€',
+                stripped
+            )
+            
+            if match:
+                designacao = match.group(1).strip()
+                quantidade = int(match.group(2))
+                preco_str = match.group(3).replace(',', '.')
+                total_str = match.group(4).replace(',', '.')
+                
+                try:
+                    preco_unitario = float(preco_str)
+                    total_linha = float(total_str)
+                    
+                    # Extrair dimensões da designação se existirem
+                    dims = ""
+                    dim_match = re.search(r'(\d{2,3})\s*[xX×]\s*(\d{2,3})', designacao)
+                    if dim_match:
+                        dims = f"{dim_match.group(1)}x{dim_match.group(2)}"
+                    
+                    # Extrair código/referência se existir (formato tipo SAN REMO, RIVIERA)
+                    codigo = ""
+                    cod_match = re.match(r'^([A-Z\s]+?)\s+\d', designacao)
+                    if cod_match:
+                        codigo = cod_match.group(1).strip()
+                    
+                    produtos.append({
+                        "artigo": codigo if codigo else designacao[:20],
+                        "descricao": designacao,
+                        "quantidade": float(quantidade),
+                        "unidade": "UN",
+                        "preco_unitario": preco_unitario,
+                        "total": total_linha,
+                        "dimensoes": dims,
+                        "cliente": cliente,
+                        "data_encomenda": data,
+                        "contremarque": contremarque,
+                        "referencia_ordem": "",
+                        "lote_producao": "",
+                        "volume": 0,
+                        "peso": 0.0,
+                        "iva": 20.0  # IVA França padrão
+                    })
+                except ValueError as e:
+                    print(f"⚠️ Erro ao converter valores numéricos em '{stripped[:50]}': {e}")
+                    continue
+    
+    return produtos
+
+
 def parse_portuguese_document(text: str, qr_codes=None, texto_pdfplumber_curto=False):
     """Extrai cabeçalho (req/doc/fornecedor/data) e linhas de produto."""
     if qr_codes is None:
@@ -948,7 +1063,24 @@ def parse_portuguese_document(text: str, qr_codes=None, texto_pdfplumber_curto=F
             if m:
                 result["supplier_name"] = m.group(1).title()
 
-    if doc_type == "ORDEM_COMPRA":
+    if doc_type == "BON_COMMANDE":
+        produtos = parse_bon_commande(text)
+        if produtos:
+            result["produtos"] = produtos
+            print(f"✅ Extraídos {len(produtos)} produtos do Bon de Commande")
+            
+            # Extrair cliente e data dos produtos
+            if produtos and produtos[0].get("cliente"):
+                result["supplier_name"] = produtos[0]["cliente"]
+            if produtos and produtos[0].get("data_encomenda"):
+                result["delivery_date"] = produtos[0]["data_encomenda"]
+            
+            # Extrair contremarque como número de documento
+            if produtos and produtos[0].get("contremarque"):
+                result["document_number"] = produtos[0]["contremarque"]
+        else:
+            print("⚠️ Parser Bon de Commande retornou 0 produtos")
+    elif doc_type == "ORDEM_COMPRA":
         produtos = parse_ordem_compra(text)
         if produtos:
             result["produtos"] = produtos
