@@ -34,6 +34,102 @@ except ImportError:
 # Se precisares especificar o caminho do tesseract no Windows:
 # pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
+# --- OCR.space API (Level 0 - Cloud OCR com 25k req/mês grátis) ---
+try:
+    import requests
+    OCR_SPACE_AVAILABLE = True
+except ImportError:
+    OCR_SPACE_AVAILABLE = False
+
+def ocr_space_api(file_path: str, language='por'):
+    """
+    OCR.space API - Level 0 (prioridade máxima)
+    - 25.000 requisições/mês grátis
+    - Suporta PT, ES, FR, EN + 30 idiomas
+    - Detecção automática de tabelas
+    - Fallback: retorna None se falhar
+    """
+    if not OCR_SPACE_AVAILABLE:
+        return None
+    
+    api_key = os.environ.get('OCR_SPACE_API_KEY')
+    if not api_key:
+        print("⚠️ OCR_SPACE_API_KEY não encontrada - usando engines locais")
+        return None
+    
+    try:
+        url = 'https://api.ocr.space/parse/image'
+        
+        # Mapeamento de idiomas (por=português, spa=espanhol, fre=francês)
+        lang_map = {'por': 'por', 'pt': 'por', 'es': 'spa', 'spa': 'spa', 'fr': 'fre', 'fre': 'fre', 'en': 'eng'}
+        ocr_language = lang_map.get(language.lower(), 'por')
+        
+        with open(file_path, 'rb') as f:
+            payload = {
+                'apikey': api_key,
+                'language': ocr_language,
+                'isOverlayRequired': False,
+                'detectOrientation': True,
+                'scale': True,
+                'OCREngine': 2,  # Engine 2 é mais preciso para tabelas
+                'isTable': True  # Detecção de tabelas ativada
+            }
+            
+            response = requests.post(url, files={'file': f}, data=payload, timeout=30)
+            
+            if response.status_code == 200:
+                result = response.json()
+                
+                if result.get('IsErroredOnProcessing'):
+                    print(f"⚠️ OCR.space error: {result.get('ErrorMessage', 'Unknown error')}")
+                    return None
+                
+                # Extrai texto de todas as páginas
+                text_parts = []
+                if result.get('ParsedResults'):
+                    for page in result['ParsedResults']:
+                        page_text = page.get('ParsedText', '')
+                        if page_text:
+                            text_parts.append(page_text)
+                
+                full_text = '\n'.join(text_parts)
+                
+                if full_text.strip():
+                    print(f"✅ OCR.space (API): {len(full_text)} chars extraídos")
+                    return full_text
+                else:
+                    print("⚠️ OCR.space retornou texto vazio - fallback para engines locais")
+                    return None
+            else:
+                print(f"⚠️ OCR.space HTTP {response.status_code} - fallback para engines locais")
+                return None
+                
+    except requests.Timeout:
+        print("⚠️ OCR.space timeout (30s) - fallback para engines locais")
+        return None
+    except Exception as e:
+        print(f"⚠️ OCR.space exception: {e} - fallback para engines locais")
+        return None
+
+# --- Imports opcionais para extração universal ---
+try:
+    import pdfplumber
+    PDFPLUMBER_AVAILABLE = True
+except ImportError:
+    PDFPLUMBER_AVAILABLE = False
+
+try:
+    import camelot
+    CAMELOT_AVAILABLE = True
+except ImportError:
+    CAMELOT_AVAILABLE = False
+
+try:
+    from rapidfuzz import fuzz, process
+    RAPIDFUZZ_AVAILABLE = True
+except ImportError:
+    RAPIDFUZZ_AVAILABLE = False
+
 # --- PaddleOCR (lazy loading para evitar problemas no startup) ---
 _paddle_ocr_instance = None
 
@@ -133,8 +229,14 @@ def real_ocr_extract(file_path: str):
 
 
 def extract_text_from_pdf(file_path: str):
-    """Tenta extrair texto (texto embutido). Se falhar, usa OCR página a página."""
+    """
+    Cascata de extração de PDF (4 níveis):
+    1. Texto embutido (PyPDF2) - mais rápido
+    2. OCR.space API - cloud, preciso, grátis 25k/mês
+    3. PaddleOCR/EasyOCR/Tesseract - local, offline
+    """
     try:
+        # LEVEL 1: Tenta texto embutido primeiro (mais rápido)
         text = ""
         with open(file_path, "rb") as f:
             reader = PyPDF2.PdfReader(f)
@@ -158,7 +260,26 @@ def extract_text_from_pdf(file_path: str):
                     print(f"⚠️ Erro ao buscar QR codes: {e}")
             return text.strip(), qr_codes
 
-        print("📄 PDF sem texto embutido—usar OCR…")
+        # LEVEL 2: OCR.space API (cloud, grátis, preciso)
+        print("📄 PDF sem texto embutido - tentando OCR.space API...")
+        ocr_text = ocr_space_api(file_path, language='por')
+        
+        if ocr_text and len(ocr_text.strip()) > 50:
+            # QR codes (se disponível)
+            qr_codes = []
+            if QR_CODE_ENABLED:
+                try:
+                    print("🔍 Procurando QR codes no PDF...")
+                    pages = convert_from_path(file_path, dpi=300)
+                    for page_num, page_img in enumerate(pages, start=1):
+                        page_qr = detect_and_read_qrcodes(page_img, page_number=page_num)
+                        qr_codes.extend(page_qr)
+                except Exception as e:
+                    print(f"⚠️ Erro ao buscar QR codes: {e}")
+            return ocr_text.strip(), qr_codes
+
+        # LEVEL 3: Engines locais (PaddleOCR → EasyOCR → Tesseract)
+        print("📄 OCR.space falhou - usando engines locais (PaddleOCR/EasyOCR/Tesseract)...")
         return extract_text_from_pdf_with_ocr(file_path)
 
     except Exception as e:
@@ -1278,6 +1399,261 @@ def parse_pedido_espanhol(text: str):
                     pass
     
     return produtos
+
+
+# ============================================================================
+# FUNÇÕES UNIVERSAIS DE EXTRAÇÃO (Fuzzy Matching + Table Extraction)
+# ============================================================================
+
+def universal_kv_extract(text: str, file_path: str = None):
+    """
+    Extração universal de key-value pairs usando fuzzy matching (rapidfuzz).
+    Encontra: fornecedor/supplier/proveedor, NIF, IBAN, número documento, data, número encomenda
+    """
+    if not RAPIDFUZZ_AVAILABLE:
+        return {}
+    
+    result = {}
+    lines = text.split('\n')
+    
+    # Sinônimos multi-idioma para campos-chave
+    synonyms = {
+        'fornecedor': ['fornecedor', 'supplier', 'proveedor', 'empresa', 'vendedor', 'seller', 'company'],
+        'nif': ['nif', 'vat', 'nipc', 'tax id', 'cif', 'dni', 'identificação fiscal'],
+        'iban': ['iban', 'account', 'conta bancária', 'bank account', 'cuenta bancaria'],
+        'documento': ['documento', 'document', 'factura', 'fatura', 'invoice', 'guia', 'pedido', 'order'],
+        'data': ['data', 'date', 'fecha', 'datum'],
+        'encomenda': ['encomenda', 'order', 'pedido', 'purchase order', 'po', 'commande']
+    }
+    
+    for line in lines:
+        line_clean = line.strip()
+        if not line_clean or len(line_clean) < 3:
+            continue
+        
+        # Split em possível key:value
+        parts = line_clean.split(':', 1)
+        if len(parts) == 2:
+            key_candidate = parts[0].strip().lower()
+            value_candidate = parts[1].strip()
+            
+            # Fuzzy match para cada categoria
+            for field, variants in synonyms.items():
+                if field in result:  # Já encontrado
+                    continue
+                
+                # Usa rapidfuzz para encontrar melhor match
+                best_match = process.extractOne(key_candidate, variants, scorer=fuzz.ratio)
+                
+                if best_match and best_match[1] >= 70:  # Score >= 70%
+                    result[field] = value_candidate
+                    break
+    
+    return result
+
+
+def universal_table_extract(file_path: str):
+    """
+    Extração universal de tabelas usando Camelot + pdfplumber.
+    Retorna lista de produtos extraídos de tabelas detectadas.
+    """
+    produtos = []
+    
+    # Método 1: Camelot (melhor para tabelas com bordas)
+    if CAMELOT_AVAILABLE and file_path.lower().endswith('.pdf'):
+        try:
+            tables = camelot.read_pdf(file_path, pages='all', flavor='lattice')
+            
+            if len(tables) > 0:
+                print(f"✅ Camelot detectou {len(tables)} tabela(s)")
+                
+                for table_idx, table in enumerate(tables):
+                    df = table.df
+                    
+                    # Tenta identificar colunas de produto (heurística)
+                    possible_headers = df.iloc[0].tolist() if len(df) > 0 else []
+                    header_lower = [str(h).lower() for h in possible_headers]
+                    
+                    # Procura colunas importantes
+                    col_map = {}
+                    for idx, h in enumerate(header_lower):
+                        if any(kw in h for kw in ['código', 'codigo', 'code', 'ref', 'artigo', 'article']):
+                            col_map['codigo'] = idx
+                        elif any(kw in h for kw in ['descrição', 'descripcion', 'description', 'designation', 'produto']):
+                            col_map['descricao'] = idx
+                        elif any(kw in h for kw in ['quantidade', 'qty', 'qtd', 'quant', 'unidades', 'cantidad']):
+                            col_map['quantidade'] = idx
+                        elif any(kw in h for kw in ['preço', 'precio', 'price', 'unitário', 'unit']):
+                            col_map['preco'] = idx
+                    
+                    # Extrai produtos
+                    for row_idx in range(1, len(df)):
+                        row = df.iloc[row_idx]
+                        
+                        produto = {}
+                        if 'codigo' in col_map:
+                            produto['artigo'] = str(row[col_map['codigo']]).strip()
+                        if 'descricao' in col_map:
+                            produto['descricao'] = str(row[col_map['descricao']]).strip()
+                        if 'quantidade' in col_map:
+                            qty_str = str(row[col_map['quantidade']]).strip()
+                            try:
+                                produto['quantidade'] = float(qty_str.replace(',', '.'))
+                            except:
+                                produto['quantidade'] = 0.0
+                        if 'preco' in col_map:
+                            preco_str = str(row[col_map['preco']]).strip()
+                            try:
+                                produto['preco_unitario'] = float(preco_str.replace(',', '.'))
+                            except:
+                                produto['preco_unitario'] = 0.0
+                        
+                        # Valida produto mínimo (tem código OU descrição + quantidade)
+                        if (produto.get('artigo') or produto.get('descricao')) and produto.get('quantidade', 0) > 0:
+                            produtos.append(produto)
+        
+        except Exception as e:
+            print(f"⚠️ Camelot falhou: {e}")
+    
+    # Método 2: pdfplumber (melhor para tabelas sem bordas)
+    if PDFPLUMBER_AVAILABLE and file_path.lower().endswith('.pdf') and len(produtos) == 0:
+        try:
+            with pdfplumber.open(file_path) as pdf:
+                for page in pdf.pages:
+                    tables = page.extract_tables()
+                    
+                    if tables:
+                        print(f"✅ pdfplumber detectou {len(tables)} tabela(s) na página {page.page_number}")
+                        
+                        for table in tables:
+                            if not table or len(table) < 2:
+                                continue
+                            
+                            # Primeira linha = headers
+                            headers = [str(h).lower().strip() if h else '' for h in table[0]]
+                            
+                            # Mapeia colunas
+                            col_map = {}
+                            for idx, h in enumerate(headers):
+                                if any(kw in h for kw in ['código', 'codigo', 'code', 'ref', 'artigo']):
+                                    col_map['codigo'] = idx
+                                elif any(kw in h for kw in ['descrição', 'descripcion', 'description', 'designation']):
+                                    col_map['descricao'] = idx
+                                elif any(kw in h for kw in ['quantidade', 'qty', 'qtd', 'quant', 'unidades', 'cantidad']):
+                                    col_map['quantidade'] = idx
+                                elif any(kw in h for kw in ['preço', 'precio', 'price', 'unitário', 'unit']):
+                                    col_map['preco'] = idx
+                            
+                            # Extrai linhas
+                            for row in table[1:]:
+                                if not row or len(row) == 0:
+                                    continue
+                                
+                                produto = {}
+                                if 'codigo' in col_map and col_map['codigo'] < len(row):
+                                    produto['artigo'] = str(row[col_map['codigo']]).strip() if row[col_map['codigo']] else ''
+                                if 'descricao' in col_map and col_map['descricao'] < len(row):
+                                    produto['descricao'] = str(row[col_map['descricao']]).strip() if row[col_map['descricao']] else ''
+                                if 'quantidade' in col_map and col_map['quantidade'] < len(row):
+                                    qty_str = str(row[col_map['quantidade']]).strip() if row[col_map['quantidade']] else '0'
+                                    try:
+                                        produto['quantidade'] = float(qty_str.replace(',', '.'))
+                                    except:
+                                        produto['quantidade'] = 0.0
+                                if 'preco' in col_map and col_map['preco'] < len(row):
+                                    preco_str = str(row[col_map['preco']]).strip() if row[col_map['preco']] else '0'
+                                    try:
+                                        produto['preco_unitario'] = float(preco_str.replace(',', '.'))
+                                    except:
+                                        produto['preco_unitario'] = 0.0
+                                
+                                # Valida produto mínimo
+                                if (produto.get('artigo') or produto.get('descricao')) and produto.get('quantidade', 0) > 0:
+                                    produtos.append(produto)
+        
+        except Exception as e:
+            print(f"⚠️ pdfplumber falhou: {e}")
+    
+    if produtos:
+        print(f"✅ Extração universal de tabelas: {len(produtos)} produtos")
+    
+    return produtos
+
+
+def parse_generic_document(text: str, file_path: str = None):
+    """
+    Parser genérico universal - última tentativa quando parsers específicos falharem.
+    Combina regex heurísticos + table extraction + fuzzy matching.
+    """
+    produtos = []
+    metadata = {}
+    
+    # 1. Extração de metadados com fuzzy matching
+    if file_path:
+        metadata = universal_kv_extract(text, file_path)
+        print(f"📋 Metadados extraídos (fuzzy): {list(metadata.keys())}")
+    
+    # 2. Tentativa de extração por tabelas
+    if file_path:
+        produtos = universal_table_extract(file_path)
+    
+    # 3. Se ainda não tem produtos, tenta regex genéricos
+    if len(produtos) == 0:
+        lines = text.split('\n')
+        
+        # Regex genérico para linhas de produto (artigo + descrição + quantidade + preço)
+        generic_patterns = [
+            # Padrão 1: CÓDIGO DESCRIÇÃO QTY PREÇO
+            r'^\s*([A-Z0-9\-]+)\s+(.{10,60}?)\s+(\d+[,.]?\d*)\s+(\d+[,.]?\d+)\s*$',
+            # Padrão 2: CÓDIGO | DESCRIÇÃO | QTY
+            r'^\s*([A-Z0-9\-]+)\s*\|\s*(.{10,60}?)\s*\|\s*(\d+[,.]?\d*)',
+            # Padrão 3: QTY DESCRIÇÃO CÓDIGO
+            r'^\s*(\d+[,.]?\d*)\s+(.{10,60}?)\s+([A-Z0-9\-]+)\s*$'
+        ]
+        
+        for line in lines:
+            line_stripped = line.strip()
+            if len(line_stripped) < 10:
+                continue
+            
+            for pattern_idx, pattern in enumerate(generic_patterns):
+                match = re.match(pattern, line_stripped)
+                if match:
+                    try:
+                        if pattern_idx == 0:  # CÓDIGO DESC QTY PREÇO
+                            codigo, desc, qty, preco = match.groups()
+                            produtos.append({
+                                'artigo': codigo.strip(),
+                                'descricao': desc.strip(),
+                                'quantidade': float(qty.replace(',', '.')),
+                                'preco_unitario': float(preco.replace(',', '.'))
+                            })
+                        elif pattern_idx == 1:  # CÓDIGO | DESC | QTY
+                            codigo, desc, qty = match.groups()
+                            produtos.append({
+                                'artigo': codigo.strip(),
+                                'descricao': desc.strip(),
+                                'quantidade': float(qty.replace(',', '.')),
+                                'preco_unitario': 0.0
+                            })
+                        elif pattern_idx == 2:  # QTY DESC CÓDIGO
+                            qty, desc, codigo = match.groups()
+                            produtos.append({
+                                'artigo': codigo.strip(),
+                                'descricao': desc.strip(),
+                                'quantidade': float(qty.replace(',', '.')),
+                                'preco_unitario': 0.0
+                            })
+                        break  # Encontrou match, próxima linha
+                    except ValueError:
+                        continue
+    
+    if produtos:
+        print(f"✅ Parser genérico universal: {len(produtos)} produtos extraídos")
+    else:
+        print("⚠️ Parser genérico universal: 0 produtos extraídos")
+    
+    return {'produtos': produtos, 'metadata': metadata}
 
 
 def parse_portuguese_document(text: str, qr_codes=None, texto_pdfplumber_curto=False):

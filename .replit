@@ -5,7 +5,7 @@ integrations = ["python_openai:1.0.0", "python_gemini:1.0.0"]
 
 [nix]
 channel = "stable-25_05"
-packages = ["freetype", "gcc", "hdf5", "lcms2", "libGL", "libGLU", "libimagequant", "libjpeg", "libtiff", "libwebp", "libxcrypt", "openjpeg", "openssl", "poppler-utils", "poppler_utils", "tcl", "tesseract", "tk", "zbar", "zlib"]
+packages = ["freetype", "gcc", "hdf5", "lcms2", "libGL", "libGLU", "libimagequant", "libjpeg", "libtiff", "libwebp", "libxcrypt", "openjpeg", "openssl", "poppler-utils", "poppler_utils", "rapidfuzz-cpp", "taskflow", "tcl", "tesseract", "tk", "zbar", "zlib"]
 
 [workflows]
 runButton = "Project"
@@ -50,6 +50,10 @@ externalPort = 3001
 [[ports]]
 localPort = 35973
 externalPort = 3000
+
+[[ports]]
+localPort = 37883
+externalPort = 3003
 
 [[ports]]
 localPort = 46479
