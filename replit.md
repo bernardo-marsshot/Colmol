@@ -39,6 +39,25 @@ Successfully imported and configured for Replit environment on September 24, 202
 
 ## Recent Changes
 
+### October 13, 2025 - ORDEM_COMPRA Parser for Multi-Line Product Formats
+- **New Document Type**: Added "ORDEM_COMPRA" detection and dedicated parser for purchase order documents
+- **Multi-Line Product Parsing**: Parser handles separated reference and quantity lines:
+  - Reference line: `26.100145 COLCHAO 1,95X1,40=27"SPA CHERRY VISCO"COLMOL`
+  - Quantity line: `1.000 UN 2025-10-17`
+- **Robust Regex Logic**: Fixed parser to prevent false matches:
+  - Quantity detection FIRST (more specific): Unit MUST be followed by date OR end-of-line
+  - Reference detection SECOND (less specific): Matches product codes with descriptions
+  - Supports both uppercase and lowercase units (UN, un, KG, kg, etc.)
+- **Defensive Pairing**: Added validation to ensure consistent reference-quantity matching:
+  - Logs warning when counts differ
+  - Uses min(refs, qtys) to prevent IndexError
+  - Shows which products will be paired
+- **OCR Performance Tuning**: Enhanced settings for scanned documents:
+  - DPI: 300 (high quality)
+  - Timeout: 60s per page
+  - PSM mode: 3 (fully automatic page segmentation)
+- **Successfully Tested**: Processed real user document with 2 products, created PO OC250000525
+
 ### October 13, 2025 - Bidirectional Nota de Encomenda ↔ Guia de Remessa System
 - **Automatic PO Creation from Notas**: Notas de Encomenda (FT) now automatically create PurchaseOrder + POLines from OCR data
 - **Smart Document Routing**: process_inbound() detects doc_type='FT' and creates PO instead of matching logic

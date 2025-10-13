@@ -805,33 +805,39 @@ def parse_ordem_compra(text: str):
             continue
         
         # Detectar linha de quantidade + unidade PRIMEIRO (mais específico)
-        # Formato: 1.000 UN 2025-10-17
-        # A unidade DEVE ser seguida por espaço+data OU fim de linha (não mais texto)
-        qty_match = re.match(r'^([\d,\.]+)\s+([A-Z]{2,4})(?:\s+(\d{4}-\d{2}-\d{2})|\s*$)', stripped, re.IGNORECASE)
+        # Formato: 1.000 UN 2025-10-17 [texto opcional]
+        # Aceita: uppercase/lowercase units, data opcional, texto trailing opcional
+        # Exemplo: "1.000 UN 2025-10-17", "1.000 un", "3.5 KG 2025-10-17 RECEBIDO"
+        qty_match = re.match(r'^([\d,\.]+)\s+([A-Za-z]{2,4})(?:\s+(\d{4}-\d{2}-\d{2}))?', stripped)
         if qty_match:
             quantidade_str = qty_match.group(1)
             unidade = qty_match.group(2).upper()
             data_entrega = qty_match.group(3) if qty_match.group(3) else ""
             
-            try:
-                # Converter quantidade (formato PT: 1.000 = 1000)
-                if '.' in quantidade_str and ',' not in quantidade_str:
-                    # Formato 1.000 (mil)
-                    quantidade = float(quantidade_str.replace('.', ''))
-                elif ',' in quantidade_str:
-                    # Formato 1,5 (um e meio)
-                    quantidade = float(quantidade_str.replace(',', '.'))
-                else:
-                    quantidade = float(quantidade_str)
-                    
-                quantidades.append({
-                    'quantidade': quantidade,
-                    'unidade': unidade,
-                    'data_entrega': data_entrega
-                })
-                continue
-            except ValueError:
-                pass
+            # Validar unidade: lista de unidades conhecidas OU tem data (evita false positives)
+            unidades_validas = {'UN', 'UNI', 'UNID', 'PC', 'PCS', 'KG', 'G', 'M', 'M2', 'M3', 'L', 'ML', 'CX', 'PAR', 'PAC', 'SET', 'RL', 'FD'}
+            is_valid_unit = unidade in unidades_validas or data_entrega
+            
+            if is_valid_unit:
+                try:
+                    # Converter quantidade (formato PT: 1.000 = 1000)
+                    if '.' in quantidade_str and ',' not in quantidade_str:
+                        # Formato 1.000 (mil)
+                        quantidade = float(quantidade_str.replace('.', ''))
+                    elif ',' in quantidade_str:
+                        # Formato 1,5 (um e meio)
+                        quantidade = float(quantidade_str.replace(',', '.'))
+                    else:
+                        quantidade = float(quantidade_str)
+                        
+                    quantidades.append({
+                        'quantidade': quantidade,
+                        'unidade': unidade,
+                        'data_entrega': data_entrega
+                    })
+                    continue
+                except ValueError:
+                    pass
         
         # Detectar linha de referência + descrição (menos específico)
         # Formato: 26.100145 COLCHAO 1,95X1,40=27"SPA CHERRY VISCO"COLMOL
@@ -844,8 +850,20 @@ def parse_ordem_compra(text: str):
             })
             continue
     
-    # Combinar referências com quantidades (assumindo ordem sequencial)
-    for i, ref in enumerate(referencias):
+    # Validar emparelhamento de referências e quantidades
+    if len(referencias) != len(quantidades):
+        print(f"⚠️ Contagem inconsistente: {len(referencias)} referências vs {len(quantidades)} quantidades")
+        print(f"   Referências: {[r['codigo'] for r in referencias]}")
+        qtys_str = ["{} {}".format(q['quantidade'], q['unidade']) for q in quantidades]
+        print(f"   Quantidades: {qtys_str}")
+        # Usar o mínimo para evitar IndexError
+        min_count = min(len(referencias), len(quantidades))
+        print(f"   Processando apenas {min_count} produtos emparelhados")
+    
+    # Combinar referências com quantidades (ordem sequencial 1:1)
+    paired_count = min(len(referencias), len(quantidades))
+    for i in range(paired_count):
+        ref = referencias[i]
         if i < len(quantidades):
             qty_info = quantidades[i]
             
