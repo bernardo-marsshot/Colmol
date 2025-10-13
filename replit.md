@@ -66,3 +66,37 @@ Key architectural decisions and features include:
 - **Successfully Tested**: Processed real user document with 2/2 products, created PO OC250000525
 - **Multi-Line Format**: Handles separated reference and quantity lines with robust regex
 - **Defensive Pairing**: Validates reference-quantity matching to prevent IndexError
+
+### October 13, 2025 - Universal Document Extraction System
+- **Leitor Universal de Documentos**: Transformado `services.py` num leitor universal capaz de processar QUALQUER formato de fornecedor
+- **Bibliotecas Adicionadas**:
+  - **pdfplumber**: Extração avançada de tabelas em PDFs
+  - **Camelot**: Extração de tabelas complexas com múltiplos flavors (lattice/stream)
+  - **RapidFuzz**: Fuzzy matching para identificar campos com sinónimos multi-idioma
+- **Funções Universais Criadas**:
+  - **`universal_kv_extract()`**: Extração de metadados com fuzzy matching
+    - Detecta: fornecedor/supplier/proveedor, NIF/CIF/VAT, IBAN, documento, data, PO
+    - Suporta variações linguísticas (PT/ES/FR/EN)
+    - Preenche campos vazios automaticamente
+  - **`universal_table_extract()`**: Extração de produtos de tabelas
+    - Camelot (lattice → stream fallback)
+    - pdfplumber (se Camelot falhar)
+    - Heurísticas para identificar colunas (código, descrição, quantidade)
+  - **`parse_generic_document()`**: Parser universal com 3 estratégias
+    - **Estratégia 1**: Regex genérico (CÓDIGO + DESCRIÇÃO + QTD)
+    - **Estratégia 2**: Extração de tabelas (Camelot/pdfplumber)
+    - **Estratégia 3**: Buffer multi-linha com filtros de ruído
+    - Filtra automaticamente: endereços, headers, palavras-chave de ruído
+- **Sistema de Fallback em Cascata**:
+  1. Parsers específicos (FATURA_ELASTRON, GUIA_COLMOL, PEDIDO_ESPANHOL, etc.)
+  2. Parser genérico universal (regex + heurísticas)
+  3. Extração de tabelas (Camelot + pdfplumber)
+  4. Enriquecimento de metadados (fuzzy matching)
+- **Matching Inteligente**: Modificado `process_inbound()` para comparar com `POLine` (linhas da Purchase Order) em vez de `CodeMapping` (catálogo geral)
+  - Valida quantidade recebida vs. quantidade encomendada
+  - Respeita tolerância configurada (`POLine.tolerance`)
+  - Detecta quantidades muito abaixo da encomenda (<50%)
+- **Testes Validados**:
+  - ✅ 177.pdf (NATURCOLCHON): Parser específico extraiu 1/1 produtos
+  - ✅ PC5_0005051.pdf (COSGUI): Fallback universal extraiu produtos que parser específico não conseguia
+- **100% Gratuito e Offline**: Todas as bibliotecas funcionam localmente sem APIs externas
