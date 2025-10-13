@@ -344,13 +344,15 @@ def extract_text_from_pdf_with_ocr(file_path: str):
             qr_codes = detect_and_read_qrcodes(page, page_number=i)
             all_qr_codes.extend(qr_codes)
             
-            # OCR da página
+            # OCR da página - cascata de 3 níveis
             page_text = ""
             paddle_failed = False
+            easy_failed = False
+            ocr_engine_used = None
             
             try:
+                # Nível 1: PaddleOCR (rápido e preciso)
                 if paddle_ocr:
-                    # Tenta PaddleOCR primeiro
                     try:
                         img_array = np.array(page)
                         result = paddle_ocr.ocr(img_array, cls=True)
@@ -363,21 +365,52 @@ def extract_text_from_pdf_with_ocr(file_path: str):
                                     if confidence > 0.5:
                                         page_text += text + "\n"
                         
-                        # Se PaddleOCR não extraiu texto, marca como falho
-                        if not page_text.strip():
+                        if page_text.strip():
+                            ocr_engine_used = "PaddleOCR"
+                        else:
                             paddle_failed = True
-                            print(f"⚠️ PaddleOCR não extraiu texto da página {i}, tentando Tesseract...")
+                            print(f"⚠️ PaddleOCR não extraiu texto da página {i}, tentando EasyOCR...")
                     except Exception as paddle_error:
                         paddle_failed = True
-                        print(f"⚠️ PaddleOCR falhou na página {i}: {paddle_error}, tentando Tesseract...")
+                        print(f"⚠️ PaddleOCR falhou na página {i}: {paddle_error}, tentando EasyOCR...")
                 
-                # Fallback para Tesseract se PaddleOCR não disponível ou falhou
-                if not paddle_ocr or paddle_failed:
+                # Nível 2: EasyOCR (se PaddleOCR falhou)
+                if (not paddle_ocr or paddle_failed) and not page_text.strip():
+                    easy_ocr = get_easy_ocr()
+                    if easy_ocr:
+                        try:
+                            import numpy as np
+                            img_array = np.array(page)
+                            result = easy_ocr.readtext(img_array)
+                            
+                            if result:
+                                for detection in result:
+                                    text = detection[1]
+                                    confidence = detection[2]
+                                    if confidence > 0.3:
+                                        page_text += text + " "
+                                page_text = page_text.strip() + "\n"
+                            
+                            if page_text.strip():
+                                ocr_engine_used = "EasyOCR"
+                            else:
+                                easy_failed = True
+                                print(f"⚠️ EasyOCR não extraiu texto da página {i}, tentando Tesseract...")
+                        except Exception as easy_error:
+                            easy_failed = True
+                            print(f"⚠️ EasyOCR falhou na página {i}: {easy_error}, tentando Tesseract...")
+                
+                # Nível 3: Tesseract (fallback final)
+                if not page_text.strip():
                     page_text = pytesseract.image_to_string(
                         page, config="--psm 3 --oem 3 -l por", lang="por", timeout=60)
+                    if page_text.strip():
+                        ocr_engine_used = "Tesseract"
                 
                 if page_text.strip():
                     all_text += f"\n--- Página {i} ---\n{page_text}\n"
+                    if ocr_engine_used:
+                        print(f"✅ Página {i} processada com {ocr_engine_used}")
                     
             except RuntimeError as e:
                 if "timeout" in str(e).lower():
@@ -399,19 +432,20 @@ def extract_text_from_pdf_with_ocr(file_path: str):
 
 
 def extract_text_from_image(file_path: str):
-    """OCR para imagem com PaddleOCR (ou Tesseract como fallback) + leitura de QR."""
+    """OCR para imagem com cascata de 3 níveis: PaddleOCR → EasyOCR → Tesseract."""
     import numpy as np
     try:
         img = Image.open(file_path)
         qr_codes = detect_and_read_qrcodes(img)
         
-        # Tenta usar PaddleOCR primeiro
-        paddle_ocr = get_paddle_ocr()
         ocr_text = ""
         paddle_failed = False
+        easy_failed = False
+        ocr_engine_used = None
         
+        # Nível 1: PaddleOCR (rápido e preciso)
+        paddle_ocr = get_paddle_ocr()
         if paddle_ocr:
-            # Tenta PaddleOCR primeiro
             try:
                 img_array = np.array(img)
                 result = paddle_ocr.ocr(img_array, cls=True)
@@ -424,19 +458,50 @@ def extract_text_from_image(file_path: str):
                             if confidence > 0.5:
                                 ocr_text += text + "\n"
                 
-                # Se PaddleOCR não extraiu texto, marca como falho
-                if not ocr_text.strip():
+                if ocr_text.strip():
+                    ocr_engine_used = "PaddleOCR"
+                else:
                     paddle_failed = True
-                    print(f"⚠️ PaddleOCR não extraiu texto da imagem, tentando Tesseract...")
+                    print(f"⚠️ PaddleOCR não extraiu texto da imagem, tentando EasyOCR...")
             except Exception as paddle_error:
                 paddle_failed = True
-                print(f"⚠️ PaddleOCR falhou: {paddle_error}, tentando Tesseract...")
+                print(f"⚠️ PaddleOCR falhou: {paddle_error}, tentando EasyOCR...")
         
-        # Fallback para Tesseract se PaddleOCR não disponível ou falhou
-        if not paddle_ocr or paddle_failed:
+        # Nível 2: EasyOCR (se PaddleOCR falhou)
+        if (not paddle_ocr or paddle_failed) and not ocr_text.strip():
+            easy_ocr = get_easy_ocr()
+            if easy_ocr:
+                try:
+                    img_array = np.array(img)
+                    result = easy_ocr.readtext(img_array)
+                    
+                    if result:
+                        for detection in result:
+                            text = detection[1]
+                            confidence = detection[2]
+                            if confidence > 0.3:
+                                ocr_text += text + " "
+                        ocr_text = ocr_text.strip() + "\n"
+                    
+                    if ocr_text.strip():
+                        ocr_engine_used = "EasyOCR"
+                    else:
+                        easy_failed = True
+                        print(f"⚠️ EasyOCR não extraiu texto da imagem, tentando Tesseract...")
+                except Exception as easy_error:
+                    easy_failed = True
+                    print(f"⚠️ EasyOCR falhou: {easy_error}, tentando Tesseract...")
+        
+        # Nível 3: Tesseract (fallback final)
+        if not ocr_text.strip():
             ocr_text = pytesseract.image_to_string(img,
                                                    config="--psm 6 --oem 3 -l por",
                                                    lang="por")
+            if ocr_text.strip():
+                ocr_engine_used = "Tesseract"
+        
+        if ocr_engine_used:
+            print(f"✅ Imagem processada com {ocr_engine_used}")
         
         return ocr_text.strip(), qr_codes
     except Exception as e:
