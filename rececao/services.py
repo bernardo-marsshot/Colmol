@@ -1109,6 +1109,69 @@ def map_supplier_codes(supplier, payload):
 
 
 @transaction.atomic
+def create_po_from_nota_encomenda(inbound: InboundDocument, payload: dict):
+    """
+    Cria automaticamente PurchaseOrder + POLines a partir de uma Nota de Encomenda (Fatura).
+    Extrai: número encomenda, fornecedor, produtos, quantidades, dimensões.
+    """
+    from .models import PurchaseOrder, POLine
+    
+    # Extrair número da encomenda do documento
+    po_number = payload.get("document_number") or payload.get("po_number") or f"PO-{inbound.number}"
+    
+    # Verificar se PO já existe (evitar duplicados)
+    existing_po = PurchaseOrder.objects.filter(number=po_number).first()
+    if existing_po:
+        print(f"⚠️ PO {po_number} já existe, vinculando documento à PO existente")
+        inbound.po = existing_po
+        inbound.save()
+        return existing_po
+    
+    # Criar nova Purchase Order
+    po = PurchaseOrder.objects.create(
+        number=po_number,
+        supplier=inbound.supplier
+    )
+    print(f"✅ Criada PO {po_number} para fornecedor {inbound.supplier.name}")
+    
+    # Extrair produtos do payload (suporta formatos: produtos ou lines)
+    produtos = payload.get("produtos", [])
+    if not produtos:
+        produtos = payload.get("lines", [])
+    
+    # Criar POLines para cada produto
+    lines_created = 0
+    for produto in produtos:
+        # Extrair dados do produto
+        article_code = produto.get("artigo", produto.get("supplier_code", ""))
+        description = produto.get("descricao", produto.get("description", ""))
+        unit = produto.get("unidade", produto.get("unit", "UN"))
+        qty_ordered = float(produto.get("quantidade", produto.get("qty", 0)))
+        
+        if not article_code or qty_ordered <= 0:
+            continue
+        
+        # Usar article_code como internal_sku (pode ser mapeado depois)
+        POLine.objects.create(
+            po=po,
+            internal_sku=article_code,
+            description=description,
+            unit=unit,
+            qty_ordered=qty_ordered,
+            tolerance=0
+        )
+        lines_created += 1
+    
+    print(f"✅ Criadas {lines_created} linhas na PO {po_number}")
+    
+    # Vincular documento à PO criada
+    inbound.po = po
+    inbound.save()
+    
+    return po
+
+
+@transaction.atomic
 def process_inbound(inbound: InboundDocument):
     payload = real_ocr_extract(inbound.file.path)
 
@@ -1121,7 +1184,30 @@ def process_inbound(inbound: InboundDocument):
     inbound.parsed_payload = payload
     inbound.save()
 
-    # Validar se ficheiro é ilegível
+    # Se for Nota de Encomenda (FT), criar PurchaseOrder e retornar
+    if inbound.doc_type == 'FT':
+        print(f"📋 Processando Nota de Encomenda: {inbound.number}")
+        po = create_po_from_nota_encomenda(inbound, payload)
+        
+        # Criar MatchResult básico para Nota de Encomenda
+        res, _ = MatchResult.objects.get_or_create(inbound=inbound)
+        produtos = payload.get("produtos", payload.get("lines", []))
+        res.status = "matched"
+        res.summary = {
+            "lines_ok": len(produtos),
+            "lines_issues": 0,
+            "total_lines_in_document": len(produtos),
+            "lines_read_successfully": len(produtos),
+            "po_created": po.number if po else None
+        }
+        res.certified_id = hashlib.sha256(
+            (str(inbound.id) + str(payload)).encode()).hexdigest()[:16]
+        res.save()
+        
+        print(f"✅ Nota de Encomenda processada: PO {po.number if po else 'N/A'} criada")
+        return res
+
+    # Validar se ficheiro é ilegível (apenas para Guias de Remessa)
     texto_extraido = payload.get("texto_completo", "")
     produtos_extraidos = payload.get("produtos", [])
     linhas_extraidas = payload.get("lines", [])

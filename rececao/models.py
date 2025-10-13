@@ -54,7 +54,7 @@ class InboundDocument(models.Model):
     file = models.FileField(upload_to='inbound/')
     received_at = models.DateTimeField(auto_now_add=True)
     parsed_payload = models.JSONField(default=dict, blank=True)  # resultado do OCR/extração
-    po = models.ForeignKey(PurchaseOrder, on_delete=models.SET_NULL, null=True, blank=True)
+    po = models.ForeignKey(PurchaseOrder, on_delete=models.SET_NULL, null=True, blank=True, related_name='inbound_docs')
 
     def __str__(self):
         return f"{self.get_doc_type_display()} {self.number} ({self.supplier})"

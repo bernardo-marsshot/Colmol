@@ -88,7 +88,7 @@
       <div class="col-md-2">
         <span class="text-muted">{{ d.supplier.name }}</span>
       </div>
-      <div class="col-md-4">
+      <div class="col-md-3">
         <a href="{% url 'inbound_detail' d.pk %}" class="btn-bizneo-document">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"
             aria-hidden="true">
@@ -104,9 +104,11 @@
           {{ d.get_doc_type_display }} {{ d.number }}
         </a>
       </div>
-      <div class="col-md-1">
+      <div class="col-md-2">
         {% if d.po %}
-        <small class="text-muted">{{ d.po.number }}</small>
+        <a href="/po/" class="text-decoration-none" title="Ver encomenda {{ d.po.number }}">
+          <small>📋 {{ d.po.number }}</small>
+        </a>
         {% else %}
         <small class="text-muted">-</small>
         {% endif %}
