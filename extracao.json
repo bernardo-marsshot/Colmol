@@ -1,86 +1,44 @@
 {
   "numero_requisicao": "",
-  "document_number": "STOCK",
-  "po_number": "STOCK",
-  "supplier_name": "MAXILITERIE",
-  "delivery_date": "07.10.25",
+  "document_number": "",
+  "po_number": "",
+  "supplier_name": "",
+  "delivery_date": "09/10/2025",
   "qr_codes": [],
-  "produtos": [
+  "produtos": [],
+  "lines": [
     {
-      "artigo": "MATELAS SAN REMO",
-      "descricao": "MATELAS SAN REMO 140x190",
-      "quantidade": 2.0,
-      "unidade": "UN",
-      "preco_unitario": 202.0,
-      "total": 404.0,
-      "dimensoes": "140x190",
-      "cliente": "MAXILITERIE",
-      "data_encomenda": "07.10.25",
-      "contremarque": "STOCK",
-      "referencia_ordem": "",
-      "lote_producao": "",
-      "volume": 0,
-      "peso": 0.0,
-      "iva": 20.0
+      "supplier_code": "X190",
+      "description": "COLCHON TOP VISCO 2019 135X190",
+      "linha_raw": "COLCHON TOP VISCO 2019 135X190",
+      "unit": "UNI",
+      "qty": 0.0,
+      "mini_codigo": "35x190",
+      "dimensoes": {
+        "comprimento": 190,
+        "largura": 35,
+        "espessura": 0
+      }
     },
     {
-      "artigo": "MATELAS SAN REMO",
-      "descricao": "MATELAS SAN REMO 180x200",
-      "quantidade": 2.0,
-      "unidade": "UN",
-      "preco_unitario": 295.0,
-      "total": 590.0,
-      "dimensoes": "180x200",
-      "cliente": "MAXILITERIE",
-      "data_encomenda": "07.10.25",
-      "contremarque": "STOCK",
-      "referencia_ordem": "",
-      "lote_producao": "",
-      "volume": 0,
-      "peso": 0.0,
-      "iva": 20.0
-    },
-    {
-      "artigo": "MATELAS RIVIERA",
-      "descricao": "MATELAS RIVIERA 180  x 200",
-      "quantidade": 1.0,
-      "unidade": "UN",
-      "preco_unitario": 489.0,
-      "total": 489.0,
-      "dimensoes": "180x200",
-      "cliente": "MAXILITERIE",
-      "data_encomenda": "07.10.25",
-      "contremarque": "STOCK",
-      "referencia_ordem": "",
-      "lote_producao": "",
-      "volume": 0,
-      "peso": 0.0,
-      "iva": 20.0
-    },
-    {
-      "artigo": "MATELAS RIVIE RA",
-      "descricao": "MATELAS RIVIE RA 160  x 200",
-      "quantidade": 1.0,
-      "unidade": "UN",
-      "preco_unitario": 441.0,
-      "total": 441.0,
-      "dimensoes": "160x200",
-      "cliente": "MAXILITERIE",
-      "data_encomenda": "07.10.25",
-      "contremarque": "STOCK",
-      "referencia_ordem": "",
-      "lote_producao": "",
-      "volume": 0,
-      "peso": 0.0,
-      "iva": 20.0
+      "supplier_code": "X190",
+      "description": "COLCHON TOP VISCO 2019 150X190",
+      "linha_raw": "COLCHON TOP VISCO 2019 150X190",
+      "unit": "UNI",
+      "qty": 0.0,
+      "mini_codigo": "50x190",
+      "dimensoes": {
+        "comprimento": 190,
+        "largura": 50,
+        "espessura": 0
+      }
     }
   ],
-  "lines": [],
   "totals": {
-    "total_lines": 4,
-    "total_quantity": 6.0
+    "total_lines": 2,
+    "total_quantity": 0.0
   },
-  "tipo_documento": "BON_COMMANDE",
-  "texto_completo": "Désignation  Quantité  Prix unitaire  Montant  \nSTOCK MAGASIN     \nMATELAS SAN REMO 140x190  2 202.00€ 404.00€ \nMATELAS SAN REMO 180x200  2 295.00€ 590.00 € \nMATELAS RIVIERA 180  x 200  1 489.00€ 489.00€  \nMATELAS RIVIE RA 160  x 200  1 441.00€  441.00€  \nTOTAL   1924.00€  BON DE COMMANDE  : contremarque  \nDATE  : 07.10.25  \n \nCONTREMARQUE  :   STOCK  \n \nLivraison demandée pour le  : \n \nDÈS QUE POSSIBLE   AIRE DES MOISSONS  \n10410 – ST PARRES AUX TERTRES  \nTél : 03.25.42.45.94/96  \nSarl M3C au capital de 7622.45 €  \nSIREN  : 423  103 076 \nN° CCE FR 76  423 103 076 \nEntreprise indépendante franchisée   \nCOLMOL  \nADRESSE DE LIVRAISON   \nMAXILITERIE  \nZONE COMMERCIALE AIRE DES MOISSONS  \n10410 – SAINT PARRES AUX TERTRES",
+  "tipo_documento": "DOCUMENTO_GENERICO",
+  "texto_completo": "Fecha\nPedido nº\nProveedor\nN.I.F.\nPag.\nAtendido por\n1\nPT500248800\n0000292\nPC5/0005051\n09/10/2025\nADMINISTRA\nPEDIDO\nCOSGUI D.M. S.L.\nB39031059\nPOLIGONO INDUTRIAL MORERO, NAVE 1 10\n39611\nGUARNIZO \n942252861\nNIF.\nfacturacion@cosgui.com\nCOLMOL COLCHOES SA\nZONA INDUSTRIAL DAS CAVADAS APART 119 RUA DO PROGR\n3721-\nVILA DE CUCUJAES\n4,00\nCOLCHON TOP VISCO 2019 135X190\nLUSTOPVS135190\n4,00\nCOLCHON TOP VISCO 2019 150X190\nLUSTOPVS150190\nDescripción\nCantidad\nCódigo\nSu Referencia\nNotas :",
   "baixa_qualidade_texto": false
 }
