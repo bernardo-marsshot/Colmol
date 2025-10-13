@@ -43,13 +43,16 @@ Successfully imported and configured for Replit environment on September 24, 202
 - **Automatic PO Creation from Notas**: Notas de Encomenda (FT) now automatically create PurchaseOrder + POLines from OCR data
 - **Smart Document Routing**: process_inbound() detects doc_type='FT' and creates PO instead of matching logic
 - **Bidirectional Linking**: InboundDocument.po field with related_name='inbound_docs' enables access to linked Guias from PO
+- **Page Separation**: 
+  - **Dashboard**: Shows ONLY Guias de Remessa (GR) - filters out Notas de Encomenda
+  - **Encomendas Page**: Shows PurchaseOrders created from Notas + linked Guias with status badges
 - **Enhanced Encomendas Page**: po_list.html displays all Guias received for each PO with clickable links and status badges (✓ matched, ! exceptions)
-- **Dashboard PO Links**: Dashboard now shows clickable PO links (📋) for each document with link to Encomendas page
+- **Dashboard PO Links**: Dashboard shows clickable PO links (📋) for each Guia with link to Encomendas page
 - **Nomenclature Updates**: 
   - Navigation: "Carregar Guia/Fatura" → "Carregar Documento"
   - Doc types: "Fatura" → "Nota de Encomenda", "Guia de Remessa" maintained
 - **Template Safety**: po_list.html now guards against missing MatchResult to prevent crashes
-- **Complete Flow**: Nota de Encomenda → creates PO → Guia de Remessa → matches with PO → visible in both Encomendas and Dashboard pages
+- **Complete Flow**: Nota de Encomenda → creates PO (visible in Encomendas) → Guia de Remessa → matches with PO → visible in both pages
 
 ### October 9, 2025 - PaddleOCR Integration with Tesseract Fallback
 - **PaddleOCR as Primary Engine**: Upgraded from Tesseract-only to PaddleOCR as primary OCR engine (30% more accurate for Portuguese text, better table extraction)
