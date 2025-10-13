@@ -20,28 +20,40 @@ Key architectural decisions and features include:
 -   **Deployment**: Configured for autoscale deployment.
 
 ## External Dependencies
--   **OCR Engines** (Cascata de 3 Níveis):
-    -   **PaddleOCR**: Primary OCR engine - fast and accurate for Portuguese, Spanish, French.
-    -   **EasyOCR**: Secondary fallback - activated when PaddleOCR fails or returns empty text.
-    -   **Tesseract OCR**: Final fallback - robust local processing with Portuguese language pack.
-    -   **Cascade Logic**: PaddleOCR → EasyOCR → Tesseract (automatic fallback for maximum reliability)
-    -   **All engines**: 100% local/offline, zero cost, no API keys required
+-   **OCR Engines** (Cascata de 4 Níveis):
+    -   **OCR.space API (Level 0)**: Cloud OCR - 25.000 req/mês grátis, preciso para tabelas, multi-idioma (PT/ES/FR/EN+30)
+    -   **PaddleOCR (Level 1)**: Primary local engine - fast and accurate for Portuguese, Spanish, French
+    -   **EasyOCR (Level 2)**: Secondary local fallback - activated when PaddleOCR fails or returns empty text
+    -   **Tesseract OCR (Level 3)**: Final local fallback - robust processing with Portuguese language pack
+    -   **Cascade Logic**: OCR.space → PaddleOCR → EasyOCR → Tesseract (automatic fallback for maximum reliability)
+    -   **Cost**: OCR.space free tier (25k/month), local engines 100% offline/free
+-   **Universal Extraction Tools**:
+    -   **Camelot-py**: PDF table extraction (lattice/stream modes for bordered/borderless tables)
+    -   **pdfplumber**: Advanced PDF parsing and table detection
+    -   **rapidfuzz**: Fuzzy string matching for multi-language field detection (fornecedor/supplier/proveedor)
 -   **Database**: SQLite (db.sqlite3).
 
 ## Recent Changes
 
-### October 13, 2025 - Multi-Engine OCR Cascade System
-- **3-Level OCR Cascade**: Implemented intelligent fallback system for maximum document reading success
-  - **Level 1 (PaddleOCR)**: Primary engine - fast, accurate for PT/ES/FR text
-  - **Level 2 (EasyOCR)**: Secondary fallback - activated when PaddleOCR fails/empty
-  - **Level 3 (Tesseract)**: Final fallback - robust local processing
-- **Lazy Loading**: All OCR engines use lazy initialization to prevent Django startup issues
-- **Smart Detection**: System automatically detects embedded PDF text vs scanned images
-  - Embedded text: Direct extraction (fastest)
-  - Scanned/images: Automatic cascade through 3 OCR engines
-- **Detailed Logging**: Shows which OCR engine processed each page/image
-- **Expected Success Rate**: 90-95% (up from 85% with single engine)
-- **Zero Cost**: All engines local/offline, no API dependencies
+### October 13, 2025 - Universal Document Extraction System (OCR.space + Fuzzy Matching + Table Extraction)
+- **4-Level OCR Cascade**: Implementado sistema híbrido cloud + local para máxima taxa de sucesso
+  - **Level 0 (OCR.space API)**: Cloud OCR gratuito (25k/mês), preciso para tabelas multi-idioma
+  - **Level 1 (PaddleOCR)**: Engine local primário - rápido e preciso para PT/ES/FR
+  - **Level 2 (EasyOCR)**: Fallback secundário local - ativado quando PaddleOCR falha
+  - **Level 3 (Tesseract)**: Fallback final local - processamento robusto com pack português
+- **Universal Key-Value Extraction**: Fuzzy matching (rapidfuzz) para detectar campos em qualquer idioma
+  - Sinônimos multi-idioma: fornecedor/supplier/proveedor, NIF/VAT/CIF, data/date/fecha
+  - Score threshold 70% para aceitar matches
+- **Universal Table Extraction**: Extração automática de tabelas quando parsers específicos falham
+  - **Camelot**: Detecção de tabelas com bordas (lattice mode)
+  - **pdfplumber**: Detecção de tabelas sem bordas (fallback)
+  - Mapeia automaticamente colunas: código, descrição, quantidade, preço
+- **Parse Fallback Universal**: Ativado automaticamente quando parsers específicos retornam 0 produtos
+  - 3 estratégias: table extraction → regex genéricos → heurísticas
+  - Combina metadados (fuzzy) + produtos (tabelas/regex)
+- **Tested**: 177.pdf (NATURCOLCHON) 1/1 ✅, PC5_0005051.pdf usa fallback universal
+- **Cost**: 100% grátis (OCR.space free tier + engines locais offline)
+- **Known Limitations**: Universal table extraction pode mapear colunas incorretamente em tabelas mal formatadas (ex: PC5_0005051.pdf captura endereço em vez de produto). Requer validação adicional de heurísticas de coluna.
 
 ### October 13, 2025 - PEDIDO_ESPANHOL Parser for Spanish Purchase Orders
 - **New Document Type**: Added "PEDIDO_ESPANHOL" detection and parser for Spanish purchase order documents
