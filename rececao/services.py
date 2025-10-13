@@ -549,7 +549,9 @@ def detect_document_type(text: str):
     """Detecta automaticamente o tipo de documento português."""
     text_lower = text.lower()
     
-    if "elastron" in text_lower and "fatura" in text_lower:
+    if "ordem compra" in text_lower or "ordem de compra" in text_lower:
+        return "ORDEM_COMPRA"
+    elif "elastron" in text_lower and "fatura" in text_lower:
         return "FATURA_ELASTRON"
     elif "colmol" in text_lower and ("guia" in text_lower or "comunicação de saída" in text_lower):
         return "GUIA_COLMOL"
@@ -785,6 +787,92 @@ def parse_guia_generica(text: str):
     return produtos
 
 
+def parse_ordem_compra(text: str):
+    """
+    Parser específico para Ordens de Compra com linhas separadas.
+    Formato: Referência + Descrição numa linha, Quantidade + Unidade + Data noutra linha.
+    """
+    produtos = []
+    lines = text.split("\n")
+    
+    # Encontrar referências de produtos
+    referencias = []
+    quantidades = []
+    
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            continue
+        
+        # Detectar linha de quantidade + unidade PRIMEIRO (mais específico)
+        # Formato: 1.000 UN 2025-10-17
+        # A unidade DEVE ser seguida por espaço+data OU fim de linha (não mais texto)
+        qty_match = re.match(r'^([\d,\.]+)\s+([A-Z]{2,4})(?:\s+(\d{4}-\d{2}-\d{2})|\s*$)', stripped, re.IGNORECASE)
+        if qty_match:
+            quantidade_str = qty_match.group(1)
+            unidade = qty_match.group(2).upper()
+            data_entrega = qty_match.group(3) if qty_match.group(3) else ""
+            
+            try:
+                # Converter quantidade (formato PT: 1.000 = 1000)
+                if '.' in quantidade_str and ',' not in quantidade_str:
+                    # Formato 1.000 (mil)
+                    quantidade = float(quantidade_str.replace('.', ''))
+                elif ',' in quantidade_str:
+                    # Formato 1,5 (um e meio)
+                    quantidade = float(quantidade_str.replace(',', '.'))
+                else:
+                    quantidade = float(quantidade_str)
+                    
+                quantidades.append({
+                    'quantidade': quantidade,
+                    'unidade': unidade,
+                    'data_entrega': data_entrega
+                })
+                continue
+            except ValueError:
+                pass
+        
+        # Detectar linha de referência + descrição (menos específico)
+        # Formato: 26.100145 COLCHAO 1,95X1,40=27"SPA CHERRY VISCO"COLMOL
+        # Só faz match se NÃO for linha de quantidade (já verificado acima)
+        ref_match = re.match(r'^(\d+\.\d+)\s+(.+)$', stripped)
+        if ref_match:
+            referencias.append({
+                'codigo': ref_match.group(1),
+                'descricao': ref_match.group(2).strip()
+            })
+            continue
+    
+    # Combinar referências com quantidades (assumindo ordem sequencial)
+    for i, ref in enumerate(referencias):
+        if i < len(quantidades):
+            qty_info = quantidades[i]
+            
+            # Extrair dimensões da descrição se existirem
+            dims = ""
+            dim_match = re.search(r'(\d),(\d{2})[xX×](\d),(\d{2})', ref['descricao'])
+            if dim_match:
+                dims = f"{dim_match.group(1)}.{dim_match.group(2)}x{dim_match.group(3)}.{dim_match.group(4)}"
+            
+            produtos.append({
+                "artigo": ref['codigo'],
+                "descricao": ref['descricao'],
+                "quantidade": qty_info['quantidade'],
+                "unidade": qty_info['unidade'],
+                "data_entrega": qty_info['data_entrega'],
+                "dimensoes": dims,
+                "referencia_ordem": "",
+                "lote_producao": "",
+                "volume": 0,
+                "peso": 0.0,
+                "iva": 23.0,
+                "total": 0.0
+            })
+    
+    return produtos
+
+
 def parse_portuguese_document(text: str, qr_codes=None, texto_pdfplumber_curto=False):
     """Extrai cabeçalho (req/doc/fornecedor/data) e linhas de produto."""
     if qr_codes is None:
@@ -842,7 +930,20 @@ def parse_portuguese_document(text: str, qr_codes=None, texto_pdfplumber_curto=F
             if m:
                 result["supplier_name"] = m.group(1).title()
 
-    if doc_type == "FATURA_ELASTRON":
+    if doc_type == "ORDEM_COMPRA":
+        produtos = parse_ordem_compra(text)
+        if produtos:
+            result["produtos"] = produtos
+            print(f"✅ Extraídos {len(produtos)} produtos da Ordem de Compra")
+            
+            # Extrair número da ordem de compra
+            oc_match = re.search(r'ORDEM\s+COMPRA\s+N[ºo]?\s*([A-Z0-9]+)', text, re.IGNORECASE)
+            if oc_match:
+                result["po_number"] = oc_match.group(1)
+                result["document_number"] = oc_match.group(1)
+        else:
+            print("⚠️ Parser Ordem de Compra retornou 0 produtos")
+    elif doc_type == "FATURA_ELASTRON":
         produtos = parse_fatura_elastron(text)
         if produtos:
             result["produtos"] = produtos

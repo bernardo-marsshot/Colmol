@@ -1,14 +1,46 @@
 {
-  "error": "OCR failed - no text extracted from document",
-  "numero_requisicao": "ERROR-nota_encomenda_1760356779.pdf",
-  "document_number": "",
-  "po_number": "",
-  "supplier_name": "",
-  "delivery_date": "",
+  "numero_requisicao": "",
+  "document_number": "OC250000525",
+  "po_number": "OC250000525",
+  "supplier_name": "Contribuinte Data",
+  "delivery_date": "25-10-08",
   "qr_codes": [],
+  "produtos": [
+    {
+      "artigo": "26.100145",
+      "descricao": "COLCHAO 1,95X1,40=27\"SPA CHERRY VISCO\"COLMOL",
+      "quantidade": 1000.0,
+      "unidade": "UN",
+      "data_entrega": "2025-10-17",
+      "dimensoes": "1.95x1.40",
+      "referencia_ordem": "",
+      "lote_producao": "",
+      "volume": 0,
+      "peso": 0.0,
+      "iva": 23.0,
+      "total": 0.0
+    },
+    {
+      "artigo": "26.100100",
+      "descricao": "COLCHAO 1,83X1,33=24Cm ORTOPEDICO\" KOLUNA \"COLMOL",
+      "quantidade": 3000.0,
+      "unidade": "UN",
+      "data_entrega": "2025-10-17",
+      "dimensoes": "1.83x1.33",
+      "referencia_ordem": "",
+      "lote_producao": "",
+      "volume": 0,
+      "peso": 0.0,
+      "iva": 23.0,
+      "total": 0.0
+    }
+  ],
   "lines": [],
   "totals": {
-    "total_lines": 0,
-    "total_quantity": 0
-  }
+    "total_lines": 2,
+    "total_quantity": 4000.0
+  },
+  "tipo_documento": "ORDEM_COMPRA",
+  "texto_completo": "--- Página 1 ---\nProcessado por computador - xSoft\n\nSantos e Fernandes\n\nArmazém de Utilidades Porlar, Lda.\n\nR. Liberdade n.21\n\nAlgar\n\n3040-656 Coimbra\n\nTelef.: 239802670 - TIm.: 917594110\n\nWeb: www.catalogosantosefernandes.pt\n\nContribuinte nº 501931414\n\nSociedade por Quotas - Capital Social: 399.038,31 Euros\nMatriculada na C.R.C. Coimbra sob o nº 4781\n\nFORNECEDOR CONTRIBUINTE DATA\n\nCOLMOL - COLCHOES, SA\nZONA INDUSTRIAL CAVADAS\nAPARTADO 115\n\n3721-908 VILA CUCUJAES\nPORTUGAL\n\nORIGINAL\nORDEM COMPRA Nº OC250000525\n\nPÁGINA\n\n00072 500248800 2025-10-08\n\n11\n\nREFERÊNCIA — DESCRIÇÃO\n\nQUANTIDADE P.UNITARIO — DESC. LIQUIDO ENTREGA\n\n26.100145 COLCHAO 1,95X1,40=27\"SPA CHERRY VISCO\"COLMOL\n26.100100 COLCHAO 1,83X1,33=24Cm ORTOPEDICO\" KOLUNA \"COLMOL\n\n1.000 UN 2025-10-17\n3.000 UN 2025-10-17\n\nLOCAL DE ENTREGA:\n\nO Dep. Compras",
+  "baixa_qualidade_texto": false
 }
