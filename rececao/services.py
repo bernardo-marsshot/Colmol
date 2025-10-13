@@ -546,8 +546,13 @@ def extract_guia_remessa_products(text: str):
 
 
 def detect_document_type(text: str):
-    """Detecta automaticamente o tipo de documento português e francês."""
+    """Detecta automaticamente o tipo de documento português, francês e espanhol."""
     text_lower = text.lower()
+    
+    # Documentos espanhóis
+    if ("pedido" in text_lower and "españa" in text_lower) or \
+       ("pedido" in text_lower and any(kw in text_lower for kw in ["artículo", "descripción", "unidades"])):
+        return "PEDIDO_ESPANHOL"
     
     # Documentos franceses
     if "bon de commande" in text_lower or ("commande" in text_lower and "désignation" in text_lower):
@@ -1006,6 +1011,194 @@ def parse_bon_commande(text: str):
     return produtos
 
 
+def parse_pedido_espanhol(text: str):
+    """
+    Parser dedicado para PEDIDO espanhol (NATURCOLCHON, COSGUI, etc).
+    
+    Formatos esperados:
+    1. NATURCOLCHON: Código | Descripción | Unidades | Precio | Importe
+       COPR1520 COLCHON PRAGA DE 150X200 CM 5,00 175,00 875,00
+    
+    2. COSGUI: Código | Descripción | Cantidad
+       LUSTOPVS135190 COLCHON TOP VISCO 2019 135X190 4,00
+    """
+    produtos = []
+    lines = text.split("\n")
+    
+    # Buscar número de pedido
+    pedido_num = ""
+    ped_match = re.search(r'(?:Pedido|Número).*?(\d+)', text, re.IGNORECASE)
+    if ped_match:
+        pedido_num = ped_match.group(1)
+    
+    # Buscar data
+    fecha = ""
+    fecha_match = re.search(r'Fecha.*?(\d{2}/\d{2}/\d{4})', text, re.IGNORECASE)
+    if fecha_match:
+        fecha = fecha_match.group(1)
+    
+    # Buscar proveedor
+    proveedor = ""
+    prov_match = re.search(r'Proveedor.*?([A-Z\s\.]+)', text, re.IGNORECASE)
+    if prov_match:
+        proveedor = prov_match.group(1).strip()
+    
+    in_product_section = False
+    
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        if not stripped:
+            continue
+        
+        # Detectar início da seção de produtos (keywords podem vir em linhas separadas)
+        if re.search(r'Artículo|Descripción|Cantidad', stripped, re.IGNORECASE):
+            in_product_section = True
+            continue
+        
+        # Detectar fim da seção
+        if re.search(r'^Total|^Importe neto|^Notas|^Plazo|^Base I\.V\.A', stripped, re.IGNORECASE):
+            in_product_section = False
+            continue
+        
+        if in_product_section:
+            # Formato 1B: DESCRIPCIÓN CÓDIGO TOTAL PRECIO UNIDADES (formato invertido NATURCOLCHON)
+            # Exemplo: COLCHON PRAGA DE 150X200 CM*NUEVO* COPR1520 875,00 175,00 5,00
+            # VERIFICAR PRIMEIRO pois tem 3 números (mais específico)
+            match1b = re.match(
+                r'^(.+?)\s+([A-Z0-9]{4,})\s+([\d,]+)\s+([\d,]+)\s+([\d,]+)$',
+                stripped
+            )
+            
+            # Formato 1: CÓDIGO DESCRIPCIÓN UNIDADES PRECIO IMPORTE
+            # Exemplo: COPR1520 COLCHON PRAGA DE 150X200 CM*NUEVO* 5,00 175,00 875,00
+            match1 = re.match(
+                r'^([A-Z0-9]{4,})\s+(.+?)\s+([\d,]+)\s+([\d,]+)\s+([\d,]+)$',
+                stripped
+            )
+            
+            if match1b:
+                # Formato invertido: descrição vem primeiro
+                descripcion = match1b.group(1).strip()
+                codigo = match1b.group(2)
+                total_str = match1b.group(3).replace(',', '.')
+                precio_str = match1b.group(4).replace(',', '.')
+                cantidad_str = match1b.group(5).replace(',', '.')
+                
+                try:
+                    cantidad = float(cantidad_str)
+                    precio = float(precio_str)
+                    total = float(total_str)
+                    
+                    # Extrair dimensões
+                    dims = ""
+                    dim_match = re.search(r'(\d{2,3})[xX×](\d{2,3})', descripcion)
+                    if dim_match:
+                        dims = f"{dim_match.group(1)}x{dim_match.group(2)}"
+                    
+                    produtos.append({
+                        "artigo": codigo,
+                        "descricao": descripcion,
+                        "quantidade": cantidad,
+                        "unidade": "UN",
+                        "preco_unitario": precio,
+                        "total": total,
+                        "dimensoes": dims,
+                        "pedido_numero": pedido_num,
+                        "fecha": fecha,
+                        "proveedor": proveedor,
+                        "referencia_ordem": "",
+                        "lote_producao": "",
+                        "volume": 0,
+                        "peso": 0.0,
+                        "iva": 21.0  # IVA Espanha padrão
+                    })
+                    continue
+                except ValueError:
+                    pass
+            
+            elif match1:
+                codigo = match1.group(1)
+                descripcion = match1.group(2).strip()
+                cantidad_str = match1.group(3).replace(',', '.')
+                precio_str = match1.group(4).replace(',', '.')
+                total_str = match1.group(5).replace(',', '.')
+                
+                try:
+                    cantidad = float(cantidad_str)
+                    precio = float(precio_str)
+                    total = float(total_str)
+                    
+                    # Extrair dimensões
+                    dims = ""
+                    dim_match = re.search(r'(\d{2,3})[xX×](\d{2,3})', descripcion)
+                    if dim_match:
+                        dims = f"{dim_match.group(1)}x{dim_match.group(2)}"
+                    
+                    produtos.append({
+                        "artigo": codigo,
+                        "descricao": descripcion,
+                        "quantidade": cantidad,
+                        "unidade": "UN",
+                        "preco_unitario": precio,
+                        "total": total,
+                        "dimensoes": dims,
+                        "pedido_numero": pedido_num,
+                        "fecha": fecha,
+                        "proveedor": proveedor,
+                        "referencia_ordem": "",
+                        "lote_producao": "",
+                        "volume": 0,
+                        "peso": 0.0,
+                        "iva": 21.0  # IVA Espanha padrão
+                    })
+                    continue
+                except ValueError:
+                    pass
+            
+            # Formato 2: CÓDIGO DESCRIPCIÓN CANTIDAD
+            # Exemplo: LUSTOPVS135190 COLCHON TOP VISCO 2019 135X190 4,00
+            match2 = re.match(
+                r'^([A-Z0-9]{6,})\s+(.+?)\s+([\d,]+)$',
+                stripped
+            )
+            
+            if match2:
+                codigo = match2.group(1)
+                descripcion = match2.group(2).strip()
+                cantidad_str = match2.group(3).replace(',', '.')
+                
+                try:
+                    cantidad = float(cantidad_str)
+                    
+                    # Extrair dimensões
+                    dims = ""
+                    dim_match = re.search(r'(\d{2,3})[xX×](\d{2,3})', descripcion)
+                    if dim_match:
+                        dims = f"{dim_match.group(1)}x{dim_match.group(2)}"
+                    
+                    produtos.append({
+                        "artigo": codigo,
+                        "descricao": descripcion,
+                        "quantidade": cantidad,
+                        "unidade": "UN",
+                        "preco_unitario": 0.0,
+                        "total": 0.0,
+                        "dimensoes": dims,
+                        "pedido_numero": pedido_num,
+                        "fecha": fecha,
+                        "proveedor": proveedor,
+                        "referencia_ordem": "",
+                        "lote_producao": "",
+                        "volume": 0,
+                        "peso": 0.0,
+                        "iva": 21.0
+                    })
+                except ValueError:
+                    pass
+    
+    return produtos
+
+
 def parse_portuguese_document(text: str, qr_codes=None, texto_pdfplumber_curto=False):
     """Extrai cabeçalho (req/doc/fornecedor/data) e linhas de produto."""
     if qr_codes is None:
@@ -1063,7 +1256,22 @@ def parse_portuguese_document(text: str, qr_codes=None, texto_pdfplumber_curto=F
             if m:
                 result["supplier_name"] = m.group(1).title()
 
-    if doc_type == "BON_COMMANDE":
+    if doc_type == "PEDIDO_ESPANHOL":
+        produtos = parse_pedido_espanhol(text)
+        if produtos:
+            result["produtos"] = produtos
+            print(f"✅ Extraídos {len(produtos)} produtos do Pedido Espanhol")
+            
+            # Extrair metadados dos produtos
+            if produtos and produtos[0].get("proveedor"):
+                result["supplier_name"] = produtos[0]["proveedor"]
+            if produtos and produtos[0].get("fecha"):
+                result["delivery_date"] = produtos[0]["fecha"]
+            if produtos and produtos[0].get("pedido_numero"):
+                result["document_number"] = produtos[0]["pedido_numero"]
+        else:
+            print("⚠️ Parser Pedido Espanhol retornou 0 produtos")
+    elif doc_type == "BON_COMMANDE":
         produtos = parse_bon_commande(text)
         if produtos:
             result["produtos"] = produtos

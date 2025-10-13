@@ -1,183 +1,51 @@
 # COLMOL - Django Project Setup
 
 ## Overview
-COLMOL is a Django prototype for intelligent document receipt processing. The project implements document matching between Purchase Orders (PO) and delivery receipts/invoices using OCR simulation, SKU mapping, quantity validation, and digital certification.
+COLMOL is a Django prototype for intelligent document receipt processing. Its main purpose is to automate document matching between Purchase Orders (PO) and delivery receipts/invoices using OCR simulation, SKU mapping, quantity validation, and digital certification. The project aims to streamline the processing of diverse document formats, manage exceptions gracefully, and provide a comprehensive dashboard for real-time statistics and catalog management.
 
-## Project Status
-Successfully imported and configured for Replit environment on September 24, 2025.
+## User Preferences
+I prefer iterative development with clear, concise explanations for any changes or new features. Please ensure that all new functionalities integrate seamlessly with existing systems without breaking current operations. Prioritize robust error handling and fallback mechanisms. I also prefer descriptive and expressive variable names.
 
-## Architecture
-- **Framework**: Django 5.0.6
-- **Database**: SQLite (db.sqlite3)
-- **Language**: Python 3.11
-- **Frontend**: Django templates with HTML/CSS
-- **OCR Engine**: Tesseract OCR (local, offline)
-- **Document Formats**: Auto-detection for Elastron invoices, Colmol delivery notes, generic Portuguese documents
-- **Demo Data**: Pre-loaded using management command
+## System Architecture
+The project is built on Django 5.0.6 using Python 3.11, with SQLite for the database. The frontend utilizes Django templates with HTML/CSS. The system employs a multi-engine OCR approach, primarily using PaddleOCR for its accuracy in Portuguese text and table extraction, with Tesseract OCR as a robust local fallback mechanism.
 
-## Current Configuration
-- **Development Server**: Running on 0.0.0.0:5000
-- **Host Settings**: ALLOWED_HOSTS = ["*"] (configured for Replit proxy)
-- **Static Files**: /static/ directory created
-- **Media Files**: /media/ directory for file uploads
-- **Deployment**: Configured for autoscale deployment
+Key architectural decisions and features include:
+-   **Multi-format Document Processing**: Auto-detection and parsing for various document types, including Elastron invoices, Colmol delivery notes, generic documents, and specific Spanish (PEDIDO_ESPANHOL) and French (BON_COMMANDE) purchase order formats.
+-   **OCR Integration**: Local, offline OCR processing using PaddleOCR (primary) and Tesseract (fallback) for enhanced accuracy and reliability, including QR code detection.
+-   **Format-Specific and Generic Parsers**: Dedicated parsing logic for known supplier formats and a flexible generic parser with heuristics for unknown formats.
+-   **Purchase Order Matching & Validation**: SKU mapping, quantity validation, and exception management for parsing errors and mismatches.
+-   **Bidirectional Document Flow**: Automatic Purchase Order creation from "Notas de Encomenda" and linking with "Guias de Remessa" for comprehensive tracking.
+-   **Advanced Illegible File Detection**: Multi-layer validation system to detect and report illegible or malformed documents, automatically creating exception tasks.
+-   **User Interface**: Dashboard for KPIs, document filtering, and an admin interface for catalog management.
+-   **Deployment**: Configured for autoscale deployment.
 
-## Key Features
-- **Multi-format Document Processing**: Auto-detects and parses Elastron invoices, Colmol delivery notes, and generic documents
-- **Tesseract OCR**: Local offline OCR processing for Portuguese documents
-- **Format-Specific Parsers**: Dedicated extraction logic for each supplier format
-- **QR Code Detection**: Reads and parses Portuguese fiscal QR codes (AT format)
-- **Purchase Order Matching**: SKU mapping and quantity validation
-- **Exception Management**: Handles parsing errors and mismatches gracefully
-- **Dashboard with KPIs**: Real-time statistics and document filtering
-- **Admin Interface**: Catalog management and configuration
-
-## URLs
-- `/` - Dashboard homepage
-- `/upload/` - Document upload interface  
-- `/admin/` - Django admin interface
-
+## External Dependencies
+-   **OCR Engines**:
+    -   **PaddleOCR**: Local, offline OCR processing (primary engine).
+    -   **Tesseract OCR**: Local, offline OCR processing (fallback engine) with Portuguese language pack.
+-   **Database**: SQLite (db.sqlite3).
 ## Recent Changes
 
+### October 13, 2025 - PEDIDO_ESPANHOL Parser for Spanish Purchase Orders
+- **New Document Type**: Added "PEDIDO_ESPANHOL" detection and parser for Spanish purchase order documents
+- **Multi-Format Support**: Handles 2 Spanish format variations:
+  - **Format 1 (Standard)**: CÓDIGO DESCRIPCIÓN UNIDADES PRECIO IMPORTE
+  - **Format 1B (Inverted NATURCOLCHON)**: DESCRIPCIÓN CÓDIGO TOTAL PRECIO UNIDADES ✅
+  - **Format 2 (Simple)**: CÓDIGO DESCRIPCIÓN CANTIDAD (partial - needs multi-line buffer)
+- **Priority-Based Matching**: Format 1B checked FIRST (3 numbers, more specific) to prevent false positives
+- **Product Extraction**: Successfully extracts código, descripción, cantidad, precio unitario, total from NATURCOLCHON format
+- **Metadata Extraction**: Pedido número, Fecha, Proveedor, Dimension auto-detection (150x200)
+- **Successfully Tested**: 177.pdf (NATURCOLCHON) - 1/1 products extracted ✅
+- **Pending Format**: PC5_0005051.pdf (COSGUI) - requires multi-line buffer (qty, desc, code on separate lines)
+- **IVA Rate**: Defaults to 21% (Spanish VAT standard rate)
+- **Integration**: Seamlessly integrated into existing OCR pipeline
+
 ### October 13, 2025 - BON DE COMMANDE Parser for French Purchase Orders
-- **New Document Type**: Added "BON_COMMANDE" detection and dedicated parser for French purchase order documents
-- **French Format Support**: Parser handles French "Bon de Commande" format with European pricing (€)
-- **Product Extraction**: Extracts designation, quantity, unit price, and line total from tabular format
-- **Metadata Extraction**: 
-  - Client: ADRESSE DE LIVRAISON section
-  - Date: DATE field (DD.MM.YY format)
-  - Contremarque: Reference code for stock tracking
-- **Dimension Detection**: Automatically extracts product dimensions from descriptions (e.g., "140x190")
-- **Regex Pattern**: `^(.+?)\s+(\d+)\s+([\d,\.]+)\s*€\s+([\d,\.]+)\s*€` for product lines
-- **Successfully Tested**: Processed French document with 4 products (MATELAS SAN REMO, RIVIERA), total €1924.00
+- **Successfully Tested**: Processed French document with 4/4 products (MATELAS SAN REMO, RIVIERA), total €1924.00
+- **Format Support**: Extracts designation, quantity, unit price from tabular format with € symbol
 - **IVA Rate**: Defaults to 20% (French VAT standard rate)
-- **Integration**: Seamlessly integrated into existing OCR pipeline without modifying other parsers
 
-### October 13, 2025 - ORDEM_COMPRA Parser for Multi-Line Product Formats
-- **New Document Type**: Added "ORDEM_COMPRA" detection and dedicated parser for purchase order documents
-- **Multi-Line Product Parsing**: Parser handles separated reference and quantity lines:
-  - Reference line: `26.100145 COLCHAO 1,95X1,40=27"SPA CHERRY VISCO"COLMOL`
-  - Quantity line: `1.000 UN 2025-10-17`
-- **Robust Regex Logic**: Fixed parser to prevent false matches:
-  - Quantity detection FIRST (more specific): Unit MUST be followed by date OR end-of-line
-  - Reference detection SECOND (less specific): Matches product codes with descriptions
-  - Supports both uppercase and lowercase units (UN, un, KG, kg, etc.)
-- **Defensive Pairing**: Added validation to ensure consistent reference-quantity matching:
-  - Logs warning when counts differ
-  - Uses min(refs, qtys) to prevent IndexError
-  - Shows which products will be paired
-- **OCR Performance Tuning**: Enhanced settings for scanned documents:
-  - DPI: 300 (high quality)
-  - Timeout: 60s per page
-  - PSM mode: 3 (fully automatic page segmentation)
-- **Successfully Tested**: Processed real user document with 2 products, created PO OC250000525
-
-### October 13, 2025 - Bidirectional Nota de Encomenda ↔ Guia de Remessa System
-- **Automatic PO Creation from Notas**: Notas de Encomenda (FT) now automatically create PurchaseOrder + POLines from OCR data
-- **Smart Document Routing**: process_inbound() detects doc_type='FT' and creates PO instead of matching logic
-- **Bidirectional Linking**: InboundDocument.po field with related_name='inbound_docs' enables access to linked Guias from PO
-- **Page Separation**: 
-  - **Dashboard**: Shows ONLY Guias de Remessa (GR) - filters out Notas de Encomenda
-  - **Encomendas Page**: Shows PurchaseOrders created from Notas + linked Guias with status badges
-- **Enhanced Encomendas Page**: po_list.html displays all Guias received for each PO with clickable links and status badges (✓ matched, ! exceptions)
-- **Dashboard PO Links**: Dashboard shows clickable PO links (📋) for each Guia with link to Encomendas page
-- **Nomenclature Updates**: 
-  - Navigation: "Carregar Guia/Fatura" → "Carregar Documento"
-  - Doc types: "Fatura" → "Nota de Encomenda", "Guia de Remessa" maintained
-- **Template Safety**: po_list.html now guards against missing MatchResult to prevent crashes
-- **Complete Flow**: Nota de Encomenda → creates PO (visible in Encomendas) → Guia de Remessa → matches with PO → visible in both pages
-
-### October 9, 2025 - PaddleOCR Integration with Tesseract Fallback
-- **PaddleOCR as Primary Engine**: Upgraded from Tesseract-only to PaddleOCR as primary OCR engine (30% more accurate for Portuguese text, better table extraction)
-- **Lazy Loading Implementation**: Created `get_paddle_ocr()` function with lazy initialization to avoid Django startup errors with system dependencies (libgomp.so.1)
-- **Complete Fallback Mechanism**: Automatic fallback PaddleOCR → Tesseract with per-page error handling:
-  - If PaddleOCR import fails → uses Tesseract for all documents
-  - If PaddleOCR.ocr() throws exception → catches error and retries with Tesseract
-  - If PaddleOCR returns empty/low-confidence text → automatically tries Tesseract
-  - Informative logging when fallback occurs
-- **Per-Page Processing**: Both PDF and image OCR functions handle failures gracefully on a per-page basis
-- **No External Dependencies**: Both PaddleOCR and Tesseract are local/offline, completely free, no API keys required
-- **Maintained Compatibility**: All existing parsers (Elastron 13/13, Colmol 7/7, Generic) continue working with improved accuracy
-
-### October 7, 2025 - Tesseract OCR Migration, Generic Parser & Advanced Validation
-- **Simplified to Tesseract Only**: Removed OCR.space dependency, now using only local Tesseract OCR
-- **Improved Elastron Parser**: Adapted for Tesseract output format - now extracts 13/13 products (100%)
-- **Fixed Colmol Parser**: Corrected dimension pattern detection - now extracts 7/7 products (100%)
-- **Tesseract-Compatible Parsing**: Modified parsers to work with Tesseract's spaced text format
-- **Generic Parser for Any Supplier**: Created `parse_guia_generica()` with flexible heuristics to extract products from ANY delivery note format
-  - Detects product codes (8+ alphanumeric chars), descriptions, quantities, and units
-  - Supports PT (25,000) and EN (25.0) number formats
-  - Extracts dimensions from descriptions (1980x0880x0020 → 1.98x0.88x0.02)
-  - Automatic fallback: if specific parser fails, tries generic parser
-- **Advanced Illegible File Detection**: Multi-layer validation system with automatic ExceptionTask creation:
-  1. **Text length validation**: Text < 100 chars → "Ficheiro ilegível - texto muito curto"
-  2. **Product extraction validation**: Guia/Fatura with 0 products → "Ficheiro ilegível - nenhum produto extraído"
-  3. **Low quality detection**: pdfplumber text < 50 chars + no products → "Ficheiro ilegível - qualidade de imagem muito baixa"
-  4. **Product quality validation**: >50% invalid products (code <5 chars OR quantity ≤0) → "Ficheiro desformatado - X/Y produtos com dados inválidos"
-- **OCR Performance & Timeout Protection**:
-  - **DPI optimized**: Reduced from 300 to 200 DPI for faster processing with acceptable quality
-  - **Per-page timeout**: 15-second timeout per page prevents hanging on low-quality images
-  - **Graceful degradation**: Skips timed-out pages and continues processing
-  - **Performance tracking**: Logs conversion time and per-page processing time
-  - **Timeout handling**: Automatically detects and reports OCR timeout errors
-- **Format-Specific Parsers**: 
-  - `parse_fatura_elastron()`: Handles Elastron invoices with Tesseract format (100% extraction rate)
-  - `parse_guia_colmol()`: Processes Colmol delivery notes with encomenda/requisição tracking (100% extraction rate)
-  - `parse_guia_generica()`: Universal parser for any supplier's delivery notes with fallback support
-- **Multi-Format Support**: Successfully tested with:
-  - Elastron invoices (13/13 products extracted)
-  - Colmol delivery notes (7/7 products extracted)
-  - Generic delivery notes from multiple suppliers
-  - Malformed/low-quality PDFs (automatic exception creation)
-- **Offline Processing**: No external API dependencies, fully local OCR processing
-- **Excel Export Fix**: Updated `export_document_to_excel()` to handle dimensions as strings (Tesseract format) instead of dictionaries
-
-### October 6, 2025
-- **Fixed CodeMapping lookup bug**: System was using supplier_code from order reference (e.g., "1ECWH") instead of article_code (product SKU) for lookups, causing all lines to map to the same first result
-- **Improved validation logic**: Now uses `article_code` field for CodeMapping queries in both `map_supplier_codes()` and validation
-- **Enhanced exception messages**: Changed to show only article_code (e.g., "E0748001901") instead of article_code + supplier_code
-- **Quantity validation fix**: Added None-safety with `qty_ordered or 0` and removed conditional check - now always validates quantity even when qty_ordered=0
-- **Database schema updates**: Added `article_code` field to ReceiptLine model, added `qty_ordered` field to CodeMapping model
-- **Dashboard interactive filter**: Added clickable chart on dashboard to filter documents by status (Processado, Com exceções, Erro, Pendente) - uses CSS classes with !important for reliable filtering
-- **Fixed status bug**: Corrected 'exception' to 'exceptions' throughout codebase to match MatchResult model definition
-- **Filter CSS fix**: Strengthened filter implementation with `.filtered-out` CSS class to ensure hidden elements stay hidden regardless of other styles
-- **Modal close fix**: Fixed popup/modal backdrop not closing completely - added JavaScript to remove leftover backdrops and reset body styles
-- **Detail page chart**: Added line reading statistics chart to individual document detail pages - shows document-specific breakdown of lines read vs lines with errors
-- **Document history**: Removed 10-document limit from dashboard - now shows all documents from beginning with vertical scroll (600px max height) to preserve complete history
-- **Excel dimensões fix**: Fixed Excel export to correctly show product dimensions (largura x comprimento x espessura) for Guia de Remessa documents - now matches products using article_code and supports both new (produtos[]) and legacy (lines[]) formats
-
-### September 24, 2025
-- Installed Python 3.11 and Django 5.0.6
-- Created static and media directories
-- Loaded demo data successfully
-- Configured workflow for port 5000
-- Set up deployment configuration
-- Verified all core functionality working
-
-## OCR Configuration
-
-### PaddleOCR (Primary Engine)
-- **Engine**: PaddleOCR (local, offline processing, 30% more accurate than Tesseract)
-- **Language**: Multilingual model with excellent Portuguese support
-- **Features**: Advanced text extraction, better table detection, confidence scoring
-- **Lazy Loading**: Initialized only when needed to avoid startup issues
-- **Automatic Fallback**: Falls back to Tesseract if unavailable or fails
-
-### Tesseract OCR (Fallback Engine)
-- **Engine**: Tesseract OCR (local, offline processing)
-- **Language**: Portuguese (`por`) language pack
-- **Features**: Text extraction, QR code detection (OpenCV), table parsing
-- **Usage**: Automatic fallback when PaddleOCR fails or returns empty results
-- **No API Keys Required**: Fully local processing without external dependencies
-
-### Supported Document Formats
-1. **Fatura Elastron**: Auto-detected via "elastron" + "fatura" keywords (100% extraction rate)
-2. **Guia Colmol**: Auto-detected via "colmol" + "guia" keywords (100% extraction rate)
-3. **Generic Invoices**: Fallback parser for unknown invoice formats
-4. **Generic Delivery Notes**: Fallback parser for unknown guia formats
-
-## Next Steps
-- Add more supplier-specific parsers (expand format library)
-- Email IMAP connector for automatic document ingestion
-- Mobile PWA for physical verification
-- Export capabilities to PHC systems
+### October 13, 2025 - ORDEM_COMPRA Parser for Multi-Line Portuguese Purchase Orders
+- **Successfully Tested**: Processed real user document with 2/2 products, created PO OC250000525
+- **Multi-Line Format**: Handles separated reference and quantity lines with robust regex
+- **Defensive Pairing**: Validates reference-quantity matching to prevent IndexError
