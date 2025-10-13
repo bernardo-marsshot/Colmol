@@ -67,22 +67,29 @@ def save_extraction_to_json(data: dict, filename: str = "extracao.json"):
 
 
 def real_ocr_extract(file_path: str):
-    """OCR usando Tesseract. Extrai texto e faz parse para estrutura."""
-    text_content = ""
-    qr_codes = []
+    """
+    Sistema Multi-OCR: Tenta múltiplas estratégias de extração até conseguir texto válido.
+    Fallback em cascata: PaddleOCR → Tesseract Alta Qualidade → Tesseract Modo Tabela → 
+                         Tesseract Preprocessing → Tesseract Linha a Linha
+    """
     ext = os.path.splitext(file_path)[1].lower()
-
-    print(f"🔍 Processando com Tesseract: {os.path.basename(file_path)}")
     
-    if ext == ".pdf":
-        text_content, qr_codes = extract_text_from_pdf(file_path)
-    elif ext in [".jpg", ".jpeg", ".png", ".tiff", ".bmp"]:
-        text_content, qr_codes = extract_text_from_image(file_path)
-
+    print(f"🔍 Iniciando extração multi-OCR: {os.path.basename(file_path)}")
+    
+    # Usa sistema multi-OCR com fallback automático
+    ocr_result = extract_with_fallback(file_path)
+    
+    text_content = ocr_result.get("text", "")
+    qr_codes = ocr_result.get("qr_codes", [])
+    strategy_used = ocr_result.get("strategy_used", "Desconhecida")
+    
+    # Log da estratégia utilizada
+    print(f"\n🎯 Estratégia utilizada: {strategy_used}")
+    
     # Validação antecipada: se texto muito curto, pode ser ficheiro ilegível/desformatado
     texto_pdfplumber_curto = len(text_content) < 50
     if texto_pdfplumber_curto:
-        print(f"⚠️ Texto pdfplumber muito curto ({len(text_content)} chars) - possível ficheiro ilegível")
+        print(f"⚠️ Texto extraído muito curto ({len(text_content)} chars) - possível ficheiro ilegível")
 
     preview = "\n".join(text_content.splitlines()[:60])
     print("---- OCR PREVIEW (primeiras linhas) ----")
@@ -93,9 +100,9 @@ def real_ocr_extract(file_path: str):
         print(f"✅ {len(qr_codes)} QR code(s) detectado(s)")
 
     if not text_content.strip():
-        print("❌ OCR vazio")
+        print("❌ Todas as estratégias OCR falharam")
         error_result = {
-            "error": "OCR failed - no text extracted from document",
+            "error": f"OCR failed - {ocr_result.get('error', 'no text extracted from document')}",
             "numero_requisicao": f"ERROR-{os.path.basename(file_path)}",
             "document_number": "",
             "po_number": "",
@@ -107,11 +114,13 @@ def real_ocr_extract(file_path: str):
                 "total_lines": 0,
                 "total_quantity": 0
             },
+            "strategy_used": strategy_used
         }
         save_extraction_to_json(error_result)
         return error_result
 
     result = parse_portuguese_document(text_content, qr_codes, texto_pdfplumber_curto)
+    result["strategy_used"] = strategy_used  # Adiciona info da estratégia ao resultado
     save_extraction_to_json(result)
     return result
 
