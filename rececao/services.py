@@ -2173,35 +2173,58 @@ def process_inbound(inbound: InboundDocument):
         inbound.po = po
         inbound.save()
 
-    # Matching
+    # Matching - COMPARAR COM POLINE (linhas da Purchase Order)
     ok = 0
     issues = 0
     exceptions = []
     if inbound.po:
         for r in inbound.lines.all():
-            # Verificar se código não está mapeado
-            # IMPORTANTE: Lookup usando article_code (SKU do produto), não supplier_code (referência da ordem)
-            mapping = CodeMapping.objects.filter(
-                supplier=inbound.supplier,
-                supplier_code=r.article_code
+            # Procurar POLine correspondente usando article_code (SKU do produto)
+            # POLine.internal_sku deve corresponder ao article_code da linha recebida
+            po_line = POLine.objects.filter(
+                po=inbound.po,
+                internal_sku=r.article_code
             ).first()
             
-            if not mapping:
+            if not po_line:
+                # Fallback: tentar com CodeMapping para sugerir SKU correto
+                mapping = CodeMapping.objects.filter(
+                    supplier=inbound.supplier,
+                    supplier_code=r.article_code
+                ).first()
+                
+                suggested_sku = mapping.internal_sku if mapping else ""
+                
                 issues += 1
                 exceptions.append({
                     "line": r.article_code,
-                    "issue": "Código não mapeado para SKU interno",
-                    "suggested": "",
+                    "issue": "Produto não encontrado na Purchase Order",
+                    "suggested": suggested_sku,
                 })
                 continue
             
-            # Verificar se quantidade recebida EXCEDE a quantidade encomendada (do CodeMapping)
-            qty_ordered = float(mapping.qty_ordered or 0)  # Proteção contra None
-            if float(r.qty_received) > qty_ordered:
+            # Verificar quantidade recebida vs quantidade encomendada (com tolerância)
+            qty_ordered = float(po_line.qty_ordered or 0)
+            tolerance = float(po_line.tolerance or 0)
+            qty_received = float(r.qty_received)
+            
+            # Quantidade máxima permitida = qty_ordered + tolerance
+            max_allowed = qty_ordered + tolerance
+            
+            if qty_received > max_allowed:
                 issues += 1
                 exceptions.append({
                     "line": r.article_code,
-                    "issue": f"Quantidade excedida (recebida {r.qty_received} vs encomendada {qty_ordered})",
+                    "issue": f"Quantidade excedida (recebida {qty_received} vs encomendada {qty_ordered}, tolerância {tolerance})",
+                })
+                continue
+            
+            # Validação extra: quantidade muito abaixo da encomenda
+            if qty_received < (qty_ordered * 0.5):
+                issues += 1
+                exceptions.append({
+                    "line": r.article_code,
+                    "issue": f"Quantidade muito abaixo da encomenda (recebida {qty_received} vs encomendada {qty_ordered})",
                 })
                 continue
             

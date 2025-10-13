@@ -1,39 +1,29 @@
 {
   "numero_requisicao": "",
-  "document_number": "AMA",
-  "po_number": "AMA",
+  "document_number": "com",
+  "po_number": "com",
   "supplier_name": "",
-  "delivery_date": "01/10/2025",
-  "qr_codes": [
+  "delivery_date": "09/10/2025",
+  "qr_codes": [],
+  "produtos": [
     {
-      "data": {
-        "nif_emitente": "501400354",
-        "nif_adquirente": "500248800",
-        "pais_adquirente": "PT",
-        "tipo_documento": "FT",
-        "estado_documento": "N",
-        "data_documento": "20251001",
-        "identificacao_documento": "VIT 2025/2754",
-        "atcud": "JJWFDDF8-2754",
-        "espaco_fiscal": "PT",
-        "base_tributavel_taxa_normal": "3620.10",
-        "total_iva_taxa_normal": "832.62",
-        "total_impostos": "832.62",
-        "total_documento": "4452.72",
-        "hash": "fAKI",
-        "certificado": "993"
-      },
-      "raw_data": "A:501400354*B:500248800*C:PT*D:FT*E:N*F:20251001*G:VIT 2025/2754*H:JJWFDDF8-2754*I1:PT*I7:3620.10*I8:832.62*N:832.62*O:4452.72*Q:fAKI*R:993",
-      "page": 1
+      "artigo": "POLIGONO",
+      "descricao": "INDUTRIAL MORERO, NAVE 1",
+      "quantidade": 10.0,
+      "unidade": "UN",
+      "preco_unitario": 0.0,
+      "total": 0.0,
+      "dimensoes": "",
+      "origem": "regex_generic"
     }
   ],
-  "produtos": [],
   "lines": [],
   "totals": {
-    "total_lines": 0,
-    "total_quantity": 0
+    "total_lines": 1,
+    "total_quantity": 10.0
   },
-  "tipo_documento": "FATURA_GENERICA",
-  "texto_completo": "--- Página 1 ---\nData 01/10/2025 FACIURA VIT/20252754 PLASTIRSO Página Conds pag . 60 Dias FÁBRICA DE PLÁSTICOS, S.A. Ex . mo (s) Senhor (es) PLASTIRSO-Fabrica de Plasticos,S.A COLMOL 2 . IND.PATEIRAS  TRAV.IND.15-16 4785-623 TROFA ZONA INDUSIRIAL DAS CAVADAS NIF: 501400354 APARI . 115 Registo SIRER: 3721-908 VIIA DE CUCUJÃES Cliente 102428 NIF 500248800 Qtd_ Und Artigo Descrição Preço Und_ IVA Desconto Ordem de venda:226354 V/ Encomenda 4212 550,000 kg  710270091 FIIM PEB 270x0 .09 BOB . 55 KG MÁX 1, 4800/kg 23 ,08 110,000 kg 7101101212 FILME PEB 11Ox0.12,ANII-ESIAIICO , BOB 55KG 1,5300/kg 23 , 08 220 , 000  kg 710205124 PEB 205x0 .12 , ANII-ESIAIICO , BOB . 55KG 1,5300/kg 23 , 08 Ordem de venda:226355 V/ Enconenda 4263 4100,000 kg 710270091 FIIME PEB 270x0.09 ,BOB.55 KG vÁX . 1,4800/kg 23,08 Ordem de venda: 226682 V/ Enconenda 4501 220,000 kg 710160121 FIIME PEB 160x0.12 ,ANTI-ESTATICO , BOB . 55KG 1,5300/kg 23 , 08 Ordem de venda:226751 V / Enconenda 4656 220 ,000 kg 710205124 FILME PEB 205x0 .12 , ANII-ESTATICO , BOB . 55KG 1,5300/kg 23 , 08 Salvo especificação em contrario, desconhecemos fim a se destinam produtos aqui facturados Embalagens 1 Euro. ; 4 Pal - CARGA ESCARCA Data Hora: 01/10/25 08:13 Data ARTIGOS IVA Local Carga: N/ Instalações Local Descarga Direcção Indicada 3620,10 832, 62 NOTA: Em caso de defeito 56 nos responsabilizamos pela substituição do material defei As nercadorias viajam por conta e risco do cliente Reclamações s6 serão atendi do prazo de 8 dias Em caso de litígio 0 foro competente é da comarca de Sant Dados Bancarios para paganento: IBAN: PT500o0706050035861000076 SWIFT ATCUD: JJWEDDF8-2754 fAKI-Processado por programa certificado PLASTIRSO Fábrica de Plásticos, S.A Telef +351 252 403 090 Fax: +351 252 403 099 <chamada para rede fixa nacionalv Travessa da Indústria, 15 e 16 Loteamento Industrial das Pateiras E-mail: plastirso@plastirso.pt www plastirso.pt Apartado 74 S. Tiago de Bougado Contribuinte N.ª PT 501 400 354 Matriculada na C R. C. da Trofa ; 4786-909 TROFA - PORTUGAL Capital Social 50.000 € que",
-  "baixa_qualidade_texto": false
+  "tipo_documento": "PEDIDO_ESPANHOL",
+  "texto_completo": "Fecha\nPedido nº\nProveedor\nN.I.F.\nPag.\nAtendido por\n1\nPT500248800\n0000292\nPC5/0005051\n09/10/2025\nADMINISTRA\nPEDIDO\nCOSGUI D.M. S.L.\nB39031059\nPOLIGONO INDUTRIAL MORERO, NAVE 1 10\n39611\nGUARNIZO \n942252861\nNIF.\nfacturacion@cosgui.com\nCOLMOL COLCHOES SA\nZONA INDUSTRIAL DAS CAVADAS APART 119 RUA DO PROGR\n3721-\nVILA DE CUCUJAES\n4,00\nCOLCHON TOP VISCO 2019 135X190\nLUSTOPVS135190\n4,00\nCOLCHON TOP VISCO 2019 150X190\nLUSTOPVS150190\nDescripción\nCantidad\nCódigo\nSu Referencia\nNotas :",
+  "baixa_qualidade_texto": false,
+  "nif": "PT500248800"
 }
