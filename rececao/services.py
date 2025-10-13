@@ -1497,6 +1497,15 @@ def parse_generic_document(text: str, file_path: str = None):
     """
     produtos = []
     
+    # Palavras-chave que NÃO são produtos (filtro de ruído)
+    noise_keywords = [
+        'POLIGONO', 'POLYGON', 'ZONA', 'ZONE', 'INDUSTRIAL', 'INDUTRIAL',
+        'RUA', 'STREET', 'AVENIDA', 'AVENUE', 'NAVE', 'ARMAZEM', 'WAREHOUSE',
+        'APARTADO', 'TELEFONE', 'PHONE', 'FAX', 'EMAIL', 'MAIL',
+        'PROVEEDOR', 'SUPPLIER', 'CLIENTE', 'CUSTOMER', 'PEDIDO', 'ORDER',
+        'FECHA', 'DATE', 'PAGINA', 'PAGE', 'TOTAL', 'SUBTOTAL'
+    ]
+    
     # Estratégia 1: Regex genérico para linhas de produto
     # Padrão: CÓDIGO DESCRIÇÃO QUANTIDADE
     lines = text.split("\n")
@@ -1504,6 +1513,11 @@ def parse_generic_document(text: str, file_path: str = None):
     for line in lines:
         stripped = line.strip()
         if len(stripped) < 10:
+            continue
+        
+        # Filtrar linhas com palavras de ruído
+        stripped_upper = stripped.upper()
+        if any(keyword in stripped_upper for keyword in noise_keywords):
             continue
         
         # Padrão 1: CÓDIGO (6+ chars) + DESCRIÇÃO + QTD numérica
@@ -1517,6 +1531,14 @@ def parse_generic_document(text: str, file_path: str = None):
                 codigo = match1.group(1)
                 descricao = match1.group(2).strip()
                 quantidade = float(match1.group(3).replace(',', '.'))
+                
+                # Validações adicionais
+                # - Código deve parecer SKU (letras + números ou só números)
+                # - Quantidade deve ser razoável (0.1 a 10000)
+                if not re.match(r'^[A-Z0-9]{6,}$', codigo):
+                    continue
+                if quantidade < 0.1 or quantidade > 10000:
+                    continue
                 
                 # Extrair dimensões se presentes
                 dims = ""
@@ -1543,28 +1565,51 @@ def parse_generic_document(text: str, file_path: str = None):
         if produtos_tabela:
             produtos.extend(produtos_tabela)
     
-    # Estratégia 3: Heurísticas para formatos não-tabulares
+    # Estratégia 3: Heurísticas para formatos não-tabulares (buffer multi-linha MELHORADO)
     if not produtos:
-        # Buffer multi-linha (para formatos tipo COSGUI)
         buffer_lines = []
+        buffer_text = []
+        
         for i, line in enumerate(lines):
             stripped = line.strip()
             if not stripped:
+                buffer_lines = []
+                buffer_text = []
                 continue
             
-            # Detectar linha com quantidade
+            # Filtrar ruído
+            stripped_upper = stripped.upper()
+            if any(keyword in stripped_upper for keyword in noise_keywords):
+                continue
+            
+            # Detectar linha com APENAS quantidade (formato: "4,00" ou "4.00")
             qtd_match = re.match(r'^([\d,\.]+)$', stripped)
-            if qtd_match and i > 0:
-                # Verificar linhas anteriores no buffer
-                if len(buffer_lines) >= 2:
-                    try:
-                        quantidade = float(qtd_match.group(1).replace(',', '.'))
-                        descricao = buffer_lines[-1]
-                        codigo = buffer_lines[-2] if len(buffer_lines) >= 2 else ""
+            if qtd_match and len(buffer_lines) >= 1:
+                # Formato COSGUI: DESCRIÇÃO → CÓDIGO → QUANTIDADE (3 linhas)
+                try:
+                    quantidade = float(qtd_match.group(1).replace(',', '.'))
+                    
+                    # Validar quantidade razoável
+                    if quantidade < 0.1 or quantidade > 10000:
+                        buffer_lines = []
+                        buffer_text = []
+                        continue
+                    
+                    # Última linha pode ser código
+                    codigo_candidato = buffer_lines[-1]
+                    
+                    # Verificar se parece SKU (6+ chars, alfanumérico)
+                    if len(codigo_candidato) >= 6 and re.match(r'^[A-Z0-9]+$', codigo_candidato.upper()):
+                        # Descrição é a penúltima linha (se existir)
+                        descricao = buffer_lines[-2] if len(buffer_lines) >= 2 else codigo_candidato
                         
-                        if codigo and descricao:
+                        # Se descrição tem dimensões, é provável ser produto
+                        has_dimensions = re.search(r'\d{2,3}[xX×]\d{2,3}', descricao)
+                        has_product_keywords = any(kw in descricao.upper() for kw in ['COLCHON', 'MATELAS', 'BLOCO', 'ESPUMA'])
+                        
+                        if has_dimensions or has_product_keywords or len(descricao) > 15:
                             produtos.append({
-                                "artigo": codigo,
+                                "artigo": codigo_candidato,
                                 "descricao": descricao,
                                 "quantidade": quantidade,
                                 "unidade": "UN",
@@ -1572,15 +1617,18 @@ def parse_generic_document(text: str, file_path: str = None):
                                 "total": 0.0,
                                 "origem": "multiline_buffer"
                             })
-                    except ValueError:
-                        pass
+                except ValueError:
+                    pass
                 
                 buffer_lines = []
+                buffer_text = []
             else:
                 buffer_lines.append(stripped)
-                # Limitar buffer a 3 linhas
-                if len(buffer_lines) > 3:
+                buffer_text.append(stripped)
+                # Limitar buffer a 4 linhas
+                if len(buffer_lines) > 4:
                     buffer_lines.pop(0)
+                    buffer_text.pop(0)
     
     return produtos
 
