@@ -50,6 +50,22 @@ def get_paddle_ocr():
             _paddle_ocr_instance = False
     return _paddle_ocr_instance if _paddle_ocr_instance is not False else None
 
+# --- EasyOCR (lazy loading para evitar problemas no startup) ---
+_easyocr_instance = None
+
+def get_easy_ocr():
+    """Inicializa EasyOCR lazy - só quando necessário."""
+    global _easyocr_instance
+    if _easyocr_instance is None:
+        try:
+            import easyocr
+            _easyocr_instance = easyocr.Reader(['pt', 'es', 'fr'], gpu=False)
+            print("✅ EasyOCR inicializado (PT/ES/FR)")
+        except Exception as e:
+            print(f"⚠️ EasyOCR não disponível: {e}")
+            _easyocr_instance = False
+    return _easyocr_instance if _easyocr_instance is not False else None
+
 # ----------------- OCR: PDF/Imagens -----------------
 
 
