@@ -1,0 +1,44 @@
+{
+  "numero_requisicao": "",
+  "document_number": "",
+  "po_number": "",
+  "supplier_name": "",
+  "delivery_date": "",
+  "qr_codes": [],
+  "produtos": [],
+  "lines": [
+    {
+      "supplier_code": "REN",
+      "description": "SIREN  : 423  103 076",
+      "linha_raw": "SIREN  : 423  103 076 ",
+      "unit": "UNI",
+      "qty": 6.0,
+      "mini_codigo": "3x76",
+      "dimensoes": {
+        "comprimento": 76,
+        "largura": 3,
+        "espessura": 0
+      }
+    },
+    {
+      "supplier_code": "CCE",
+      "description": "N° CCE FR 76  423 103 076",
+      "linha_raw": "N° CCE FR 76  423 103 076 ",
+      "unit": "UNI",
+      "qty": 6.0,
+      "mini_codigo": "3x76",
+      "dimensoes": {
+        "comprimento": 76,
+        "largura": 3,
+        "espessura": 0
+      }
+    }
+  ],
+  "totals": {
+    "total_lines": 2,
+    "total_quantity": 12.0
+  },
+  "tipo_documento": "DOCUMENTO_GENERICO",
+  "texto_completo": "Désignation  Quantité  Prix unitaire  Montant  \nSTOCK MAGASIN     \nMATELAS SAN REMO 140x190  2 202.00€ 404.00€ \nMATELAS SAN REMO 180x200  2 295.00€ 590.00 € \nMATELAS RIVIERA 180  x 200  1 489.00€ 489.00€  \nMATELAS RIVIE RA 160  x 200  1 441.00€  441.00€  \nTOTAL   1924.00€  BON DE COMMANDE  : contremarque  \nDATE  : 07.10.25  \n \nCONTREMARQUE  :   STOCK  \n \nLivraison demandée pour le  : \n \nDÈS QUE POSSIBLE   AIRE DES MOISSONS  \n10410 – ST PARRES AUX TERTRES  \nTél : 03.25.42.45.94/96  \nSarl M3C au capital de 7622.45 €  \nSIREN  : 423  103 076 \nN° CCE FR 76  423 103 076 \nEntreprise indépendante franchisée   \nCOLMOL  \nADRESSE DE LIVRAISON   \nMAXILITERIE  \nZONE COMMERCIALE AIRE DES MOISSONS  \n10410 – SAINT PARRES AUX TERTRES",
+  "baixa_qualidade_texto": false
+}
