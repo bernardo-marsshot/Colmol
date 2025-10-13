@@ -12,3 +12,6 @@ python-dotenv
 paddleocr
 paddlepaddle
 easyocr
+camelot-py[cv]
+pdfplumber
+rapidfuzz

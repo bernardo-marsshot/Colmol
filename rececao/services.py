@@ -31,6 +31,31 @@ except ImportError:
     QR_CODE_ENABLED = False
     print("⚠️ QR code não disponível (instale opencv-python para ativar)")
 
+# --- Universal extraction libraries (optional) ---
+try:
+    import pdfplumber
+    PDFPLUMBER_ENABLED = True
+    print("✅ pdfplumber disponível")
+except ImportError:
+    PDFPLUMBER_ENABLED = False
+    print("⚠️ pdfplumber não disponível (instale para extração avançada de tabelas)")
+
+try:
+    import camelot
+    CAMELOT_ENABLED = True
+    print("✅ Camelot disponível")
+except ImportError:
+    CAMELOT_ENABLED = False
+    print("⚠️ Camelot não disponível (instale camelot-py[cv] para extração de tabelas)")
+
+try:
+    from rapidfuzz import fuzz, process
+    RAPIDFUZZ_ENABLED = True
+    print("✅ RapidFuzz disponível")
+except ImportError:
+    RAPIDFUZZ_ENABLED = False
+    print("⚠️ RapidFuzz não disponível (instale para fuzzy matching de campos)")
+
 # Se precisares especificar o caminho do tesseract no Windows:
 # pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
@@ -127,7 +152,7 @@ def real_ocr_extract(file_path: str):
         save_extraction_to_json(error_result)
         return error_result
 
-    result = parse_portuguese_document(text_content, qr_codes, texto_pdfplumber_curto)
+    result = parse_portuguese_document(text_content, qr_codes, texto_pdfplumber_curto, file_path)
     save_extraction_to_json(result)
     return result
 
@@ -1280,7 +1305,287 @@ def parse_pedido_espanhol(text: str):
     return produtos
 
 
-def parse_portuguese_document(text: str, qr_codes=None, texto_pdfplumber_curto=False):
+# ============================================
+# UNIVERSAL EXTRACTION FUNCTIONS
+# ============================================
+
+def universal_kv_extract(text: str, file_path: str = None):
+    """
+    Extração universal de campos-chave usando fuzzy matching.
+    Procura campos como: fornecedor/supplier/proveedor, NIF, IBAN, número documento, data, etc.
+    """
+    result = {
+        "fornecedor": "",
+        "nif": "",
+        "iban": "",
+        "document_number": "",
+        "po_number": "",
+        "delivery_date": "",
+        "total_amount": 0.0,
+    }
+    
+    # Dicionário de sinónimos para cada campo
+    field_synonyms = {
+        "fornecedor": ["fornecedor", "supplier", "proveedor", "empresa", "vendedor", "razao social", "nombre"],
+        "nif": ["nif", "vat", "cif", "dni", "tax id", "nipc", "contribuinte"],
+        "iban": ["iban", "conta", "account", "cuenta bancaria"],
+        "document_number": ["documento", "guia", "fatura", "factura", "invoice", "gr", "numero", "nº", "n.º"],
+        "po_number": ["pedido", "encomenda", "order", "po", "purchase order"],
+        "delivery_date": ["data", "date", "fecha", "entrega", "delivery"],
+    }
+    
+    lines = text.split("\n")
+    
+    for line in lines:
+        stripped = line.strip()
+        if not stripped or len(stripped) < 3:
+            continue
+        
+        # NIF / CIF / VAT (padrão: letras + números)
+        nif_match = re.search(r'\b([A-Z]{0,3}\d{9})\b', stripped)
+        if nif_match and not result["nif"]:
+            result["nif"] = nif_match.group(1)
+        
+        # IBAN (padrão PT50...)
+        iban_match = re.search(r'\b([A-Z]{2}\d{2}[\s]?[\d\s]{10,30})\b', stripped)
+        if iban_match and not result["iban"]:
+            result["iban"] = iban_match.group(1).replace(" ", "")
+        
+        # Data (formato DD/MM/YYYY, DD-MM-YYYY, YYYY-MM-DD)
+        date_match = re.search(r'\b(\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{4}[/-]\d{1,2}[/-]\d{1,2})\b', stripped)
+        if date_match and not result["delivery_date"]:
+            result["delivery_date"] = date_match.group(1)
+        
+        # Total amount (formato: 1.234,56 ou 1234.56)
+        total_match = re.search(r'(?:total|importe|amount)[\s:]+?([\d.,]+)\s*€?', stripped, re.IGNORECASE)
+        if total_match:
+            try:
+                amount_str = total_match.group(1).replace('.', '').replace(',', '.')
+                result["total_amount"] = float(amount_str)
+            except ValueError:
+                pass
+        
+        # Fuzzy matching para campos textuais
+        if RAPIDFUZZ_ENABLED:
+            for field, synonyms in field_synonyms.items():
+                if result.get(field):
+                    continue
+                
+                # Verificar se algum sinónimo está na linha
+                for synonym in synonyms:
+                    if fuzz.partial_ratio(synonym.lower(), stripped.lower()) > 80:
+                        # Extrair valor após o campo
+                        parts = re.split(r'[:\.]\s*', stripped, maxsplit=1)
+                        if len(parts) > 1:
+                            value = parts[1].strip()
+                            # Limpar caracteres especiais
+                            value = re.sub(r'[^\w\s\d/-]', '', value).strip()
+                            if len(value) > 2:
+                                result[field] = value
+                                break
+    
+    return result
+
+
+def universal_table_extract(file_path: str):
+    """
+    Extração universal de tabelas usando Camelot + pdfplumber.
+    Retorna lista de produtos extraídos de tabelas no PDF.
+    """
+    produtos = []
+    
+    if not os.path.exists(file_path):
+        print(f"⚠️ Ficheiro não encontrado: {file_path}")
+        return produtos
+    
+    ext = os.path.splitext(file_path)[1].lower()
+    if ext != ".pdf":
+        print(f"⚠️ universal_table_extract só suporta PDFs (recebeu: {ext})")
+        return produtos
+    
+    # Tentar Camelot primeiro (melhor para tabelas complexas)
+    if CAMELOT_ENABLED:
+        try:
+            print("🔍 Tentando extrair tabelas com Camelot...")
+            tables = camelot.read_pdf(file_path, pages='all', flavor='lattice')
+            
+            if len(tables) == 0:
+                # Fallback para stream mode
+                tables = camelot.read_pdf(file_path, pages='all', flavor='stream')
+            
+            print(f"✅ Camelot encontrou {len(tables)} tabela(s)")
+            
+            for table_idx, table in enumerate(tables):
+                df = table.df
+                
+                # Tentar identificar colunas (código, descrição, quantidade)
+                for row_idx, row in df.iterrows():
+                    row_values = [str(cell).strip() for cell in row if str(cell).strip()]
+                    
+                    # Heurística: linha com código alfanumérico + descrição + número
+                    if len(row_values) >= 3:
+                        codigo_match = re.match(r'^[A-Z0-9]{4,}$', row_values[0])
+                        qtd_match = re.match(r'^[\d,\.]+$', row_values[-1])
+                        
+                        if codigo_match and qtd_match:
+                            try:
+                                produtos.append({
+                                    "artigo": row_values[0],
+                                    "descricao": " ".join(row_values[1:-1]),
+                                    "quantidade": float(row_values[-1].replace(',', '.')),
+                                    "unidade": "UN",
+                                    "preco_unitario": 0.0,
+                                    "total": 0.0,
+                                    "origem": f"camelot_table_{table_idx}"
+                                })
+                            except (ValueError, IndexError):
+                                continue
+            
+            if produtos:
+                print(f"✅ Camelot extraiu {len(produtos)} produto(s)")
+                return produtos
+        
+        except Exception as e:
+            print(f"⚠️ Erro no Camelot: {e}")
+    
+    # Fallback: pdfplumber
+    if PDFPLUMBER_ENABLED:
+        try:
+            print("🔍 Tentando extrair tabelas com pdfplumber...")
+            with pdfplumber.open(file_path) as pdf:
+                for page_num, page in enumerate(pdf.pages):
+                    tables = page.extract_tables()
+                    
+                    for table_idx, table in enumerate(tables):
+                        for row in table:
+                            if not row or len(row) < 3:
+                                continue
+                            
+                            row_clean = [str(cell).strip() if cell else "" for cell in row]
+                            
+                            # Heurística similar ao Camelot
+                            codigo_match = re.match(r'^[A-Z0-9]{4,}$', row_clean[0])
+                            qtd_match = re.match(r'^[\d,\.]+$', row_clean[-1])
+                            
+                            if codigo_match and qtd_match:
+                                try:
+                                    produtos.append({
+                                        "artigo": row_clean[0],
+                                        "descricao": " ".join(row_clean[1:-1]),
+                                        "quantidade": float(row_clean[-1].replace(',', '.')),
+                                        "unidade": "UN",
+                                        "preco_unitario": 0.0,
+                                        "total": 0.0,
+                                        "origem": f"pdfplumber_p{page_num}_t{table_idx}"
+                                    })
+                                except (ValueError, IndexError):
+                                    continue
+            
+            if produtos:
+                print(f"✅ pdfplumber extraiu {len(produtos)} produto(s)")
+        
+        except Exception as e:
+            print(f"⚠️ Erro no pdfplumber: {e}")
+    
+    return produtos
+
+
+def parse_generic_document(text: str, file_path: str = None):
+    """
+    Parser genérico universal que tenta múltiplas estratégias para extrair produtos.
+    Usa: regex patterns, table extraction, heurísticas.
+    """
+    produtos = []
+    
+    # Estratégia 1: Regex genérico para linhas de produto
+    # Padrão: CÓDIGO DESCRIÇÃO QUANTIDADE
+    lines = text.split("\n")
+    
+    for line in lines:
+        stripped = line.strip()
+        if len(stripped) < 10:
+            continue
+        
+        # Padrão 1: CÓDIGO (6+ chars) + DESCRIÇÃO + QTD numérica
+        match1 = re.match(
+            r'^([A-Z0-9]{6,})\s+(.+?)\s+([\d,\.]+)\s*$',
+            stripped
+        )
+        
+        if match1:
+            try:
+                codigo = match1.group(1)
+                descricao = match1.group(2).strip()
+                quantidade = float(match1.group(3).replace(',', '.'))
+                
+                # Extrair dimensões se presentes
+                dims = ""
+                dim_match = re.search(r'(\d{2,3})[xX×](\d{2,3})', descricao)
+                if dim_match:
+                    dims = f"{dim_match.group(1)}x{dim_match.group(2)}"
+                
+                produtos.append({
+                    "artigo": codigo,
+                    "descricao": descricao,
+                    "quantidade": quantidade,
+                    "unidade": "UN",
+                    "preco_unitario": 0.0,
+                    "total": 0.0,
+                    "dimensoes": dims,
+                    "origem": "regex_generic"
+                })
+            except (ValueError, IndexError):
+                continue
+    
+    # Estratégia 2: Extração de tabelas (se file_path fornecido)
+    if file_path and not produtos:
+        produtos_tabela = universal_table_extract(file_path)
+        if produtos_tabela:
+            produtos.extend(produtos_tabela)
+    
+    # Estratégia 3: Heurísticas para formatos não-tabulares
+    if not produtos:
+        # Buffer multi-linha (para formatos tipo COSGUI)
+        buffer_lines = []
+        for i, line in enumerate(lines):
+            stripped = line.strip()
+            if not stripped:
+                continue
+            
+            # Detectar linha com quantidade
+            qtd_match = re.match(r'^([\d,\.]+)$', stripped)
+            if qtd_match and i > 0:
+                # Verificar linhas anteriores no buffer
+                if len(buffer_lines) >= 2:
+                    try:
+                        quantidade = float(qtd_match.group(1).replace(',', '.'))
+                        descricao = buffer_lines[-1]
+                        codigo = buffer_lines[-2] if len(buffer_lines) >= 2 else ""
+                        
+                        if codigo and descricao:
+                            produtos.append({
+                                "artigo": codigo,
+                                "descricao": descricao,
+                                "quantidade": quantidade,
+                                "unidade": "UN",
+                                "preco_unitario": 0.0,
+                                "total": 0.0,
+                                "origem": "multiline_buffer"
+                            })
+                    except ValueError:
+                        pass
+                
+                buffer_lines = []
+            else:
+                buffer_lines.append(stripped)
+                # Limitar buffer a 3 linhas
+                if len(buffer_lines) > 3:
+                    buffer_lines.pop(0)
+    
+    return produtos
+
+
+def parse_portuguese_document(text: str, qr_codes=None, texto_pdfplumber_curto=False, file_path=None):
     """Extrai cabeçalho (req/doc/fornecedor/data) e linhas de produto."""
     if qr_codes is None:
         qr_codes = []
@@ -1351,7 +1656,7 @@ def parse_portuguese_document(text: str, qr_codes=None, texto_pdfplumber_curto=F
             if produtos and produtos[0].get("pedido_numero"):
                 result["document_number"] = produtos[0]["pedido_numero"]
         else:
-            print("⚠️ Parser Pedido Espanhol retornou 0 produtos")
+            print("⚠️ Parser Pedido Espanhol retornou 0 produtos - tentando extração universal...")
     elif doc_type == "BON_COMMANDE":
         produtos = parse_bon_commande(text)
         if produtos:
@@ -1368,7 +1673,7 @@ def parse_portuguese_document(text: str, qr_codes=None, texto_pdfplumber_curto=F
             if produtos and produtos[0].get("contremarque"):
                 result["document_number"] = produtos[0]["contremarque"]
         else:
-            print("⚠️ Parser Bon de Commande retornou 0 produtos")
+            print("⚠️ Parser Bon de Commande retornou 0 produtos - tentando extração universal...")
     elif doc_type == "ORDEM_COMPRA":
         produtos = parse_ordem_compra(text)
         if produtos:
@@ -1381,7 +1686,7 @@ def parse_portuguese_document(text: str, qr_codes=None, texto_pdfplumber_curto=F
                 result["po_number"] = oc_match.group(1)
                 result["document_number"] = oc_match.group(1)
         else:
-            print("⚠️ Parser Ordem de Compra retornou 0 produtos")
+            print("⚠️ Parser Ordem de Compra retornou 0 produtos - tentando extração universal...")
     elif doc_type == "FATURA_ELASTRON":
         produtos = parse_fatura_elastron(text)
         if produtos:
@@ -1431,6 +1736,52 @@ def parse_portuguese_document(text: str, qr_codes=None, texto_pdfplumber_curto=F
                         "dimensoes": p["dimensoes"],
                     })
                 result["lines"] = legacy
+
+    # ========== FALLBACK UNIVERSAL (se parsers específicos não encontraram produtos) ==========
+    if not result.get("produtos") or len(result["produtos"]) == 0:
+        print("🔄 Ativando extração universal de fallback...")
+        
+        # Tentativa 1: Parser genérico universal com regex e heurísticas
+        produtos_generic = parse_generic_document(text, file_path)
+        if produtos_generic:
+            result["produtos"] = produtos_generic
+            print(f"✅ Extração universal (regex/heurísticas) encontrou {len(produtos_generic)} produto(s)")
+        
+        # Tentativa 2: Extração de tabelas com Camelot/pdfplumber (se ainda não tiver produtos)
+        if (not result.get("produtos") or len(result["produtos"]) == 0) and file_path:
+            produtos_tabela = universal_table_extract(file_path)
+            if produtos_tabela:
+                result["produtos"] = produtos_tabela
+                print(f"✅ Extração universal (tabelas) encontrou {len(produtos_tabela)} produto(s)")
+    
+    # ========== ENRIQUECIMENTO DE METADADOS COM FUZZY MATCHING ==========
+    if file_path or text:
+        kv_data = universal_kv_extract(text, file_path)
+        
+        # Preencher campos vazios com dados do fuzzy matching
+        if not result["supplier_name"] and kv_data["fornecedor"]:
+            result["supplier_name"] = kv_data["fornecedor"]
+            print(f"📝 Fornecedor detectado via fuzzy matching: {kv_data['fornecedor']}")
+        
+        if not result["document_number"] and kv_data["document_number"]:
+            result["document_number"] = kv_data["document_number"]
+            print(f"📝 Documento detectado via fuzzy matching: {kv_data['document_number']}")
+        
+        if not result["po_number"] and kv_data["po_number"]:
+            result["po_number"] = kv_data["po_number"]
+            print(f"📝 PO detectado via fuzzy matching: {kv_data['po_number']}")
+        
+        if not result["delivery_date"] and kv_data["delivery_date"]:
+            result["delivery_date"] = kv_data["delivery_date"]
+            print(f"📝 Data detectada via fuzzy matching: {kv_data['delivery_date']}")
+        
+        # Adicionar campos extras aos metadados
+        if kv_data["nif"]:
+            result["nif"] = kv_data["nif"]
+        if kv_data["iban"]:
+            result["iban"] = kv_data["iban"]
+        if kv_data["total_amount"] > 0:
+            result["total_amount"] = kv_data["total_amount"]
 
     if result["produtos"]:
         result["totals"]["total_lines"] = len(result["produtos"])
