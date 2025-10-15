@@ -2732,6 +2732,30 @@ def process_inbound(inbound: InboundDocument):
     return res
 
 
+def extract_dimensions_from_text(text: str) -> str:
+    """Extrai dimensões de uma descrição usando regex.
+    
+    Procura padrões como: 150x200, 135x190x20, 150 x 200, etc.
+    Retorna a dimensão encontrada ou string vazia.
+    """
+    if not text:
+        return ""
+    
+    import re
+    
+    patterns = [
+        r'(\d{2,3})\s*[xX×]\s*(\d{2,3})\s*[xX×]\s*(\d{1,3})',
+        r'(\d{2,3})\s*[xX×]\s*(\d{2,3})',
+    ]
+    
+    for pattern in patterns:
+        match = re.search(pattern, text)
+        if match:
+            return 'x'.join(match.groups())
+    
+    return ""
+
+
 def export_document_to_excel(inbound_id: int) -> HttpResponse:
     """Exporta para Excel no formato pedido (Mini Código, Dimensões, Quantidade)."""
     inbound = InboundDocument.objects.get(id=inbound_id)
@@ -2757,6 +2781,7 @@ def export_document_to_excel(inbound_id: int) -> HttpResponse:
     for row, linha in enumerate(inbound.lines.all(), 2):
         dimensoes = ""
         mini_codigo = ""
+        descricao = ""
 
         # Formato Guia de Remessa (novo): procura em 'produtos' usando article_code
         if inbound.parsed_payload.get("produtos"):
@@ -2776,6 +2801,7 @@ def export_document_to_excel(inbound_id: int) -> HttpResponse:
                         elif larg and comp:
                             dimensoes = f"{larg}x{comp}"
                     mini_codigo = produto.get("mini_codigo", "")
+                    descricao = produto.get("descricao", "")
                     break
         
         # Formato antigo: procura em 'lines' usando supplier_code
@@ -2795,7 +2821,12 @@ def export_document_to_excel(inbound_id: int) -> HttpResponse:
                         elif larg and comp:
                             dimensoes = f"{larg}x{comp}"
                     mini_codigo = payload_line.get("mini_codigo", "")
+                    descricao = payload_line.get("description", "")
                     break
+
+        # Fallback: se não houver dimensões, tenta extrair da descrição
+        if not dimensoes:
+            dimensoes = extract_dimensions_from_text(descricao or linha.description)
 
         ws.cell(row=row, column=1, value=mini_codigo or linha.maybe_internal_sku)
         ws.cell(row=row, column=2, value=dimensoes)
