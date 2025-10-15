@@ -2733,7 +2733,7 @@ def process_inbound(inbound: InboundDocument):
 
 
 def export_document_to_excel(inbound_id: int) -> HttpResponse:
-    """Exporta para Excel no formato pedido (Req, Mini Código, Dimensões, Quantidade…)."""
+    """Exporta para Excel no formato pedido (Mini Código, Dimensões, Quantidade)."""
     inbound = InboundDocument.objects.get(id=inbound_id)
 
     wb = Workbook()
@@ -2741,8 +2741,7 @@ def export_document_to_excel(inbound_id: int) -> HttpResponse:
     ws.title = "Requisição Processada"
 
     headers = [
-        "Nº Requisição", "Mini Código", "Dimensões (LxCxE)", "Quantidade",
-        "Código Fornecedor", "Descrição"
+        "Mini Código", "Dimensões (LxCxE)", "Quantidade"
     ]
     header_font = Font(bold=True, color="FFFFFF")
     header_fill = PatternFill(start_color="FF6B35",
@@ -2754,9 +2753,6 @@ def export_document_to_excel(inbound_id: int) -> HttpResponse:
         c.font = header_font
         c.fill = header_fill
         c.alignment = Alignment(horizontal="center")
-
-    numero_req = inbound.parsed_payload.get("numero_requisicao",
-                                            "") or f"REQ-{inbound.id}"
 
     for row, linha in enumerate(inbound.lines.all(), 2):
         dimensoes = ""
@@ -2801,14 +2797,9 @@ def export_document_to_excel(inbound_id: int) -> HttpResponse:
                     mini_codigo = payload_line.get("mini_codigo", "")
                     break
 
-        ws.cell(row=row, column=1, value=numero_req)
-        ws.cell(row=row,
-                column=2,
-                value=mini_codigo or linha.maybe_internal_sku)
-        ws.cell(row=row, column=3, value=dimensoes)
-        ws.cell(row=row, column=4, value=float(linha.qty_received))
-        ws.cell(row=row, column=5, value=linha.supplier_code)
-        ws.cell(row=row, column=6, value=linha.description)
+        ws.cell(row=row, column=1, value=mini_codigo or linha.maybe_internal_sku)
+        ws.cell(row=row, column=2, value=dimensoes)
+        ws.cell(row=row, column=3, value=float(linha.qty_received))
 
     # auto width
     for column in ws.columns:
@@ -2825,6 +2816,6 @@ def export_document_to_excel(inbound_id: int) -> HttpResponse:
         content_type=
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     response[
-        "Content-Disposition"] = f'attachment; filename="requisicao_{numero_req}_{inbound.id}.xlsx"'
+        "Content-Disposition"] = f'attachment; filename="requisicao_{inbound.id}.xlsx"'
     wb.save(response)
     return response
