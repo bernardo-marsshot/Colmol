@@ -35,6 +35,19 @@ Key architectural decisions and features include:
 
 ## Recent Changes
 
+### October 15, 2025 - Auto-Registration of Unmapped SKUs in Notas de Encomenda
+- **Feature**: Sistema agora registra automaticamente códigos não mapeados em vez de criar exceções
+- **Behavior Change**: Quando processa Nota de Encomenda com SKU não mapeado:
+  - ✅ Cria automaticamente CodeMapping usando `get_or_create` (evita race conditions)
+  - ✅ Define internal_sku = supplier_code (pode ser ajustado depois)
+  - ✅ Define qty_ordered = qty_received (quantidade de referência)
+  - ✅ Valida código não vazio antes de criar (evita IntegrityError)
+  - ✅ Mantém verificação de quantidade (over-receipt detection)
+  - ❌ NÃO cria exceção "Código não mapeado para SKU interno"
+- **Impact**: Notas de Encomenda com produtos novos são processadas automaticamente, sem exceções
+- **Validation**: Códigos vazios ou inválidos ainda geram exceção apropriada
+- **Database Safety**: Usa atomic get_or_create, protege unique_together constraint
+
 ### October 15, 2025 - Excel Export: Intelligent Dimension Extraction from Descriptions
 - **Feature**: Excel export agora extrai dimensões da descrição como fallback inteligente
 - **Export Columns**: Simplificado para 3 colunas essenciais:
