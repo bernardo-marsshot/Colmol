@@ -45,6 +45,47 @@ Key architectural decisions and features include:
 
 ## Recent Changes
 
+### October 15, 2025 - Normalização de Números: Milhares vs Decimais (3 Casas Decimais)
+- **Feature**: Sistema universal de normalização de números que distingue formato de milhares de decimais legítimos
+- **Função normalize_number**: Detecta automaticamente o formato correto baseado no padrão de 3 casas decimais
+  - **Milhares** (apenas zeros): ",000" → remove vírgula
+    - "2,000" → 2000.0 (dois mil)
+    - "125,000" → 125000.0 (cento e vinte e cinco mil)
+    - "640,000" → 640000.0 (seiscentos e quarenta mil)
+  - **Decimais legítimos** (não-zeros): ",XXX" → substitui vírgula por ponto
+    - "1,880" → 1.88 (um vírgula oitenta e oito)
+    - "0,150" → 0.15 (zero vírgula quinze)
+    - "1,250" → 1.25 (um vírgula vinte e cinco)
+  - **Decimais normais** (1-2 casas): substitui vírgula por ponto
+    - "2,5" → 2.5
+    - "34,00" → 34.0
+- **Aplicação Universal**: Integrada em todos os parsers principais
+  - `parse_fatura_elastron`: total, quantidade, desconto, preco_un, iva
+  - `parse_guia_colmol`: quantidade, dimensões (med1, med2, med3), peso, iva
+  - `parse_guia_generica`: quantidade (ambas as estratégias de extração)
+  - `parse_bon_commande`: preco_unitario, total_linha
+  - `parse_pedido_espanhol`: cantidad, qty_check
+- **Prompts LLM Atualizados**: Instruções claras no Groq e Ollama
+  - Regra: APENAS ",000" (três zeros) = milhares
+  - Valores como "1,880" são explicitamente descritos como decimais
+  - Evita conversões incorretas no nível de extração LLM
+- **Casos de Teste Validados**:
+  - ✅ "2,000" → 2000.0 (milhares)
+  - ✅ "125,000" → 125000.0 (milhares)
+  - ✅ "1,880" → 1.88 (decimal - dimensão)
+  - ✅ "0,150" → 0.15 (decimal - dimensão)
+  - ✅ "1,250" → 1.25 (decimal)
+  - ✅ "2,5" → 2.5 (decimal)
+  - ✅ "34,00" → 34.0 (decimal)
+- **Architect Review**: Aprovado após múltiplas iterações
+  - Eliminados bugs de truncamento e overcount
+  - Lógica robusta para todos os edge cases
+  - Prompts alinhados com comportamento da função
+- **Benefícios**: 
+  - Correção automática de quantidades em formato de milhares
+  - Preservação de dimensões e medidas com 3 casas decimais
+  - Consistência entre extração LLM e parsing Python
+
 ### October 15, 2025 - Groq API: Sistema de Fallback com Segunda Chave
 - **Feature**: Implementado sistema de fallback automático para evitar rate limits do Groq
 - **Fluxo de Extração LLM**:
