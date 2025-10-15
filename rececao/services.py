@@ -39,13 +39,11 @@ def normalize_number(value_str: str) -> float:
     """
     Normaliza valores numéricos com vírgula, detectando formato de milhares vs decimais.
     
-    Regras:
-    - 3 zeros após vírgula (",000") → formato de milhares (remover vírgula)
-      Exemplos: "2,000" → 2000.0, "125,000" → 125000.0
-    - 3 dígitos não-zeros após vírgula → formato decimal normal (substituir vírgula por ponto)
-      Exemplos: "1,880" → 1.88, "0,150" → 0.15, "1,250" → 1.25
-    - 1-2 casas decimais → formato decimal normal (substituir vírgula por ponto)
-      Exemplos: "2,5" → 2.5, "34,00" → 34.0, "1,88" → 1.88
+    Regras baseadas no NÚMERO DE DÍGITOS após a vírgula:
+    - 3 dígitos após vírgula → formato de milhares (remover vírgula)
+      Exemplos: "1,880" → 1880.0, "0,150" → 150.0, "2,000" → 2000.0, "125,000" → 125000.0
+    - 1-2 dígitos após vírgula → formato decimal (substituir vírgula por ponto)
+      Exemplos: "1,88" → 1.88, "2,5" → 2.5, "34,00" → 34.0
     
     Args:
         value_str: String com número (pode ter vírgula)
@@ -78,22 +76,13 @@ def normalize_number(value_str: str) -> float:
     integer_part = parts[0].replace(' ', '')
     decimal_part = parts[1].replace(' ', '')
     
-    # Se tem exatamente 3 dígitos após vírgula:
-    # - Se são TODOS zeros (000) → formato de milhares: "2,000" → 2000
-    # - Se NÃO são todos zeros → decimal normal com 3 casas: "1,880" → 1.88
+    # Se tem exatamente 3 dígitos após vírgula → formato de milhares
+    # Remover vírgula completamente: "1,880" → "1880", "2,000" → "2000"
     if len(decimal_part) == 3:
-        if decimal_part == "000":
-            # Formato de milhares: "2,000" → "2000" (concatenar integer + zeros)
-            try:
-                return float(integer_part + decimal_part)
-            except ValueError:
-                return 0.0
-        else:
-            # Decimal legítimo com 3 casas: "1,880" → "1.88"
-            try:
-                return float(f"{integer_part}.{decimal_part}")
-            except ValueError:
-                return 0.0
+        try:
+            return float(integer_part + decimal_part)
+        except ValueError:
+            return 0.0
     
     # Caso contrário (1-2 dígitos) → formato decimal normal
     # Substituir vírgula por ponto: "2,5" → "2.5"
