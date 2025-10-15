@@ -18,7 +18,7 @@ Key architectural decisions and features include:
 -   **Bidirectional Document Flow**: Automatic Purchase Order creation from "Notas de Encomenda" and linking with "Guias de Remessa" for comprehensive tracking.
 -   **Advanced Illegible File Detection**: Multi-layer validation system to detect and report illegible or malformed documents, automatically creating exception tasks.
 -   **User Interface**: Dashboard for KPIs, document filtering, and an admin interface for catalog management.
--   **Deployment**: Configured for autoscale deployment.
+-   **Deployment**: Configured for Reserved VM deployment with Gunicorn WSGI server for production-grade OCR processing.
 -   **Excel Export Enhancements**: Intelligent dimension extraction from descriptions and the use of a "Mini Códigos FPOL" mapping system for standardized Excel exports.
 -   **Robustness**: Comprehensive None-safety implemented across product processing functions to handle missing product codes gracefully.
 
@@ -35,3 +35,42 @@ Key architectural decisions and features include:
     -   **pdfplumber**: Advanced PDF parsing and table detection.
     -   **rapidfuzz**: Fuzzy string matching for multi-language field detection.
 -   **Database**: SQLite (db.sqlite3).
+
+## Recent Changes
+
+### October 15, 2025 - Deployment: Reserved VM Configuration & Image Size Optimization
+- **Deployment Type**: Switched from Autoscale to Reserved VM deployment
+  - **Reason**: OCR-heavy processing with multiple engines (PaddleOCR, EasyOCR, Tesseract) better suited for persistent VM
+  - **Production Server**: Using Gunicorn WSGI server (`--bind=0.0.0.0:5000 --reuse-port`)
+  - **Benefits**: No cold starts, consistent performance, better handling of heavy OCR workloads
+- **Image Size Optimization**: Reduced deployment image size to meet requirements
+  - **Nix Packages Cleaned**: Removed 8 unnecessary/duplicate packages (22 → 14 packages)
+    - Removed: `poppler_utils` (duplicate), `taskflow`, `tcl`, `tk`, `rapidfuzz-cpp`, `libimagequant`, `libxcrypt`, `hdf5`
+    - Kept essential: `tesseract` (OCR), `poppler-utils` (PDF), `zbar` (QR codes), `libGL/libGLU` (OpenCV), image libs
+  - **`.dockerignore` Created**: Excludes cache, media, logs, and temporary files from deployment
+    - Python cache: `__pycache__/`, `*.pyc`, `.pytest_cache/`
+    - Django: `db.sqlite3`, `media/`, `*.log`
+    - Development: `.git/`, `.vscode/`, `*.md`, `attached_assets/`, demo data
+  - **Impact**: Significantly reduced deployment image size while maintaining all OCR functionality
+- **Dependencies**: Gunicorn added to `requirements.txt` for production WSGI server
+
+### October 15, 2025 - Mini Códigos FPOL: Sistema de Mapeamento para Exportação Excel
+- **Feature**: Tabela de mini códigos FPOL adicionada à base de dados para simplificar exportações Excel
+- **Modelo MiniCodigo**: Nova tabela com 177 registos importados do Excel do utilizador
+  - Campos: `familia`, `mini_codigo` (unique), `referencia`, `designacao`, `identificador` (db_index), `tipo`
+  - Mapeia códigos de fornecedor (identificador) → mini códigos simplificados
+  - Admin Django: filtros por familia/tipo, busca por mini_codigo/designacao/identificador
+- **Comando Django**: `import_mini_codigos` para importar/atualizar mini códigos de ficheiros Excel
+  - Validação: mini_codigo obrigatório, update_or_create automático
+  - Logging: progresso cada 100 registos + sumário final
+  - Teste: 177 códigos importados com sucesso
+- **Exportação Excel Modificada**: Nova hierarquia de priorização
+  - **🎯 PRIORIDADE 1**: Consulta BD usando `article_code` → `identificador`
+  - **PRIORIDADE 2**: Se não encontrar, consulta BD usando `supplier_code` → `identificador`
+  - **Fallback 3**: Mini código do payload (documento OCR)
+  - **Fallback 4**: `maybe_internal_sku`
+  - **Fallback 5**: `article_code` original
+  - **Bonus**: Se encontrar na BD e sem descrição, usa `designacao` da BD
+- **Colunas Excel**: Mini Código, Dimensões (LxCxE), Quantidade
+- **Impact**: Exportações agora usam mini códigos padronizados da BD em vez de códigos internos variáveis
+- **Performance**: Acceptable para volumes típicos (2 queries por linha), pode otimizar com cache se necessário
