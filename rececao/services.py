@@ -132,12 +132,205 @@ except ImportError:
 
 # --- LLM para Document Extraction (Groq + Ollama) ---
 
+def groq_extract_page(page_text: str, page_num: int, api_key: str):
+    """
+    Extrai produtos de uma única página usando Groq LLM.
+    
+    Args:
+        page_text: Texto OCR da página
+        page_num: Número da página (para logging)
+        api_key: Groq API key
+    
+    Returns:
+        Lista de produtos extraídos da página
+    """
+    try:
+        system_prompt = """You are a document extraction expert. Extract ALL product data from this page of an invoice, delivery note, or purchase order in Portuguese, Spanish, or French.
+
+CRITICAL: Extract EVERY product line from THIS PAGE ONLY.
+
+Return valid JSON with ONLY products list:
+{
+  "produtos": [
+    {
+      "codigo": "product code",
+      "descricao": "description",
+      "quantidade": 10.5,
+      "preco_unitario": 25.99,
+      "total": 272.40
+    }
+  ]
+}
+
+EXAMPLES:
+- Spanish: "4,00 / COLCHON TOP VISCO 135X190 / LUSTOPVS135190" → extract all 3 fields
+- Portuguese: "COLCHAO VISCO 150X190 | 2 UN | 199€" → extract code, desc, qty, price
+- French: "MATELAS 140x200 | Qté: 2 | 245€" → extract all fields
+
+Rules:
+- Extract EVERY product from this page
+- Ignore addresses, headers, footers
+- Convert quantities/prices to numbers
+- Use null for missing fields
+- If no products on this page, return empty produtos array"""
+
+        user_prompt = f"""Extract ALL products from PAGE {page_num} (PT/ES/FR):
+
+{page_text}
+
+Return JSON with produtos array."""
+
+        response = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": "llama-3.3-70b-versatile",
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                "temperature": 0.1,
+                "max_tokens": 4000,
+                "response_format": {"type": "json_object"}
+            },
+            timeout=30
+        )
+
+        if response.status_code == 200:
+            result = response.json()
+            content = result['choices'][0]['message']['content']
+            
+            page_data = json.loads(content)
+            produtos = page_data.get('produtos', [])
+            
+            if produtos:
+                print(f"✅ Groq LLM (Página {page_num}): {len(produtos)} produtos")
+            else:
+                print(f"📄 Groq LLM (Página {page_num}): sem produtos")
+            
+            return produtos
+        else:
+            print(f"⚠️ Groq HTTP {response.status_code} (Página {page_num})")
+            return []
+            
+    except Exception as e:
+        print(f"⚠️ Groq exception (Página {page_num}): {e}")
+        return []
+
+
 def groq_extract_document(file_path: str, ocr_text: str, api_key: str):
     """
     Groq LLM Document Extractor (gratuito, sem instalação)
     Usa Llama-3.3-70B para extrair dados estruturados
+    Processa página-por-página para documentos multi-página
     """
     try:
+        # Dividir texto OCR em páginas (se já temos OCR, reutiliza em vez de fazer de novo)
+        pages_data = []
+        if ocr_text and "--- Página" in ocr_text:
+            # Texto OCR já tem páginas separadas
+            page_texts = ocr_text.split("--- Página")
+            for i, page_text in enumerate(page_texts[1:], 1):  # Skip primeiro split vazio
+                # Extrair número da página e texto
+                lines = page_text.split("\n", 1)
+                if len(lines) > 1:
+                    pages_data.append({
+                        "page": i,
+                        "text": lines[1].strip(),
+                        "qr_codes": [],
+                        "ocr_engine": "Reused OCR"
+                    })
+        
+        # Fallback: se não temos páginas do OCR, extrair do PDF
+        if not pages_data and file_path.lower().endswith('.pdf'):
+            pages_data = extract_text_from_pdf_pages(file_path)
+        
+        # Processar páginas com Groq (se temos páginas disponíveis)
+        if pages_data:
+            print(f"📄 Processamento página-por-página: {len(pages_data)} páginas")
+            
+            # Processar cada página com Groq
+            all_produtos = []
+            seen_produtos = set()  # Para deduplicação
+            
+            for page_info in pages_data:
+                page_produtos = groq_extract_page(
+                    page_info['text'], 
+                    page_info['page'], 
+                    api_key
+                )
+                
+                # Deduplicar produtos (mesmo código+descrição em páginas diferentes)
+                for produto in page_produtos:
+                    codigo = produto.get('codigo', '')
+                    descricao = produto.get('descricao', '')
+                    
+                    # Criar chave única: código + primeiras palavras da descrição
+                    desc_key = ' '.join(descricao.split()[:5]) if descricao else ''
+                    produto_key = f"{codigo}|{desc_key}".lower().strip()
+                    
+                    if produto_key and produto_key not in seen_produtos:
+                        seen_produtos.add(produto_key)
+                        all_produtos.append(produto)
+                    elif produto_key in seen_produtos:
+                        print(f"⚠️ Produto duplicado ignorado: {codigo} - {desc_key}")
+            
+            # Extrair metadados da primeira página (FORA do loop)
+            metadata = {}
+            if pages_data:
+                first_page_text = pages_data[0]['text']
+                
+                # Usar Groq para extrair metadados da primeira página
+                metadata_prompt = f"""Extract document metadata from first page (PT/ES/FR):
+
+{first_page_text[:2000]}
+
+Return JSON:
+{{
+  "fornecedor": "supplier name or null",
+  "nif": "tax ID or null", 
+  "numero_documento": "document number or null",
+  "data_documento": "YYYY-MM-DD or null",
+  "numero_encomenda": "PO number or null"
+}}"""
+                
+                try:
+                    meta_response = requests.post(
+                        "https://api.groq.com/openai/v1/chat/completions",
+                        headers={
+                            "Authorization": f"Bearer {api_key}",
+                            "Content-Type": "application/json"
+                        },
+                        json={
+                            "model": "llama-3.3-70b-versatile",
+                            "messages": [
+                                {"role": "system", "content": "You extract metadata from documents."},
+                                {"role": "user", "content": metadata_prompt}
+                            ],
+                            "temperature": 0.1,
+                            "max_tokens": 500,
+                            "response_format": {"type": "json_object"}
+                        },
+                        timeout=10
+                    )
+                    
+                    if meta_response.status_code == 200:
+                        meta_result = meta_response.json()
+                        metadata = json.loads(meta_result['choices'][0]['message']['content'])
+                except:
+                    pass  # Se falhar metadados, continua com produtos
+            
+            # Combinar metadados + produtos
+            result = metadata
+            result['produtos'] = all_produtos
+            
+            print(f"✅ Groq LLM (Total): {len(all_produtos)} produtos de {len(pages_data)} páginas")
+            return result if all_produtos else None
+        
+        # Fallback: processar como texto único (backward compatibility)
         system_prompt = """You are a document extraction expert. Extract ALL product data from invoices, delivery notes, and purchase orders in Portuguese, Spanish, or French.
 
 CRITICAL: Extract EVERY product line, even if incomplete or malformed.
@@ -160,11 +353,6 @@ Return valid JSON:
   ]
 }
 
-EXAMPLES:
-- Spanish multi-line: "4,00 / COLCHON TOP VISCO 135X190 / LUSTOPVS135190" → extract all 3 fields
-- Portuguese: "COLCHAO VISCO 150X190 | 2 UN | 199€" → extract code, desc, qty, price
-- French: "MATELAS 140x200 | Qté: 2 | 245€" → extract all fields
-
 Rules:
 - Extract EVERY product, ignore addresses/headers
 - Convert quantities/prices to numbers
@@ -172,7 +360,7 @@ Rules:
 
         user_prompt = f"""Extract ALL products from this document (PT/ES/FR):
 
-{ocr_text[:3000] if ocr_text else "No OCR text"}
+{ocr_text[:10000] if ocr_text else "No OCR text"}
 
 Return complete JSON with ALL products."""
 
@@ -699,6 +887,116 @@ def detect_and_read_qrcodes(image, page_number=None):
         return result
     except Exception as e:
         print(f"⚠️ QR erro: {e}")
+        return []
+
+
+def extract_text_from_pdf_pages(file_path: str):
+    """
+    Extrai texto de cada página do PDF separadamente (para processamento LLM página-por-página).
+    Retorna lista de dicts: [{"page": 1, "text": "...", "qr_codes": [...]}, ...]
+    """
+    import time
+    import numpy as np
+    try:
+        paddle_ocr = get_paddle_ocr()
+        ocr_engine = "PaddleOCR" if paddle_ocr else "Tesseract"
+        
+        print(f"📄 Converter PDF → imagens (OCR com {ocr_engine})…")
+        
+        start_time = time.time()
+        pages_images = convert_from_path(file_path, dpi=300)
+        conversion_time = time.time() - start_time
+        
+        if conversion_time > 20:
+            print(f"⚠️ Conversão PDF demorou {conversion_time:.1f}s - possível ficheiro problemático")
+        
+        pages_data = []
+        
+        for i, page_img in enumerate(pages_images, 1):
+            print(f"🔍 Página {i}/{len(pages_images)} - {ocr_engine}")
+            
+            page_start = time.time()
+            
+            # QR codes da página
+            qr_codes = detect_and_read_qrcodes(page_img, page_number=i)
+            
+            # OCR da página - cascata de 3 níveis
+            page_text = ""
+            ocr_engine_used = None
+            
+            try:
+                # Nível 1: PaddleOCR
+                if paddle_ocr:
+                    try:
+                        img_array = np.array(page_img)
+                        result = paddle_ocr.ocr(img_array, cls=True)
+                        
+                        if result and result[0]:
+                            for line in result[0]:
+                                if line and len(line) >= 2:
+                                    text = line[1][0]
+                                    confidence = line[1][1]
+                                    if confidence > 0.5:
+                                        page_text += text + "\n"
+                        
+                        if page_text.strip():
+                            ocr_engine_used = "PaddleOCR"
+                    except Exception as paddle_error:
+                        print(f"⚠️ PaddleOCR falhou na página {i}, tentando EasyOCR...")
+                
+                # Nível 2: EasyOCR
+                if not page_text.strip():
+                    easy_ocr = get_easy_ocr()
+                    if easy_ocr:
+                        try:
+                            img_array = np.array(page_img)
+                            result = easy_ocr.readtext(img_array)
+                            
+                            if result:
+                                for detection in result:
+                                    text = detection[1]
+                                    confidence = detection[2]
+                                    if confidence > 0.3:
+                                        page_text += text + " "
+                                page_text = page_text.strip() + "\n"
+                            
+                            if page_text.strip():
+                                ocr_engine_used = "EasyOCR"
+                        except Exception:
+                            print(f"⚠️ EasyOCR falhou na página {i}, tentando Tesseract...")
+                
+                # Nível 3: Tesseract
+                if not page_text.strip():
+                    page_text = pytesseract.image_to_string(
+                        page_img, config="--psm 3 --oem 3 -l por", lang="por", timeout=60)
+                    if page_text.strip():
+                        ocr_engine_used = "Tesseract"
+                
+                if page_text.strip():
+                    pages_data.append({
+                        "page": i,
+                        "text": page_text.strip(),
+                        "qr_codes": qr_codes,
+                        "ocr_engine": ocr_engine_used
+                    })
+                    if ocr_engine_used:
+                        print(f"✅ Página {i} processada com {ocr_engine_used}")
+                    
+            except RuntimeError as e:
+                if "timeout" in str(e).lower():
+                    print(f"⚠️ Timeout OCR na página {i}")
+            except Exception as e:
+                print(f"⚠️ Erro OCR na página {i}: {e}")
+            
+            page_time = time.time() - page_start
+            if page_time > 10:
+                print(f"⚠️ Página {i} demorou {page_time:.1f}s")
+        
+        print(f"✅ OCR completo: {len(pages_data)} páginas extraídas")
+        return pages_data
+        
+    except Exception as e:
+        print(f"❌ OCR PDF erro: {e}")
         return []
 
 
@@ -2523,12 +2821,13 @@ def create_po_from_nota_encomenda(inbound: InboundDocument, payload: dict):
 
 @transaction.atomic
 def process_inbound(inbound: InboundDocument):
-    # Estratégia híbrida: OCR rápido + Ollama pós-processamento
+    # Estratégia híbrida: OCR página-por-página + LLM pós-processamento
     # 1. Primeiro: OCR rápido para obter texto (sempre disponível)
     ocr_payload = real_ocr_extract(inbound.file.path)
     ocr_text = ocr_payload.get('texto_completo', '')
     
-    # 2. Depois: Tentar Ollama com texto OCR como contexto (melhora precisão)
+    # 2. Depois: Tentar LLM (Groq/Ollama) com texto OCR como contexto
+    # Para PDFs multi-página, groq_extract_document faz OCR interno página-por-página
     ollama_data = ollama_extract_document(inbound.file.path, ocr_text=ocr_text)
     
     if ollama_data and ollama_data.get('produtos'):
