@@ -146,6 +146,11 @@ def ollama_extract_document(file_path: str, ocr_text: str = None):
     Returns:
         dict com metadados + produtos ou None se falhar
     """
+    # Verificar se requests está disponível
+    if not OCR_SPACE_AVAILABLE:
+        print("⚠️ requests não disponível - Ollama desabilitado")
+        return None
+    
     ollama_url = os.environ.get('OLLAMA_API_URL')
     ollama_model = os.environ.get('OLLAMA_MODEL', 'llama3.2-vision')  # Default vision model
     
