@@ -34,6 +34,74 @@ except ImportError:
 # Se precisares especificar o caminho do tesseract no Windows:
 # pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
+# --- Normalização de números (3 casas decimais = milhares) ---
+def normalize_number(value_str: str) -> float:
+    """
+    Normaliza valores numéricos com vírgula, detectando formato de milhares vs decimais.
+    
+    Regras:
+    - 3 zeros após vírgula (",000") → formato de milhares (remover vírgula)
+      Exemplos: "2,000" → 2000.0, "125,000" → 125000.0
+    - 3 dígitos não-zeros após vírgula → formato decimal normal (substituir vírgula por ponto)
+      Exemplos: "1,880" → 1.88, "0,150" → 0.15, "1,250" → 1.25
+    - 1-2 casas decimais → formato decimal normal (substituir vírgula por ponto)
+      Exemplos: "2,5" → 2.5, "34,00" → 34.0, "1,88" → 1.88
+    
+    Args:
+        value_str: String com número (pode ter vírgula)
+    
+    Returns:
+        float: Valor numérico convertido corretamente
+    """
+    if not value_str or not isinstance(value_str, str):
+        return 0.0
+    
+    # Remover espaços
+    value_str = value_str.strip()
+    
+    # Se não tem vírgula, converter diretamente
+    if ',' not in value_str:
+        try:
+            return float(value_str.replace(' ', ''))
+        except ValueError:
+            return 0.0
+    
+    # Detectar quantas casas decimais após a vírgula
+    parts = value_str.split(',')
+    if len(parts) != 2:
+        # Múltiplas vírgulas ou formato inválido
+        try:
+            return float(value_str.replace(',', '').replace(' ', ''))
+        except ValueError:
+            return 0.0
+    
+    integer_part = parts[0].replace(' ', '')
+    decimal_part = parts[1].replace(' ', '')
+    
+    # Se tem exatamente 3 dígitos após vírgula:
+    # - Se são TODOS zeros (000) → formato de milhares: "2,000" → 2000
+    # - Se NÃO são todos zeros → decimal normal com 3 casas: "1,880" → 1.88
+    if len(decimal_part) == 3:
+        if decimal_part == "000":
+            # Formato de milhares: "2,000" → "2000" (concatenar integer + zeros)
+            try:
+                return float(integer_part + decimal_part)
+            except ValueError:
+                return 0.0
+        else:
+            # Decimal legítimo com 3 casas: "1,880" → "1.88"
+            try:
+                return float(f"{integer_part}.{decimal_part}")
+            except ValueError:
+                return 0.0
+    
+    # Caso contrário (1-2 dígitos) → formato decimal normal
+    # Substituir vírgula por ponto: "2,5" → "2.5"
+    try:
+        return float(f"{integer_part}.{decimal_part}")
+    except ValueError:
+        return 0.0
+
 # --- OCR.space API (Level 0 - Cloud OCR com 25k req/mês grátis) ---
 try:
     import requests
@@ -183,6 +251,21 @@ QUANTITY EXTRACTION RULES (CRITICAL):
   - If pattern is [decimal] [unit] [DECIMAL >3 OR with comma] → Normal format, use first decimal as quantity
   - If just [quantity] [unit] [price] → Standard format
 
+NUMBER FORMATTING (CRITICAL):
+⚠️ Values with ",000" (three zeros) = thousands format:
+  - "2,000" → 2000 (two thousand, NOT two point zero)
+  - "125,000" → 125000 (one hundred twenty-five thousand)
+  - "640,000" → 640000 (six hundred forty thousand)
+⚠️ Values with 3 non-zero decimal places = normal decimals:
+  - "1,880" → 1.88 (one point eighty-eight meters, NOT one thousand eight hundred eighty)
+  - "0,150" → 0.15 (zero point fifteen meters)
+  - "1,250" → 1.25 (one point two five, NOT one thousand two hundred fifty)
+⚠️ Values with 1-2 decimal places = normal decimals:
+  - "2,5" → 2.5 (two point five)
+  - "34,00" → 34.0 (thirty-four point zero)
+
+Rule: ONLY when the 3 digits after comma are "000", treat as thousands. Otherwise, treat as normal decimal.
+
 EXAMPLES (quantity extraction):
 ✅ Correct Elastron (ignore volume):
 - "34,00 ML 1 3,99" → quantidade=34.0 (ignore "1" = volume)
@@ -327,6 +410,21 @@ ALWAYS return valid JSON with this exact structure:
   ],
   "total_geral": 272.40
 }
+
+NUMBER FORMATTING (CRITICAL):
+⚠️ Values with ",000" (three zeros) = thousands format:
+  - "2,000" → 2000 (two thousand, NOT two point zero)
+  - "125,000" → 125000 (one hundred twenty-five thousand)
+  - "640,000" → 640000 (six hundred forty thousand)
+⚠️ Values with 3 non-zero decimal places = normal decimals:
+  - "1,880" → 1.88 (one point eighty-eight meters, NOT one thousand eight hundred eighty)
+  - "0,150" → 0.15 (zero point fifteen meters)
+  - "1,250" → 1.25 (one point two five, NOT one thousand two hundred fifty)
+⚠️ Values with 1-2 decimal places = normal decimals:
+  - "2,5" → 2.5 (two point five)
+  - "34,00" → 34.0 (thirty-four point zero)
+
+Rule: ONLY when the 3 digits after comma are "000", treat as thousands. Otherwise, treat as normal decimal.
 
 EXAMPLES:
 
@@ -1139,14 +1237,14 @@ def parse_fatura_elastron(text: str):
                     continue
                 
                 # Campos antes da unidade: TOTAL VOL QUANT DESC
-                total = float(parts[0].replace(',', '.'))
+                total = normalize_number(parts[0])
                 volume = int(parts[1]) if parts[1].isdigit() else 1
-                quantidade = float(parts[2].replace(',', '.'))
-                desconto = float(parts[3].replace(',', '.'))
+                quantidade = normalize_number(parts[2])
+                desconto = normalize_number(parts[3])
                 
                 # Campos depois da unidade: PRECO IVA LOTE ... DESCRICAO
-                preco_un = float(parts[unidade_idx + 1].replace(',', '.')) if unidade_idx + 1 < len(parts) else 0.0
-                iva = float(parts[unidade_idx + 2].replace(',', '.')) if unidade_idx + 2 < len(parts) else 23.0
+                preco_un = normalize_number(parts[unidade_idx + 1]) if unidade_idx + 1 < len(parts) else 0.0
+                iva = normalize_number(parts[unidade_idx + 2]) if unidade_idx + 2 < len(parts) else 23.0
                 
                 # Lote e descrição
                 lote = ""
@@ -1231,13 +1329,13 @@ def parse_guia_colmol(text: str):
                     while j < len(parts) and not re.match(r'^\d+[.,]\d+$', parts[j]):
                         j += 1
                     
-                    quantidade = float(parts[j].replace(',', '.')) if j < len(parts) else 0.0
+                    quantidade = normalize_number(parts[j]) if j < len(parts) else 0.0
                     unidade = parts[j+1] if j+1 < len(parts) else "UN"
-                    med1 = float(parts[j+2].replace(',', '.')) if j+2 < len(parts) else 0.0
-                    med2 = float(parts[j+3].replace(',', '.')) if j+3 < len(parts) else 0.0
-                    med3 = float(parts[j+4].replace(',', '.')) if j+4 < len(parts) else 0.0
-                    peso = float(parts[j+5].replace(',', '.')) if j+5 < len(parts) else 0.0
-                    iva = float(parts[j+6].replace(',', '.')) if j+6 < len(parts) else 23.0
+                    med1 = normalize_number(parts[j+2]) if j+2 < len(parts) else 0.0
+                    med2 = normalize_number(parts[j+3]) if j+3 < len(parts) else 0.0
+                    med3 = normalize_number(parts[j+4]) if j+4 < len(parts) else 0.0
+                    peso = normalize_number(parts[j+5]) if j+5 < len(parts) else 0.0
+                    iva = normalize_number(parts[j+6]) if j+6 < len(parts) else 23.0
                     
                     produtos.append({
                         "referencia_ordem": f"{current_encomenda} / Req {current_requisicao}",
@@ -1317,18 +1415,8 @@ def parse_guia_generica(text: str):
                 print(f"✅ Parser genérico Estratégia 1: {codigo} | {descricao} | {quantidade_str} {unidade}")
                 
                 try:
-                    # Converter quantidade (formato PT: 125,000 ou 125.000)
-                    if ',' in quantidade_str:
-                        # Formato 125,000 (europeu com vírgula decimal)
-                        quantidade = float(quantidade_str.replace('.', '').replace(',', '.'))
-                    else:
-                        # Formato 125.000 (milhares) ou 125 (inteiro)
-                        if quantidade_str.count('.') == 1 and len(quantidade_str.split('.')[1]) == 3:
-                            # 125.000 (milhares) → 125000
-                            quantidade = float(quantidade_str.replace('.', ''))
-                        else:
-                            # 125.5 (decimal) → 125.5
-                            quantidade = float(quantidade_str)
+                    # Usar função de normalização (3 casas decimais = milhares)
+                    quantidade = normalize_number(quantidade_str)
                     
                     dims = ""
                     dim_match = re.search(r'(\d{3,4})[xX×](\d{3,4})[xX×](\d{3,4})', descricao)
@@ -1370,10 +1458,7 @@ def parse_guia_generica(text: str):
             unidade = produto_match.group(4).strip().upper()
             
             try:
-                if ',' in quantidade_str:
-                    quantidade = float(quantidade_str.replace('.', '').replace(',', '.'))
-                else:
-                    quantidade = float(quantidade_str.replace(',', ''))
+                quantidade = normalize_number(quantidade_str)
             except ValueError:
                 continue
             
@@ -1570,12 +1655,12 @@ def parse_bon_commande(text: str):
             if match:
                 designacao = match.group(1).strip()
                 quantidade = int(match.group(2))
-                preco_str = match.group(3).replace(',', '.')
-                total_str = match.group(4).replace(',', '.')
+                preco_str = match.group(3)
+                total_str = match.group(4)
                 
                 try:
-                    preco_unitario = float(preco_str)
-                    total_linha = float(total_str)
+                    preco_unitario = normalize_number(preco_str)
+                    total_linha = normalize_number(total_str)
                     
                     # Extrair dimensões da designação se existirem
                     dims = ""
@@ -1692,7 +1777,7 @@ def parse_pedido_espanhol(text: str):
                 
                 # 3. Quantidade não pode ser muito alta (evita telefones/códigos postais)
                 try:
-                    qty_check = float(line1.replace(',', '.'))
+                    qty_check = normalize_number(line1)
                     if qty_check > 100:  # Produtos geralmente < 100 unidades
                         i += 1
                         continue
@@ -1718,10 +1803,10 @@ def parse_pedido_espanhol(text: str):
                 if match2:
                     codigo = match2.group(1)
                     descripcion = match2.group(2).strip()
-                    cantidad_str = match2.group(3).replace(',', '.')
+                    cantidad_str = match2.group(3)
                     
                     try:
-                        cantidad = float(cantidad_str)
+                        cantidad = normalize_number(cantidad_str)
                         
                         # Extrair dimensões
                         dims = ""
