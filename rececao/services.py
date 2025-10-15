@@ -132,10 +132,13 @@ except ImportError:
 
 # --- LLM para Document Extraction (Groq + Ollama) ---
 
-def groq_extract_document(file_path: str, ocr_text: str, api_key: str):
+def groq_extract_document(file_path: str, ocr_text: str, api_key: str, key_name: str = "GROQ_API_KEY"):
     """
     Groq LLM Document Extractor (gratuito, sem instalação)
     Usa Llama-3.3-70B para extrair dados estruturados
+    
+    Returns:
+        tuple: (extracted_data, status_code) ou (None, status_code) se falhar
     """
     try:
         system_prompt = """You are a document extraction expert. Extract ALL product data from invoices, delivery notes, and purchase orders in Portuguese, Spanish, or French.
@@ -236,15 +239,15 @@ Return complete JSON with ALL products."""
             
             extracted_data = json.loads(content)
             produtos_count = len(extracted_data.get('produtos', []))
-            print(f"✅ Groq LLM: {produtos_count} produtos extraídos")
-            return extracted_data
+            print(f"✅ Groq LLM ({key_name}): {produtos_count} produtos extraídos")
+            return extracted_data, 200
         else:
-            print(f"⚠️ Groq HTTP {response.status_code}")
-            return None
+            print(f"⚠️ Groq HTTP {response.status_code} ({key_name})")
+            return None, response.status_code
             
     except Exception as e:
-        print(f"⚠️ Groq exception: {e}")
-        return None
+        print(f"⚠️ Groq exception ({key_name}): {e}")
+        return None, 500
 
 def ollama_extract_document(file_path: str, ocr_text: str = None):
     """
@@ -265,12 +268,30 @@ def ollama_extract_document(file_path: str, ocr_text: str = None):
         print("⚠️ requests não disponível - LLM desabilitado")
         return None
     
-    # Tentar Groq primeiro (gratuito, sem instalação)
+    # Tentar Groq primeiro com chave primária
     groq_key = os.environ.get('GROQ_API_KEY')
     if groq_key:
-        groq_result = groq_extract_document(file_path, ocr_text, groq_key)
+        print("🔑 Tentando Groq com chave primária (GROQ_API_KEY)...")
+        groq_result, status_code = groq_extract_document(file_path, ocr_text, groq_key, "GROQ_API_KEY")
+        
+        # Se sucesso, retornar resultado
         if groq_result and groq_result.get('produtos'):
             return groq_result
+        
+        # Se erro 429 (rate limit), tentar segunda chave
+        if status_code == 429:
+            groq_key_2 = os.environ.get('GROQ_API_KEY_2')
+            if groq_key_2:
+                print("🔄 Rate limit na chave primária - tentando chave secundária (GROQ_API_KEY_2)...")
+                groq_result_2, status_code_2 = groq_extract_document(file_path, ocr_text, groq_key_2, "GROQ_API_KEY_2")
+                
+                if groq_result_2 and groq_result_2.get('produtos'):
+                    return groq_result_2
+                
+                print(f"⚠️ Groq chave secundária também falhou (status {status_code_2})")
+            else:
+                print("⚠️ GROQ_API_KEY_2 não configurada - sem fallback disponível")
+        
         print("⚠️ Groq falhou ou sem produtos - tentando Ollama fallback")
     
     # Fallback: Ollama (se configurado)

@@ -30,13 +30,37 @@ Key architectural decisions and features include:
     -   **Tesseract OCR**: Final local fallback (Level 3) with Portuguese language pack.
 -   **Large Language Model**:
     -   **Groq API**: Utilizes Llama-3.3-70B for universal, fast, multi-language document text structuring into JSON.
+    -   **Groq Fallback**: Sistema de fallback com segunda chave (GROQ_API_KEY_2) para evitar rate limits.
 -   **Universal Extraction Tools**:
     -   **Camelot-py**: PDF table extraction (lattice/stream modes).
     -   **pdfplumber**: Advanced PDF parsing and table detection.
     -   **rapidfuzz**: Fuzzy string matching for multi-language field detection.
 -   **Database**: SQLite (db.sqlite3).
 
+## Environment Variables
+-   **GROQ_API_KEY**: Chave primária para API Groq (obrigatória para extração LLM)
+-   **GROQ_API_KEY_2**: Chave secundária para fallback automático quando a primária retornar erro 429 (rate limit)
+-   **OLLAMA_API_URL**: URL da API Ollama (opcional, usado como fallback final se Groq falhar)
+-   **OLLAMA_MODEL**: Modelo Ollama a usar (padrão: llama3.2-vision)
+
 ## Recent Changes
+
+### October 15, 2025 - Groq API: Sistema de Fallback com Segunda Chave
+- **Feature**: Implementado sistema de fallback automático para evitar rate limits do Groq
+- **Fluxo de Extração LLM**:
+  1. **GROQ_API_KEY** (chave primária) - primeira tentativa
+  2. **GROQ_API_KEY_2** (chave secundária) - ativada automaticamente se status 429 (rate limit)
+  3. **Ollama** - fallback final se ambas as chaves falharem
+- **Modificações**:
+  - `groq_extract_document`: Agora retorna tupla `(extracted_data, status_code)` para detectar erros 429
+  - `ollama_extract_document`: Lógica de fallback inteligente com tentativa automática da segunda chave
+  - Logs informativos mostram qual chave está sendo usada (GROQ_API_KEY vs GROQ_API_KEY_2)
+- **Configuração**: Definir variável de ambiente `GROQ_API_KEY_2` com segunda chave da Groq
+- **Benefícios**: 
+  - Elimina interrupções por rate limits
+  - Duplica a capacidade de processamento
+  - Mantém compatibilidade total com código existente
+- **Architect Review**: Aprovado - sem regressões de compatibilidade detectadas
 
 ### October 15, 2025 - Bug Fix: Extração de Quantidade - Elastron vs Eurospuma (Solução Universal)
 - **Problem**: 
