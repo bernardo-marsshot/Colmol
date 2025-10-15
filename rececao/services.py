@@ -130,6 +130,190 @@ try:
 except ImportError:
     RAPIDFUZZ_AVAILABLE = False
 
+# --- Funções de Filtragem Inteligente de Texto para LLM ---
+
+def remove_repetitive_content(text: str, threshold: int = 3):
+    """
+    Remove linhas repetitivas (cabeçalhos/rodapés de páginas) para economizar tokens.
+    
+    Args:
+        text: Texto completo do OCR
+        threshold: Número mínimo de repetições para considerar como repetitivo
+    
+    Returns:
+        Texto limpo sem repetições excessivas
+    """
+    lines = text.split('\n')
+    line_counts = {}
+    
+    # Conta quantas vezes cada linha aparece
+    for line in lines:
+        cleaned = line.strip()
+        if len(cleaned) > 10:  # Ignora linhas muito curtas
+            line_counts[cleaned] = line_counts.get(cleaned, 0) + 1
+    
+    # Identifica linhas repetitivas (aparecem 3+ vezes)
+    repetitive_lines = {line for line, count in line_counts.items() if count >= threshold}
+    
+    if repetitive_lines:
+        print(f"🧹 Removendo {len(repetitive_lines)} linhas repetitivas (cabeçalhos/rodapés)")
+    
+    # Reconstrói o texto mantendo apenas primeira ocorrência de linhas repetitivas
+    seen_repetitive = set()
+    cleaned_lines = []
+    
+    for line in lines:
+        cleaned = line.strip()
+        if cleaned in repetitive_lines:
+            if cleaned not in seen_repetitive:
+                cleaned_lines.append(line)
+                seen_repetitive.add(cleaned)
+        else:
+            cleaned_lines.append(line)
+    
+    return '\n'.join(cleaned_lines)
+
+
+def extract_product_sections(text: str):
+    """
+    Identifica e extrai seções do texto que contêm produtos.
+    
+    Usa heurísticas para detectar:
+    - Palavras-chave de produtos (código, artigo, quantidade, preço)
+    - Padrões numéricos (códigos de produto, quantidades, valores)
+    - Linhas de tabela
+    
+    Returns:
+        Texto contendo apenas seções relevantes com produtos
+    """
+    lines = text.split('\n')
+    
+    # Palavras-chave que indicam presença de produtos (multi-idioma)
+    product_keywords = [
+        'artigo', 'codigo', 'código', 'ref', 'referencia', 'referência',
+        'descricao', 'descrição', 'description', 'designation', 'descripcion',
+        'quantidade', 'qtd', 'qty', 'quant', 'unidades', 'cantidad', 'qté',
+        'preco', 'preço', 'price', 'precio', 'prix', 'unitario', 'unitário',
+        'total', 'subtotal', 'iva', 'vat', 'colchao', 'colchón', 'matelas',
+        'sommier', 'almofada', 'base', 'estrado'
+    ]
+    
+    # Identifica linhas que provavelmente contêm produtos
+    product_line_scores = []
+    for i, line in enumerate(lines):
+        score = 0
+        line_lower = line.lower()
+        
+        # Score baseado em palavras-chave
+        for keyword in product_keywords:
+            if keyword in line_lower:
+                score += 2
+        
+        # Score baseado em padrões numéricos (códigos, quantidades, preços)
+        # Padrão: código alfanumérico (ex: LU150190, VISCO140)
+        if re.search(r'\b[A-Z]{2,}[0-9]{3,}\b', line):
+            score += 3
+        
+        # Padrão: dimensões (ex: 150x190, 140X200)
+        if re.search(r'\d{2,3}\s*[xX]\s*\d{2,3}', line):
+            score += 2
+        
+        # Padrão: quantidade com decimais (ex: 2,00 ou 10.5)
+        if re.search(r'\b\d+[,.]\d{2}\b', line):
+            score += 1
+        
+        # Padrão: valores monetários (ex: 199,00€ ou 245.50)
+        if re.search(r'\d+[,.]\d{2}\s*€?', line):
+            score += 1
+        
+        # Linhas com separadores (tabelas)
+        if '|' in line or '\t' in line:
+            score += 1
+        
+        product_line_scores.append((i, score, line))
+    
+    # Extrai seções com score >= 2 (alta probabilidade de conter produtos)
+    product_sections = []
+    current_section = []
+    in_product_section = False
+    
+    for i, score, line in product_line_scores:
+        if score >= 2:
+            if not in_product_section:
+                # Inclui 2 linhas de contexto antes
+                start_idx = max(0, i - 2)
+                for j in range(start_idx, i):
+                    current_section.append(product_line_scores[j][2])
+                in_product_section = True
+            current_section.append(line)
+        elif in_product_section:
+            # Mantém até 3 linhas após última linha de produto (contexto)
+            if len(current_section) > 0:
+                current_section.append(line)
+                if score == 0 and len(current_section) >= 3:
+                    product_sections.append('\n'.join(current_section))
+                    current_section = []
+                    in_product_section = False
+    
+    # Adiciona última seção se existir
+    if current_section:
+        product_sections.append('\n'.join(current_section))
+    
+    result = '\n\n'.join(product_sections)
+    
+    if result.strip():
+        reduction = ((len(text) - len(result)) / len(text)) * 100
+        print(f"📊 Filtragem inteligente: {len(text)} → {len(result)} chars ({reduction:.1f}% redução)")
+    
+    return result if result.strip() else text
+
+
+def smart_text_truncate(text: str, max_chars: int = 12000):
+    """
+    Trunca texto priorizando metadados importantes e seções de produtos.
+    
+    Estratégia:
+    1. Extrai primeiras 500 chars (metadados: fornecedor, documento, data)
+    2. Remove conteúdo repetitivo
+    3. Extrai seções com produtos
+    4. Trunca ao limite mantendo contexto completo
+    
+    Args:
+        text: Texto completo do OCR
+        max_chars: Limite máximo de caracteres
+    
+    Returns:
+        Texto otimizado para envio ao LLM
+    """
+    if len(text) <= max_chars:
+        return text
+    
+    print(f"📏 Texto muito longo ({len(text)} chars) - aplicando truncamento inteligente...")
+    
+    # 1. Extrai metadados importantes (primeiras linhas)
+    metadata_section = '\n'.join(text.split('\n')[:20])
+    
+    # 2. Remove conteúdo repetitivo do resto do texto
+    remaining_text = '\n'.join(text.split('\n')[20:])
+    cleaned_text = remove_repetitive_content(remaining_text)
+    
+    # 3. Extrai seções com produtos
+    product_sections = extract_product_sections(cleaned_text)
+    
+    # 4. Combina metadata + produtos respeitando o limite
+    combined = f"{metadata_section}\n\n{product_sections}"
+    
+    if len(combined) > max_chars:
+        # Se ainda exceder, trunca produtos mas mantém metadata
+        available_for_products = max_chars - len(metadata_section) - 10
+        truncated_products = product_sections[:available_for_products]
+        combined = f"{metadata_section}\n\n{truncated_products}"
+        print(f"⚠️ Produtos truncados para caber em {max_chars} chars")
+    
+    print(f"✅ Texto otimizado: {len(text)} → {len(combined)} chars")
+    return combined
+
+
 # --- LLM para Document Extraction (Groq + Ollama) ---
 
 def groq_extract_document(file_path: str, ocr_text: str, api_key: str):
@@ -138,6 +322,12 @@ def groq_extract_document(file_path: str, ocr_text: str, api_key: str):
     Usa Llama-3.3-70B para extrair dados estruturados
     """
     try:
+        # Aplicar filtragem inteligente ao texto OCR antes de enviar ao LLM
+        if ocr_text:
+            optimized_text = smart_text_truncate(ocr_text, max_chars=12000)
+        else:
+            optimized_text = "No OCR text"
+        
         system_prompt = """You are a document extraction expert. Extract ALL product data from invoices, delivery notes, and purchase orders in Portuguese, Spanish, or French.
 
 CRITICAL: Extract EVERY product line, even if incomplete or malformed.
@@ -172,7 +362,7 @@ Rules:
 
         user_prompt = f"""Extract ALL products from this document (PT/ES/FR):
 
-{ocr_text[:3000] if ocr_text else "No OCR text"}
+{optimized_text}
 
 Return complete JSON with ALL products."""
 
@@ -189,7 +379,7 @@ Return complete JSON with ALL products."""
                     {"role": "user", "content": user_prompt}
                 ],
                 "temperature": 0.1,
-                "max_tokens": 4000,
+                "max_tokens": 8000,
                 "response_format": {"type": "json_object"}
             },
             timeout=30
@@ -296,8 +486,12 @@ Rules:
 - Use null for missing fields
 - Return ONLY the JSON, no markdown, no explanations"""
 
-        # Preparar preview do texto OCR (sem backslash em f-string)
-        ocr_preview = f"OCR Text:\n{ocr_text[:2000]}" if ocr_text else "No OCR text - analyze image directly"
+        # Aplicar filtragem inteligente ao texto OCR antes de enviar ao LLM
+        if ocr_text:
+            optimized_text = smart_text_truncate(ocr_text, max_chars=12000)
+            ocr_preview = f"OCR Text:\n{optimized_text}"
+        else:
+            ocr_preview = "No OCR text - analyze image directly"
         
         user_prompt = f"""Extract ALL product data from this document.
 
@@ -322,7 +516,7 @@ IMPORTANT:
             "format": "json",  # Force JSON output
             "options": {
                 "temperature": 0.1,  # Baixa criatividade para dados estruturados
-                "num_predict": 4000,  # Tokens para documentos muito grandes
+                "num_predict": 8000,  # Tokens aumentados para capturar todos os produtos
                 "top_p": 0.9
             }
         }
