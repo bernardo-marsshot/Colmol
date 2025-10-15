@@ -159,17 +159,19 @@ def ollama_extract_document(file_path: str, ocr_text: str = None):
         return None
     
     try:
-        # Prompt estruturado para extração multi-idioma (PT/ES/FR)
-        system_prompt = """You are a document extraction expert. Extract structured data from invoices, delivery notes, and purchase orders in Portuguese, Spanish, or French.
+        # Prompt melhorado com exemplos concretos PT/ES/FR
+        system_prompt = """You are a document extraction expert. Extract ALL product data from invoices, delivery notes, and purchase orders in Portuguese, Spanish, or French.
+
+CRITICAL: Extract EVERY product line, even if incomplete or malformed.
 
 ALWAYS return valid JSON with this exact structure:
 {
-  "fornecedor": "supplier name",
-  "nif": "tax ID",
-  "numero_documento": "document number",
-  "data_documento": "YYYY-MM-DD",
-  "numero_encomenda": "purchase order number",
-  "iban": "bank account",
+  "fornecedor": "supplier name or null",
+  "nif": "tax ID or null",
+  "numero_documento": "document number or null",
+  "data_documento": "YYYY-MM-DD or null",
+  "numero_encomenda": "PO number or null",
+  "iban": "bank account or null",
   "produtos": [
     {
       "codigo": "product code/SKU",
@@ -182,24 +184,44 @@ ALWAYS return valid JSON with this exact structure:
   "total_geral": 272.40
 }
 
+EXAMPLES:
+
+Portuguese document:
+COLCHAO VISCO 150X190 | 2 UN | 199.00€ | 398.00€
+→ {"codigo": "VISCO150", "descricao": "COLCHAO VISCO 150X190", "quantidade": 2, "preco_unitario": 199.00, "total": 398.00}
+
+Spanish document (multi-line):
+4,00
+COLCHON TOP VISCO 2019 135X190
+LUSTOPVS135190
+→ {"codigo": "LUSTOPVS135190", "descricao": "COLCHON TOP VISCO 2019 135X190", "quantidade": 4.0, "preco_unitario": null, "total": null}
+
+French document:
+MATELAS SAN REMO 140X200 | Qté: 2 | PU: 245,00€ | Total: 490,00€
+→ {"codigo": "SANREMO140", "descricao": "MATELAS SAN REMO 140X200", "quantidade": 2, "preco_unitario": 245.00, "total": 490.00}
+
 Rules:
-- Extract ALL products from tables
-- Convert quantities/prices to numbers
+- Extract EVERY product, even if some fields are missing
+- Products can be in tables, lists, or multi-line format
+- Ignore addresses, headers, footers - ONLY extract products
+- Convert all quantities/prices to numbers (replace comma with dot)
 - Use null for missing fields
-- Maintain original language in descriptions
-- Return ONLY the JSON, no explanations"""
+- Return ONLY the JSON, no markdown, no explanations"""
 
         # Preparar preview do texto OCR (sem backslash em f-string)
-        ocr_preview = f"OCR Text Preview:\n{ocr_text[:1500]}" if ocr_text else "No OCR text provided - analyze image"
+        ocr_preview = f"OCR Text:\n{ocr_text[:2000]}" if ocr_text else "No OCR text - analyze image directly"
         
-        user_prompt = f"""Extract all data from this document.
+        user_prompt = f"""Extract ALL product data from this document.
 
-Document type: Invoice/Delivery Note/Purchase Order
-Expected format: Tabular data with products
+Document type: Invoice/Delivery Note/Purchase Order (PT/ES/FR)
 
 {ocr_preview}
 
-Return the complete JSON structure with all products."""
+IMPORTANT:
+- Extract EVERY product, even if data is incomplete or spread across multiple lines
+- Look for patterns: quantities + descriptions + codes
+- Ignore addresses, legal text, headers/footers
+- Return complete JSON with ALL products found"""
 
         # Preparar request para Ollama
         payload = {
@@ -212,7 +234,8 @@ Return the complete JSON structure with all products."""
             "format": "json",  # Force JSON output
             "options": {
                 "temperature": 0.1,  # Baixa criatividade para dados estruturados
-                "num_predict": 2000  # Tokens suficientes para documentos grandes
+                "num_predict": 4000,  # Tokens para documentos muito grandes
+                "top_p": 0.9
             }
         }
         
@@ -233,6 +256,10 @@ Return the complete JSON structure with all products."""
         
         # Chamar Ollama API
         print(f"🤖 Ollama ({ollama_model}): processando documento...")
+        print(f"   URL: {ollama_url}/api/chat")
+        print(f"   OCR context: {len(ocr_text) if ocr_text else 0} chars")
+        print(f"   Timeout: 60s")
+        
         response = requests.post(
             f"{ollama_url}/api/chat",
             json=payload,
