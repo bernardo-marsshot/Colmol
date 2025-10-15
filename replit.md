@@ -35,18 +35,6 @@ Key architectural decisions and features include:
 
 ## Recent Changes
 
-### October 15, 2025 - Notas de Encomenda: Adicionar Diretamente sem Exceções de Validação
-- **Feature**: Notas de Encomenda (tipo FT) agora são adicionadas diretamente na base de dados sem validações de ficheiro ilegível
-- **Behavior Change**: Validações de qualidade (texto curto, produtos inválidos, ficheiro desformatado) são APENAS aplicadas a Guias de Remessa
-- **Notas de Encomenda (FT)**:
-  - ✅ Cria PurchaseOrder automaticamente
-  - ✅ Cria linhas de receção
-  - ✅ NÃO cria ExceptionTasks de validação
-  - ✅ Aceita qualquer formato/qualidade de ficheiro
-- **Guias de Remessa**: Mantêm todas as validações de qualidade originais
-- **Impact**: Utilizadores podem inserir Notas de Encomenda sem preocupação com exceções de ficheiro ilegível
-- **Code**: Validações agora verificam `if inbound.doc_type != 'FT'` antes de criar exceções
-
 ### October 15, 2025 - Excel Export: Intelligent Dimension Extraction from Descriptions
 - **Feature**: Excel export agora extrai dimensões da descrição como fallback inteligente
 - **Export Columns**: Simplificado para 3 colunas essenciais:

@@ -2579,61 +2579,60 @@ def process_inbound(inbound: InboundDocument):
         print(f"✅ PO {po.number if po else 'N/A'} criada")
         # CONTINUA para criar linhas de receção também!
 
-    # Validar se ficheiro é ilegível (APENAS para Guias de Remessa, NÃO para Notas de Encomenda)
-    if inbound.doc_type != 'FT':
-        texto_extraido = payload.get("texto_completo", "")
-        produtos_extraidos = payload.get("produtos", [])
-        linhas_extraidas = payload.get("lines", [])
-        
-        # Considerar ficheiro ilegível se:
-        # - Texto muito curto (<100 chars)
-        # - Documento é guia/fatura mas 0 produtos extraídos
-        doc_type = payload.get("tipo_documento", "")
-        is_document_with_products = any(x in doc_type for x in ["FATURA", "GUIA"])
-        
-        if len(texto_extraido) < 100:
-            ExceptionTask.objects.create(
-                inbound=inbound,
-                line_ref="OCR",
-                issue="Ficheiro ilegível - texto extraído muito curto (menos de 100 caracteres)"
-            )
-        elif is_document_with_products and not produtos_extraidos and not linhas_extraidas:
-            ExceptionTask.objects.create(
-                inbound=inbound,
-                line_ref="OCR",
-                issue="Ficheiro ilegível - nenhum produto foi extraído do documento"
-            )
-        
-        # Se texto pdfplumber era curto E nenhum produto foi extraído → ficheiro ilegível
-        if payload.get("baixa_qualidade_texto") and not produtos_extraidos and not linhas_extraidas:
-            ExceptionTask.objects.create(
-                inbound=inbound,
-                line_ref="OCR",
-                issue="Ficheiro ilegível - qualidade de imagem muito baixa (texto quase vazio mesmo após OCR)"
-            )
-        
-        # Validar qualidade dos produtos extraídos
-        if produtos_extraidos:
-            # Verificar se produtos têm dados válidos
-            produtos_invalidos = 0
-            for produto in produtos_extraidos:
-                codigo = produto.get('artigo') or ''
-                quantidade = produto.get('quantidade', 0)
-                
-                # Produto inválido se:
-                # - Código muito curto (<5 chars), vazio, ou None
-                # - Quantidade = 0 ou inválida
-                if not codigo or len(str(codigo)) < 5 or quantidade <= 0:
-                    produtos_invalidos += 1
+    # Validar se ficheiro é ilegível (apenas para Guias de Remessa)
+    texto_extraido = payload.get("texto_completo", "")
+    produtos_extraidos = payload.get("produtos", [])
+    linhas_extraidas = payload.get("lines", [])
+    
+    # Considerar ficheiro ilegível se:
+    # - Texto muito curto (<100 chars)
+    # - Documento é guia/fatura mas 0 produtos extraídos
+    doc_type = payload.get("tipo_documento", "")
+    is_document_with_products = any(x in doc_type for x in ["FATURA", "GUIA"])
+    
+    if len(texto_extraido) < 100:
+        ExceptionTask.objects.create(
+            inbound=inbound,
+            line_ref="OCR",
+            issue="Ficheiro ilegível - texto extraído muito curto (menos de 100 caracteres)"
+        )
+    elif is_document_with_products and not produtos_extraidos and not linhas_extraidas:
+        ExceptionTask.objects.create(
+            inbound=inbound,
+            line_ref="OCR",
+            issue="Ficheiro ilegível - nenhum produto foi extraído do documento"
+        )
+    
+    # Se texto pdfplumber era curto E nenhum produto foi extraído → ficheiro ilegível
+    if payload.get("baixa_qualidade_texto") and not produtos_extraidos and not linhas_extraidas:
+        ExceptionTask.objects.create(
+            inbound=inbound,
+            line_ref="OCR",
+            issue="Ficheiro ilegível - qualidade de imagem muito baixa (texto quase vazio mesmo após OCR)"
+        )
+    
+    # Validar qualidade dos produtos extraídos
+    if produtos_extraidos:
+        # Verificar se produtos têm dados válidos
+        produtos_invalidos = 0
+        for produto in produtos_extraidos:
+            codigo = produto.get('artigo') or ''
+            quantidade = produto.get('quantidade', 0)
             
-            # Se >50% dos produtos são inválidos, ficheiro está desformatado
-            taxa_invalidos = produtos_invalidos / len(produtos_extraidos)
-            if taxa_invalidos > 0.5:
-                ExceptionTask.objects.create(
-                    inbound=inbound,
-                    line_ref="OCR",
-                    issue=f"Ficheiro desformatado - {produtos_invalidos}/{len(produtos_extraidos)} produtos com dados inválidos (códigos curtos ou quantidades zero)"
-                )
+            # Produto inválido se:
+            # - Código muito curto (<5 chars), vazio, ou None
+            # - Quantidade = 0 ou inválida
+            if not codigo or len(str(codigo)) < 5 or quantidade <= 0:
+                produtos_invalidos += 1
+        
+        # Se >50% dos produtos são inválidos, ficheiro está desformatado
+        taxa_invalidos = produtos_invalidos / len(produtos_extraidos)
+        if taxa_invalidos > 0.5:
+            ExceptionTask.objects.create(
+                inbound=inbound,
+                line_ref="OCR",
+                issue=f"Ficheiro desformatado - {produtos_invalidos}/{len(produtos_extraidos)} produtos com dados inválidos (códigos curtos ou quantidades zero)"
+            )
 
     # criar linhas de receção
     inbound.lines.all().delete()
