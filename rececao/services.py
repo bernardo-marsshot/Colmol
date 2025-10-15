@@ -2410,28 +2410,12 @@ def process_inbound(inbound: InboundDocument):
     inbound.parsed_payload = payload
     inbound.save()
 
-    # Se for Nota de Encomenda (FT), criar PurchaseOrder e retornar
+    # Se for Nota de Encomenda (FT), criar PurchaseOrder
     if inbound.doc_type == 'FT':
         print(f"📋 Processando Nota de Encomenda: {inbound.number}")
         po = create_po_from_nota_encomenda(inbound, payload)
-        
-        # Criar MatchResult básico para Nota de Encomenda
-        res, _ = MatchResult.objects.get_or_create(inbound=inbound)
-        produtos = payload.get("produtos", payload.get("lines", []))
-        res.status = "matched"
-        res.summary = {
-            "lines_ok": len(produtos),
-            "lines_issues": 0,
-            "total_lines_in_document": len(produtos),
-            "lines_read_successfully": len(produtos),
-            "po_created": po.number if po else None
-        }
-        res.certified_id = hashlib.sha256(
-            (str(inbound.id) + str(payload)).encode()).hexdigest()[:16]
-        res.save()
-        
-        print(f"✅ Nota de Encomenda processada: PO {po.number if po else 'N/A'} criada")
-        return res
+        print(f"✅ PO {po.number if po else 'N/A'} criada")
+        # CONTINUA para criar linhas de receção também!
 
     # Validar se ficheiro é ilegível (apenas para Guias de Remessa)
     texto_extraido = payload.get("texto_completo", "")
