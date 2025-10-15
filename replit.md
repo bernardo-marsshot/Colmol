@@ -38,23 +38,35 @@ Key architectural decisions and features include:
 
 ## Recent Changes
 
-### October 15, 2025 - Bug Fix: Elastron Faturas - Corrigir Extração de Quantidade vs Volume
-- **Problem**: Fatura específica FWH_25EU_N5595 extraía valores da coluna "Vol." (volumes/rolos) em vez de "Quant." (quantidade real)
-  - Tabela Elastron: Artigo, Descrição, Lote, **Quant.**, Un., **Vol.**, Preço, Desconto, IVA, Total
-  - Exemplo: extraía "1" (volume) em vez de "34,00" (quantidade em ML)
-  - LLM confundia as duas colunas numéricas adjacentes
-- **Root Cause**: Groq LLM prompt não tinha regras para distinguir quantidade vs volumes
-- **Solution**: Prompt refinado com regras contextuais robustas (independentes de OCR perfeito):
-  - **Padrão detectado**: `[decimal] [UNIT] [small_integer] [price]` → decimal é quantidade, integer é volume
-  - **Regra contextual**: Número ANTES da unidade (ML/UN/MT) = quantidade | Número DEPOIS = volume (ignorar)
-  - **Exemplos explícitos**: ✅ "34,00 ML 1 3,99" → quantidade=34.0 (NOT 1)
-  - **Exemplos negativos**: ❌ "34,00 ML 1 3,99" → quantidade=1 ✗ (volume count, wrong!)
-  - **Proteção**: Regras aplicam-se apenas a padrão Elastron, outros docs inalterados
-- **Architect Review**: Aprovado após 3 iterações de refinamento para garantir robustez sem regressões
-- **Impact**: Faturas Elastron extraem quantidade correta mesmo com OCR parcial dos headers
-- **Testing**: Utilizador deve fazer upload de FWH_25EU_N5595 via interface web Django
-  - Esperado: quantidade=34.0, 30.8, 48.5, etc. (valores decimais corretos)
-  - Verificar que volumes (1, 2) são ignorados
+### October 15, 2025 - Bug Fix: Extração de Quantidade - Elastron vs Eurospuma (Solução Universal)
+- **Problem**: 
+  - **Elastron FWH_25EU_N5595**: Extraía valores da coluna "Vol." (volumes) em vez de "Quant." (quantidade real)
+    - Exemplo: extraía "1" (volume/rolo) em vez de "34,00 ML" (quantidade)
+  - **Eurospuma 11-082873**: Regressão após correção Elastron - extraía dimensões em vez de quantidade
+    - Exemplo: extraía "1,880" (medida) em vez de "125,000 UN" (quantidade)
+- **Root Cause**: Ambos têm números após a unidade, mas com significados diferentes:
+  - **Elastron**: `[quantidade] [unit] [VOLUME=integer 1-3] [preço]` → volume a ignorar
+  - **Eurospuma**: `[quantidade] [unit] [DIMENSÃO=decimal] [dim2] [dim3]` → dimensões a não confundir
+- **Solution Final**: Lógica de detecção por tipo de número após a unidade:
+  - **Regra Elastron** (INTEGER ≤3 após unit):
+    - Pattern: `[decimal] [UNIT] [INTEGER 1-3] [price]`
+    - Lógica: INTEGER pequeno (1, 2, 3) = volume count → **IGNORAR**
+    - Exemplo: "34,00 ML 1 3,99" → quantidade=34.0 (NOT 1)
+  - **Regra Eurospuma** (DECIMAL após unit):
+    - Pattern: `[quantidade] [UNIT] [DECIMAL dimensions...]`
+    - Lógica: DECIMAIS = dimensões/medidas → **NÃO usar como quantidade**
+    - Exemplos:
+      - "125,000 UN 1,880 0,150 0,080" → quantidade=125.0 (NOT 1.880)
+      - "640,000 MT 320,000 0,260" → quantidade=640.0 (NOT 320.0)
+  - **Regra Universal**: Quantidade é sempre o **primeiro número ANTES da unidade**
+- **Architect Review**: Aprovado - distinção clara entre INTEGER (volume) vs DECIMAL (dimensões)
+- **Impact**: 
+  - ✅ Elastron: extrai quantidade correta ignorando volumes (1-3)
+  - ✅ Eurospuma: extrai quantidade correta ignorando dimensões (decimais)
+  - ✅ Outros docs: protegidos pela regra universal "primeiro número antes da unit"
+- **Testing**:
+  - Elastron FWH_25EU_N5595: quantidade=34.0, 30.8, 104.0 (NOT 1, 1, 2)
+  - Eurospuma 11-082873: quantidade=125.0, 640.0, 300.0 (NOT 1.880, 320.0, 30.0)
 
 ### October 15, 2025 - Mini Códigos FPOL: Sistema de Mapeamento para Exportação Excel
 - **Feature**: Tabela de mini códigos FPOL adicionada à base de dados para simplificar exportações Excel
