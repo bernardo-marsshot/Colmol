@@ -1460,6 +1460,32 @@ def parse_pedido_espanhol(text: str):
                 len(line2) > 10 and  # Descrição tem texto
                 re.match(r'^[A-Z0-9]{6,}$', line3)):  # Código alfanumérico
                 
+                # VALIDAÇÕES ANTI-FALSO-POSITIVO:
+                # 1. Código não pode ser número puro (evita números de documento)
+                if re.match(r'^\d+$', line3):
+                    i += 1
+                    continue
+                
+                # 2. Código não pode começar com PT (evita NIFs portugueses)
+                if line3.startswith('PT'):
+                    i += 1
+                    continue
+                
+                # 3. Quantidade não pode ser muito alta (evita telefones/códigos postais)
+                try:
+                    qty_check = float(line1.replace(',', '.'))
+                    if qty_check > 100:  # Produtos geralmente < 100 unidades
+                        i += 1
+                        continue
+                except:
+                    pass
+                
+                # 4. Descrição não pode conter palavras de endereço
+                address_words = ['POLIGONO', 'NAVE', 'CALLE', 'RUA', 'AVENIDA', 'ZONA', 'INDUSTRIAL']
+                if any(word in line2.upper() for word in address_words):
+                    i += 1
+                    continue
+                
                 # Reconstruir linha no formato esperado: CÓDIGO DESCRIPCIÓN CANTIDAD
                 reconstructed = f"{line3} {line2} {line1}"
                 print(f"🔧 Buffer multi-linha: '{line1}' + '{line2}' + '{line3}' → '{reconstructed}'")
