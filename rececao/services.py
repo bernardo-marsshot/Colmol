@@ -7,8 +7,6 @@ import base64
 from io import BytesIO
 from PIL import Image
 import signal
-import time
-import random
 
 import PyPDF2
 import pytesseract
@@ -138,23 +136,9 @@ def groq_extract_document(file_path: str, ocr_text: str, api_key: str):
     """
     Groq LLM Document Extractor (gratuito, sem instalação)
     Usa Llama-3.3-70B para extrair dados estruturados
-    
-    Com retry automático para HTTP 429 (rate limit):
-    - Tenta até 3 vezes
-    - Espera aleatória de 60-120 segundos entre tentativas
-    - Retorna {'error': 'RATE_LIMIT_EXCEEDED'} após 3 falhas
     """
-    # Truncar texto OCR se muito longo (simplificado)
-    if ocr_text:
-        if len(ocr_text) > 12000:
-            print(f"⚠️ Texto muito longo ({len(ocr_text)} chars) - truncando para 12000")
-            optimized_text = ocr_text[:12000]
-        else:
-            optimized_text = ocr_text
-    else:
-        optimized_text = "No OCR text"
-    
-    system_prompt = """You are a document extraction expert. Extract ALL product data from invoices, delivery notes, and purchase orders in Portuguese, Spanish, or French.
+    try:
+        system_prompt = """You are a document extraction expert. Extract ALL product data from invoices, delivery notes, and purchase orders in Portuguese, Spanish, or French.
 
 CRITICAL: Extract EVERY product line, even if incomplete or malformed.
 
@@ -186,69 +170,46 @@ Rules:
 - Convert quantities/prices to numbers
 - Use null for missing fields"""
 
-    user_prompt = f"""Extract ALL products from this document (PT/ES/FR):
+        user_prompt = f"""Extract ALL products from this document (PT/ES/FR):
 
-{optimized_text}
+{ocr_text[:3000] if ocr_text else "No OCR text"}
 
 Return complete JSON with ALL products."""
 
-    # Retry com backoff para HTTP 429
-    max_retries = 3
-    for attempt in range(1, max_retries + 1):
-        try:
-            response = requests.post(
-                "https://api.groq.com/openai/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json"
-                },
-                json={
-                    "model": "llama-3.3-70b-versatile",
-                    "messages": [
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_prompt}
-                    ],
-                    "temperature": 0.1,
-                    "max_tokens": 8000,
-                    "response_format": {"type": "json_object"}
-                },
-                timeout=30
-            )
+        response = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": "llama-3.3-70b-versatile",
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                "temperature": 0.1,
+                "max_tokens": 4000,
+                "response_format": {"type": "json_object"}
+            },
+            timeout=30
+        )
 
-            if response.status_code == 200:
-                result = response.json()
-                content = result['choices'][0]['message']['content']
-                
-                extracted_data = json.loads(content)
-                produtos_count = len(extracted_data.get('produtos', []))
-                print(f"✅ Groq LLM: {produtos_count} produtos extraídos")
-                return extracted_data
+        if response.status_code == 200:
+            result = response.json()
+            content = result['choices'][0]['message']['content']
             
-            elif response.status_code == 429:
-                # Rate limit atingido
-                if attempt < max_retries:
-                    # Espera aleatória entre 60-120 segundos
-                    wait_time = random.randint(60, 120)
-                    print(f"⚠️ Groq rate limit atingido (HTTP 429)")
-                    print(f"   Aguardando {wait_time}s antes de tentar novamente (tentativa {attempt}/{max_retries})...")
-                    time.sleep(wait_time)
-                    continue
-                else:
-                    # Após 3 tentativas, retorna erro especial
-                    print(f"❌ Groq rate limit: excedido após {max_retries} tentativas")
-                    return {'error': 'RATE_LIMIT_EXCEEDED'}
+            extracted_data = json.loads(content)
+            produtos_count = len(extracted_data.get('produtos', []))
+            print(f"✅ Groq LLM: {produtos_count} produtos extraídos")
+            return extracted_data
+        else:
+            print(f"⚠️ Groq HTTP {response.status_code}")
+            return None
             
-            else:
-                print(f"⚠️ Groq HTTP {response.status_code}")
-                return None
-                
-        except Exception as e:
-            print(f"⚠️ Groq exception (tentativa {attempt}/{max_retries}): {e}")
-            if attempt >= max_retries:
-                return None
-            continue
-    
-    return None
+    except Exception as e:
+        print(f"⚠️ Groq exception: {e}")
+        return None
 
 def ollama_extract_document(file_path: str, ocr_text: str = None):
     """
@@ -273,12 +234,6 @@ def ollama_extract_document(file_path: str, ocr_text: str = None):
     groq_key = os.environ.get('GROQ_API_KEY')
     if groq_key:
         groq_result = groq_extract_document(file_path, ocr_text, groq_key)
-        
-        # Detectar erro de rate limit - não tentar fallbacks
-        if groq_result and groq_result.get('error') == 'RATE_LIMIT_EXCEEDED':
-            print("❌ Groq rate limit excedido - retornando erro sem tentar fallbacks")
-            return groq_result
-        
         if groq_result and groq_result.get('produtos'):
             return groq_result
         print("⚠️ Groq falhou ou sem produtos - tentando Ollama fallback")
@@ -2575,24 +2530,6 @@ def process_inbound(inbound: InboundDocument):
     
     # 2. Depois: Tentar Ollama com texto OCR como contexto (melhora precisão)
     ollama_data = ollama_extract_document(inbound.file.path, ocr_text=ocr_text)
-    
-    # Verificar se Groq atingiu rate limit
-    if ollama_data and ollama_data.get('error') == 'RATE_LIMIT_EXCEEDED':
-        print(f"❌ Groq API: Limite diário excedido após 3 tentativas")
-        ExceptionTask.objects.create(
-            inbound=inbound,
-            line_ref="GROQ_API",
-            issue="Excedeu o limite diário de documentos processados. Aguarde alguns minutos e tente novamente, ou processe o documento manualmente."
-        )
-        inbound.parsed_payload = {
-            "error": "RATE_LIMIT_EXCEEDED",
-            "texto_completo": ocr_text or "",
-            "tipo_documento": "ERROR",
-            "produtos": [],
-            "lines": []
-        }
-        inbound.save()
-        return
     
     if ollama_data and ollama_data.get('produtos'):
         # Ollama extraiu dados com sucesso - usar dados LLM
