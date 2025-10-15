@@ -1,31 +1,75 @@
 {
   "numero_requisicao": "",
-  "document_number": "",
-  "po_number": "",
-  "supplier_name": "Contribuinte\tData\tPágina",
-  "delivery_date": "25-10-08",
-  "qr_codes": [],
-  "produtos": [
-    
+  "document_number": "/DELIVERY",
+  "po_number": "/DELIVERY",
+  "supplier_name": "",
+  "delivery_date": "29-07-2025",
+  "qr_codes": [
     {
-      "artigo": "2025-10-17",
-      "descricao": "COLCHAO 1,95X1,40=27\"SPA CHERRY VISCO\"COLMOL\t1.000 UN",
-      "quantidade": 26.100145,
-      "preco_unitario": 0.0
+      "data": {
+        "nif_emitente": "500117063",
+        "nif_adquirente": "500248800",
+        "pais_adquirente": "PT",
+        "tipo_documento": "GR",
+        "estado_documento": "F",
+        "data_documento": "20250729",
+        "identificacao_documento": "0 GR4/0245000",
+        "atcud": "JFFWWF96-0245000",
+        "espaco_fiscal": "",
+        "total_impostos": "0.00",
+        "total_documento": "0.00",
+        "hash": "6EtK",
+        "certificado": "1767"
+      },
+      "raw_data": "A:500117063*B:500248800*C:PT*D:GR*E:F*F:20250729*G:0 GR4/0245000*H:JFFWWF96-0245000*I1:*N:0.00*O:0.00*Q:6EtK*R:1767",
+      "page": 1
     },
     {
-      "artigo": "2025-10-17",
-      "descricao": "COLCHAO 1,83X1,33=24Cm ORTOPEDICO\"KOLUNA \"COLMOL\t3.000 UN",
-      "quantidade": 26.1001,
-      "preco_unitario": 0.0
+      "data": {
+        "nif_emitente": "500117063",
+        "nif_adquirente": "500248800",
+        "pais_adquirente": "PT",
+        "tipo_documento": "GR",
+        "estado_documento": "F",
+        "data_documento": "20250729",
+        "identificacao_documento": "0 GR4/0245000",
+        "atcud": "JFFWWF96-0245000",
+        "espaco_fiscal": "",
+        "total_impostos": "0.00",
+        "total_documento": "0.00",
+        "hash": "6EtK",
+        "certificado": "1767"
+      },
+      "raw_data": "A:500117063*B:500248800*C:PT*D:GR*E:F*F:20250729*G:0 GR4/0245000*H:JFFWWF96-0245000*I1:*N:0.00*O:0.00*Q:6EtK*R:1767",
+      "page": 2
+    },
+    {
+      "data": {
+        "nif_emitente": "500117063",
+        "nif_adquirente": "500248800",
+        "pais_adquirente": "PT",
+        "tipo_documento": "GR",
+        "estado_documento": "F",
+        "data_documento": "20250729",
+        "identificacao_documento": "0 GR4/0245000",
+        "atcud": "JFFWWF96-0245000",
+        "espaco_fiscal": "",
+        "total_impostos": "0.00",
+        "total_documento": "0.00",
+        "hash": "6EtK",
+        "certificado": "1767"
+      },
+      "raw_data": "A:500117063*B:500248800*C:PT*D:GR*E:F*F:20250729*G:0 GR4/0245000*H:JFFWWF96-0245000*I1:*N:0.00*O:0.00*Q:6EtK*R:1767",
+      "page": 3
     }
   ],
+  "produtos": [],
   "lines": [],
   "totals": {
-    "total_lines": 2,
-    "total_quantity": 52.200245
+    "total_lines": 0,
+    "total_quantity": 0
   },
-  "tipo_documento": "ORDEM_COMPRA",
-  "texto_completo": "S & F\t\r\nSantos e Fernandes\t\r\nArmazém de Utilidades Porlar, Lda.\tCOLMOL - COLCHOES, SA\t\r\nZONA INDUSTRIAL CAVADAS\t\r\nR. Liberdade n.21\tAPARTADO 115\t\r\nAlgar\t\r\n3040-656 Coimbra\t3721-908 VILA CUCUJAES\t\r\nTelef.: 239802670 - Tlm.: 917594110\tPORTUGAL\t\r\nWeb: www.catalogosantosefernandes.pt\t\r\nContribuinte n° 501931414\t\r\nSociedade por Quotas - Capital Social: 399.038,31 Euros\t\r\nMatriculada na C.R.C. Coimbra sob o n° 4781\t\r\nORIGINAL\t\r\nORDEM COMPRA N° OC250000525\t\r\nFORNECEDOR CONTRIBUINTE\tDATA\tPÁGINA\t\r\n00072\t500248800\t2025-10-08\t1/1\t\r\nREFERÊNCIA\tDESCRIÇÃO\tQUANTIDADE\tP. UNITARIO\tDESC.\tLIQUIDO ENTREGA\t\r\n26.100145\tCOLCHAO 1,95X1,40=27\"SPA CHERRY VISCO\"COLMOL\t1.000 UN\t2025-10-17\t\r\n26.100100\tCOLCHAO 1,83X1,33=24Cm ORTOPEDICO\"KOLUNA \"COLMOL\t3.000 UN\t2025-10-17\t\r\nProcessado por computador - xSoft\t\r\nLOCAL DE ENTREGA:\t\r\nO Dep. Compras",
+  "tipo_documento": "GUIA_COLMOL",
+  "texto_completo": "Incoterms Carga/Pick Transporte/Shipment Vend./Vendor N.Forn./Supplier Code Código AT/AT CodePágina/Page /   3\nGuia/Delivery Note\nData/DateOriginal\nEste documento não serve de Fatura - INTERNALATCUD:\nNIF/VAT ID:\nNOME CLIENTE / CUSTOMER NAME\nNIF/VAT ID:PONTO ENVIO / SHIP TOSociedade Anonima - Capital Social 557.440,48 - Ins. na Cons. do Reg.Com.de S.J.Madra sob nº1686/990510\nPEDIDO/ORDER CÓDIGO/PART NUMBER DESCRIÇÃO/DESCRIPTION LOTE/BATCH N.SÉRIE/SERIAL NR. QUANT./QUANTITY \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n *N4/0245000*\n   1\n0 GR4/0245000\n29-07-2025\nGuia de Remessa\n6EtK-Processado por programa Certificado Nº 1767/AT\nJFFWWF96-0245000\nDAP\n168242\n4\nROAD\n17685742533\nFLEXIPOL-ESPUMAS SINTETICAS,SA\nDEVESA VELHA\n3700-122\nSÃO JOÃO DA MADEIRA\nPORTUGAL\nPT 500117063\n10000646\nCOLMOL - COLCHOES SA\nZONA INDUSTRIAL DE CAVADAS\nAP.115\n3721-908\nVILA DE CUCUJAES\nPORTUGAL\nPT 500248800\n1\nCOLMOL - COLCHOES SA\nZONA INDUSTRIAL DE CAVADAS\nAP.115\n3721-908\nVILA DE CUCUJAES\nPORTUGAL\nContinua\n3582\n3681\n3748\nNIU198008800030\nNIU198017800030\nNIU198008800020\nNIU180010300030\nNIU188014800040\nNIU198010300030\nPLACA           1980x0880x0030\nPLACA           1980x1780x0030\nPLACA     1980x0880x0020\nPLACA           1800x1030x0030\nPLACA           1880x1480x0040\nPLACA           1980x1030x0030\n23 D AZ\n23 D Az\n23 D AZ\n23 D AZ\n23 D Az\n23 D Az\n115,000\n68,000\n100,000\n6,000\n20,000\n4,000\nUN\nUN\nUN\nUN\nUN\nUN\n19593676/01\n19593676/01\n19594457/01\n19594457/01\n19594457/01\n19594457/01\n19594457/02\n19594457/02\n19594457/03\n19594457/03\n19594457/03\n19597346/01\n19597346/01\n19594454/01\n19594454/01\n19594454/01\n19594454/01\n19594454/02\n19594454/02\n19594812/01\n19594812/01\n19597068/01\n19597068/01\n19597068/01\n19597068/01\n19597068/02\n19597068/02\n19597068/02\n19597072/01\n19597076/01\n19597076/01\n19597076/01\n19597076/01\n2003238774\n2003238775\n2003245045\n2003245046\n2003245047\n2003245050\n2003245051\n2003245063\n2003245064\n2003245065\n2003245066\n2003260807\n2003260810\n2003245020\n2003245021\n2003245022\n2003245035\n2003245036\n2003245037\n2003260795\n2003263151\n2003261059\n2003261060\n2003261061\n2003261062\n2003261056\n2003261057\n2003261058\n2003261282\n2003261787\n2003261788\n2003261789\n2003261792\n8,000\n5,000\n10,000\n10,000\n10,000\n10,000\n10,000\n10,000\n10,000\n10,000\n10,000\n10,000\n2,000\n10,000\n10,000\n10,000\n10,000\n10,000\n10,000\n4,000\n4,000\n15,000\n15,000\n15,000\n10,000\n15,000\n15,000\n15,000\n6,000\n6,000\n6,000\n6,000\n2,000\nTot Volumes       13\nTot Volumes        8\nTot Volumes        7\nTot Volumes        1\nTot Volumes        4\nTot Volumes        1\nTotal Cont.:   2\nTotal Cont.:   4\nTotal Cont.:   2\nTotal Cont.:   3\nTotal Cont.:   2\nTotal Cont.:   4\nTotal Cont.:   2\nTotal Cont.:   2\nTotal Cont.:   4\nTotal Cont.:   3\nTotal Cont.:   1\nTotal Cont.:   4\nTotal Lote/Batch:       13,000\nTotal Lote/Batch:       40,000\nTotal Lote/Batch:       20,000\nTotal Lote/Batch:       30,000\nTotal Lote/Batch:       12,000\nTotal Lote/Batch:       40,000\nTotal Lote/Batch:       20,000\nTotal Lote/Batch:        8,000\nTotal Lote/Batch:       55,000\nTotal Lote/Batch:       45,000\nTotal Lote/Batch:        6,000\nTotal Lote/Batch:       20,000\n\nIncoterms Carga/Pick Transporte/Shipment Vend./Vendor N.Forn./Supplier Code Código AT/AT CodePágina/Page /   3\nGuia/Delivery Note\nData/DateOriginal\nEste documento não serve de Fatura - INTERNALATCUD:\nNIF/VAT ID:\nNOME CLIENTE / CUSTOMER NAME\nNIF/VAT ID:PONTO ENVIO / SHIP TOSociedade Anonima - Capital Social 557.440,48 - Ins. na Cons. do Reg.Com.de S.J.Madra sob nº1686/990510\nPEDIDO/ORDER CÓDIGO/PART NUMBER DESCRIÇÃO/DESCRIPTION LOTE/BATCH N.SÉRIE/SERIAL NR. QUANT./QUANTITY \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n *N4/0245000*\n   2\n0 GR4/0245000\n29-07-2025\nGuia de Remessa\n6EtK-Processado por programa Certificado Nº 1767/AT\nJFFWWF96-0245000\nDAP\n168242\n4\nROAD\n17685742533\nFLEXIPOL-ESPUMAS SINTETICAS,SA\nDEVESA VELHA\n3700-122\nSÃO JOÃO DA MADEIRA\nPORTUGAL\nPT 500117063\n10000646\nCOLMOL - COLCHOES SA\nZONA INDUSTRIAL DE CAVADAS\nAP.115\n3721-908\nVILA DE CUCUJAES\nPORTUGAL\nPT 500248800\n1\nCOLMOL - COLCHOES SA\nZONA INDUSTRIAL DE CAVADAS\nAP.115\n3721-908\nVILA DE CUCUJAES\nPORTUGAL\nContinuação\nContinua\n3767\n3773\nNZJ178010800030\nNIU142001700080\nNIU188008800030\nNIU188013300030\nNIU188014800030\nNIU189014800200\nNND193015800030\nNND198015800030\nNND198019800030\nNNF199014800200\nPLACA           1780x1080x0030\nPLACA            1420x0170x0080\nPLACA           1880x0880x0030\nPLACA           1880x1330x0030\nPLACA           1880x1480x0030\nPLACA           1890x1480x0200\nPLACA            1930x1580x0030\nPLACA           1980x1580x0030\nPLACA            1980x1980x0030\nPLACA           1990x1480x0200\nVISTEC 40 M BR\n23 D AZ\n23 D Az\n23 D Az\n23 D Az\n23 D Az\n28 D VR\n28 D VR\n28 D Vr\n28 M Bg\n1,000\n20,000\n14,000\n18,000\n50,000\n6,000\n2,000\n2,000\n2,000\n2,000\nUN\nUN\nUN\nUN\nUN\nUN\nUN\nUN\nUN\nUN\n19598313/01\n19597094/01\n19597340/01\n19594460/01\n19597348/01\n19589564/02\n19598111/01\n19598111/01\n19597344/01\n19597344/01\n19597344/01\n19597344/02\n19597344/02\n19597338/01\n19597338/01\n19597338/01\n19597338/01\n19597338/01\n19597338/01\n19597362/01\n19597365/01\n19598315/01\n19597368/01\n19597368/01\n2003263205\n2003261072\n2003260466\n2003245070\n2003260783\n2003230556\n2003261823\n2003261824\n2003262101\n2003262102\n2003262103\n2003262114\n2003262115\n2003262159\n2003262160\n2003262161\n2003262162\n2003262163\n2003262164\n2003263242\n2003262552\n2003263197\n2003261273\n2003261274\n4,000\n1,000\n20,000\n10,000\n4,000\n1,000\n10,000\n7,000\n10,000\n10,000\n10,000\n10,000\n10,000\n1,000\n1,000\n1,000\n1,000\n1,000\n1,000\n2,000\n2,000\n2,000\n1,000\n1,000\nTot Volumes        1\nTot Volumes        1\nTot Volumes        2\nTot Volumes        3\nTot Volumes        5\nTot Volumes        6\nTot Volumes        1\nTot Volumes        1\nTot Volumes        1\nTot Volumes        2\nTotal Cont.:   1\nTotal Cont.:   1\nTotal Cont.:   1\nTotal Cont.:   1\nTotal Cont.:   1\nTotal Cont.:   1\nTotal Cont.:   2\nTotal Cont.:   3\nTotal Cont.:   2\nTotal Cont.:   6\nTotal Cont.:   1\nTotal Cont.:   1\nTotal Cont.:   1\nTotal Cont.:   2\nTotal Lote/Batch:        4,000\nTotal Lote/Batch:        1,000\nTotal Lote/Batch:       20,000\nTotal Lote/Batch:       10,000\nTotal Lote/Batch:        4,000\nTotal Lote/Batch:        1,000\nTotal Lote/Batch:       17,000\nTotal Lote/Batch:       30,000\nTotal Lote/Batch:       20,000\nTotal Lote/Batch:        6,000\nTotal Lote/Batch:        2,000\nTotal Lote/Batch:        2,000\nTotal Lote/Batch:        2,000\nTotal Lote/Batch:        2,000\n\nIncoterms Carga/Pick Transporte/Shipment Vend./Vendor N.Forn./Supplier Code Código AT/AT CodePágina/Page /   3\nGuia/Delivery Note\nData/DateOriginal\nEste documento não serve de Fatura - INTERNALATCUD:\nNIF/VAT ID:\nNOME CLIENTE / CUSTOMER NAME\nNIF/VAT ID:PONTO ENVIO / SHIP TOSociedade Anonima - Capital Social 557.440,48 - Ins. na Cons. do Reg.Com.de S.J.Madra sob nº1686/990510\nPEDIDO/ORDER CÓDIGO/PART NUMBER DESCRIÇÃO/DESCRIPTION LOTE/BATCH N.SÉRIE/SERIAL NR. QUANT./QUANTITY \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n *N4/0245000*\n   3\n0 GR4/0245000\n29-07-2025\nGuia de Remessa\n6EtK-Processado por programa Certificado Nº 1767/AT\nJFFWWF96-0245000\nDAP\n168242\n4\nROAD\n17685742533\nFLEXIPOL-ESPUMAS SINTETICAS,SA\nDEVESA VELHA\n3700-122\nSÃO JOÃO DA MADEIRA\nPORTUGAL\nPT 500117063\n10000646\nCOLMOL - COLCHOES SA\nZONA INDUSTRIAL DE CAVADAS\nAP.115\n3721-908\nVILA DE CUCUJAES\nPORTUGAL\nPT 500248800\n1\nCOLMOL - COLCHOES SA\nZONA INDUSTRIAL DE CAVADAS\nAP.115\n3721-908\nVILA DE CUCUJAES\nPORTUGAL\nContinuação\n3783\n3802\n3806\n3852\nNND193014800030\nNND193015800030\nNND198015800030\nNND198017800030\nNIU198015800040\nNIU180013300030\nNIU198013300030\nNIU198013800040\nNIU198015800040\nNNF199013300200\nNIJ189013300170\nPLACA           1930x1480x0030\nPLACA            1930x1580x0030\nPLACA           1980x1580x0030\nPLACA           1980x1780x0030\nPLACA           1980x1580x0040\nPLACA           1800x1330x0030\nPLACA           1980x1330x0030\nPLACA           1980x1380x0040\nPLACA           1980x1580x0040\nPLACA           1990x1330x0200\nPLACA           1890x1330x0170\n28 D VR\n28 D VR\n28 D VR\n28 D Vr\n23 D Az\n23 D AZ\n23 D Az\n23 D AZ\n23 D Az\n28 M Bg\n23 M Az\n2,000\n2,000\n9,000\n6,000\n2,000\n12,000\n8,000\n2,000\n12,000\n1,000\n1,000\nUN\nUN\nUN\nUN\nUN\nUN\nUN\nUN\nUN\nUN\nUN\n19597363/01\n19597362/01\n19597365/01\n19593284/01\n19597359/01\n19597073/01\n19597071/01\n19597071/01\n19598311/01\n19597075/01\n19597073/01\n19597073/01\n19597073/01\n19598312/01\n19598309/01\n2003263240\n2003263243\n2003262548\n2003246019\n2003263192\n2003261819\n2003261279\n2003261280\n2003263182\n2003261798\n2003261808\n2003261809\n2003261820\n2003263175\n2003263178\n2,000\n2,000\n9,000\n3,000\n3,000\n2,000\n6,000\n6,000\n8,000\n2,000\n5,000\n5,000\n2,000\n1,000\n1,000\nTot Volumes        1\nTot Volumes        1\nTot Volumes        1\nTot Volumes        2\nTot Volumes        1\nTot Volumes        2\nTot Volumes        1\nTot Volumes        1\nTot Volumes        3\nTot Volumes        1\nTot Volumes        1\nTotal Cont.:   1\nTotal Cont.:   1\nTotal Cont.:   1\nTotal Cont.:   1\nTotal Cont.:   1\nTotal Cont.:   1\nTotal Cont.:   2\nTotal Cont.:   1\nTotal Cont.:   1\nTotal Cont.:   3\nTotal Cont.:   1\nTotal Cont.:   1\nTotal Lote/Batch:        2,000\nTotal Lote/Batch:        2,000\nTotal Lote/Batch:        9,000\nTotal Lote/Batch:        3,000\nTotal Lote/Batch:        3,000\nTotal Lote/Batch:        2,000\nTotal Lote/Batch:       12,000\nTotal Lote/Batch:        8,000\nTotal Lote/Batch:        2,000\nTotal Lote/Batch:       12,000\nTotal Lote/Batch:        1,000\nTotal Lote/Batch:        1,000\nDt Expedição  29-07-2025\nTempo Exped   10:53:41\nTransp        Mat.\nNr Vol     72\nTot PB (KG)        885,192\nTot PL (KG)        885,192\nNr Cont\nSelo\nEXPEDIÇÃO\n3701-910  S.JOAO DA MADEIRA\nPlast.Kg 32,400",
   "baixa_qualidade_texto": false
 }
