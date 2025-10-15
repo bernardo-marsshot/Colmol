@@ -1,0 +1,30 @@
+{
+  "numero_requisicao": "",
+  "document_number": "",
+  "po_number": "",
+  "supplier_name": "Contribuinte\tData\tPágina",
+  "delivery_date": "25-10-08",
+  "qr_codes": [],
+  "produtos": [
+    {
+      "artigo": "2025-10-17",
+      "descricao": "COLCHAO 1,95X1,40=27\"SPA CHERRY VISCO\"COLMOL\t1.000 UN",
+      "quantidade": 26.100145,
+      "preco_unitario": 0.0
+    },
+    {
+      "artigo": "2025-10-17",
+      "descricao": "COLCHAO 1,83X1,33=24Cm ORTOPEDICO\"KOLUNA \"COLMOL\t3.000 UN",
+      "quantidade": 26.1001,
+      "preco_unitario": 0.0
+    }
+  ],
+  "lines": [],
+  "totals": {
+    "total_lines": 2,
+    "total_quantity": 52.200245
+  },
+  "tipo_documento": "ORDEM_COMPRA",
+  "texto_completo": "S & F\t\r\nSantos e Fernandes\t\r\nArmazém de Utilidades Porlar, Lda.\tCOLMOL - COLCHOES, SA\t\r\nZONA INDUSTRIAL CAVADAS\t\r\nR. Liberdade n.21\tAPARTADO 115\t\r\nAlgar\t\r\n3040-656 Coimbra\t3721-908 VILA CUCUJAES\t\r\nTelef.: 239802670 - Tlm.: 917594110\tPORTUGAL\t\r\nWeb: www.catalogosantosefernandes.pt\t\r\nContribuinte n° 501931414\t\r\nSociedade por Quotas - Capital Social: 399.038,31 Euros\t\r\nMatriculada na C.R.C. Coimbra sob o n° 4781\t\r\nORIGINAL\t\r\nORDEM COMPRA N° OC250000525\t\r\nFORNECEDOR CONTRIBUINTE\tDATA\tPÁGINA\t\r\n00072\t500248800\t2025-10-08\t1/1\t\r\nREFERÊNCIA\tDESCRIÇÃO\tQUANTIDADE\tP. UNITARIO\tDESC.\tLIQUIDO ENTREGA\t\r\n26.100145\tCOLCHAO 1,95X1,40=27\"SPA CHERRY VISCO\"COLMOL\t1.000 UN\t2025-10-17\t\r\n26.100100\tCOLCHAO 1,83X1,33=24Cm ORTOPEDICO\"KOLUNA \"COLMOL\t3.000 UN\t2025-10-17\t\r\nProcessado por computador - xSoft\t\r\nLOCAL DE ENTREGA:\t\r\nO Dep. Compras",
+  "baixa_qualidade_texto": false
+}
