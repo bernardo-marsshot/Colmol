@@ -2572,30 +2572,6 @@ def process_inbound(inbound: InboundDocument):
     inbound.parsed_payload = payload
     inbound.save()
 
-    # Auto-registro de fornecedor (se NIF extraído do documento for novo)
-    nif_fornecedor = (payload.get("nif") or "").strip()
-    nome_fornecedor = (payload.get("fornecedor") or "").strip()
-    
-    if nif_fornecedor:
-        # Verificar/criar fornecedor baseado no NIF do documento
-        from .models import Supplier
-        supplier, created = Supplier.objects.get_or_create(
-            code=nif_fornecedor,
-            defaults={
-                'name': nome_fornecedor or f"Fornecedor {nif_fornecedor}",
-                'email': ''
-            }
-        )
-        
-        if created:
-            print(f"✅ Novo fornecedor registado: {supplier.code} - {supplier.name}")
-        
-        # Atualizar inbound.supplier se for diferente
-        if inbound.supplier != supplier:
-            print(f"🔄 Atualizando fornecedor do documento de {inbound.supplier} para {supplier}")
-            inbound.supplier = supplier
-            inbound.save()
-
     # Se for Nota de Encomenda (FT), criar PurchaseOrder
     if inbound.doc_type == 'FT':
         print(f"📋 Processando Nota de Encomenda: {inbound.number}")
