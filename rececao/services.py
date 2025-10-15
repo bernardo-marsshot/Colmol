@@ -144,9 +144,13 @@ def groq_extract_document(file_path: str, ocr_text: str, api_key: str):
     - Espera aleatória de 60-120 segundos entre tentativas
     - Retorna {'error': 'RATE_LIMIT_EXCEEDED'} após 3 falhas
     """
-    # Aplicar filtragem inteligente ao texto OCR antes de enviar ao LLM
+    # Truncar texto OCR se muito longo (simplificado)
     if ocr_text:
-        optimized_text = smart_text_truncate(ocr_text, max_chars=12000)
+        if len(ocr_text) > 12000:
+            print(f"⚠️ Texto muito longo ({len(ocr_text)} chars) - truncando para 12000")
+            optimized_text = ocr_text[:12000]
+        else:
+            optimized_text = ocr_text
     else:
         optimized_text = "No OCR text"
     
