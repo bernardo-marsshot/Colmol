@@ -130,14 +130,93 @@ try:
 except ImportError:
     RAPIDFUZZ_AVAILABLE = False
 
-# --- Ollama LLM para Document Extraction (Level -1: Pós-processador Inteligente) ---
+# --- LLM para Document Extraction (Groq + Ollama) ---
+
+def groq_extract_document(file_path: str, ocr_text: str, api_key: str):
+    """
+    Groq LLM Document Extractor (gratuito, sem instalação)
+    Usa Llama-3.3-70B para extrair dados estruturados
+    """
+    try:
+        system_prompt = """You are a document extraction expert. Extract ALL product data from invoices, delivery notes, and purchase orders in Portuguese, Spanish, or French.
+
+CRITICAL: Extract EVERY product line, even if incomplete or malformed.
+
+Return valid JSON:
+{
+  "fornecedor": "supplier name or null",
+  "nif": "tax ID or null",
+  "numero_documento": "document number or null",
+  "data_documento": "YYYY-MM-DD or null",
+  "numero_encomenda": "PO number or null",
+  "produtos": [
+    {
+      "codigo": "product code",
+      "descricao": "description",
+      "quantidade": 10.5,
+      "preco_unitario": 25.99,
+      "total": 272.40
+    }
+  ]
+}
+
+EXAMPLES:
+- Spanish multi-line: "4,00 / COLCHON TOP VISCO 135X190 / LUSTOPVS135190" → extract all 3 fields
+- Portuguese: "COLCHAO VISCO 150X190 | 2 UN | 199€" → extract code, desc, qty, price
+- French: "MATELAS 140x200 | Qté: 2 | 245€" → extract all fields
+
+Rules:
+- Extract EVERY product, ignore addresses/headers
+- Convert quantities/prices to numbers
+- Use null for missing fields"""
+
+        user_prompt = f"""Extract ALL products from this document (PT/ES/FR):
+
+{ocr_text[:3000] if ocr_text else "No OCR text"}
+
+Return complete JSON with ALL products."""
+
+        response = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": "llama-3.3-70b-versatile",
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                "temperature": 0.1,
+                "max_tokens": 4000,
+                "response_format": {"type": "json_object"}
+            },
+            timeout=30
+        )
+
+        if response.status_code == 200:
+            result = response.json()
+            content = result['choices'][0]['message']['content']
+            
+            extracted_data = json.loads(content)
+            produtos_count = len(extracted_data.get('produtos', []))
+            print(f"✅ Groq LLM: {produtos_count} produtos extraídos")
+            return extracted_data
+        else:
+            print(f"⚠️ Groq HTTP {response.status_code}")
+            return None
+            
+    except Exception as e:
+        print(f"⚠️ Groq exception: {e}")
+        return None
 
 def ollama_extract_document(file_path: str, ocr_text: str = None):
     """
-    Ollama LLM Document Extractor - Level -1 (pós-processador inteligente)
+    LLM Document Extractor - Level -1 (pós-processador inteligente)
     
-    Usa LLM local/remoto (via Ollama) para extrair dados estruturados de documentos.
-    Combina vision (se disponível) ou texto OCR com prompt engineering.
+    Usa LLM (Groq/Ollama) para extrair dados estruturados de documentos.
+    Combina texto OCR com prompt engineering.
     
     Args:
         file_path: Caminho do PDF/imagem
@@ -148,14 +227,20 @@ def ollama_extract_document(file_path: str, ocr_text: str = None):
     """
     # Verificar se requests está disponível
     if not OCR_SPACE_AVAILABLE:
-        print("⚠️ requests não disponível - Ollama desabilitado")
+        print("⚠️ requests não disponível - LLM desabilitado")
         return None
     
+    # Tentar Groq primeiro (gratuito, sem instalação)
+    groq_key = os.environ.get('GROQ_API_KEY')
+    if groq_key:
+        return groq_extract_document(file_path, ocr_text, groq_key)
+    
+    # Fallback: Ollama (se configurado)
     ollama_url = os.environ.get('OLLAMA_API_URL')
-    ollama_model = os.environ.get('OLLAMA_MODEL', 'llama3.2-vision')  # Default vision model
+    ollama_model = os.environ.get('OLLAMA_MODEL', 'llama3.2-vision')
     
     if not ollama_url:
-        print("⚠️ OLLAMA_API_URL não configurada - Ollama desabilitado")
+        print("⚠️ Nenhum LLM configurado (GROQ_API_KEY ou OLLAMA_API_URL)")
         return None
     
     try:
