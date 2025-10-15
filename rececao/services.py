@@ -233,14 +233,17 @@ def ollama_extract_document(file_path: str, ocr_text: str = None):
     # Tentar Groq primeiro (gratuito, sem instalação)
     groq_key = os.environ.get('GROQ_API_KEY')
     if groq_key:
-        return groq_extract_document(file_path, ocr_text, groq_key)
+        groq_result = groq_extract_document(file_path, ocr_text, groq_key)
+        if groq_result and groq_result.get('produtos'):
+            return groq_result
+        print("⚠️ Groq falhou ou sem produtos - tentando Ollama fallback")
     
     # Fallback: Ollama (se configurado)
     ollama_url = os.environ.get('OLLAMA_API_URL')
     ollama_model = os.environ.get('OLLAMA_MODEL', 'llama3.2-vision')
     
     if not ollama_url:
-        print("⚠️ Nenhum LLM configurado (GROQ_API_KEY ou OLLAMA_API_URL)")
+        print("⚠️ Nenhum LLM configurado ou todos falharam")
         return None
     
     try:
