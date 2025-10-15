@@ -7,23 +7,6 @@
   "qr_codes": [],
   "produtos": [
     {
-      "artigo": "0000292",
-      "descricao": "PT500248800",
-      "quantidade": 1.0,
-      "unidade": "UN",
-      "preco_unitario": 0.0,
-      "total": 0.0,
-      "dimensoes": "",
-      "pedido_numero": "",
-      "fecha": "",
-      "proveedor": "N.I.F.\nPag.\nAtendido por",
-      "referencia_ordem": "",
-      "lote_producao": "",
-      "volume": 0,
-      "peso": 0.0,
-      "iva": 21.0
-    },
-    {
       "artigo": "POLIGONO",
       "descricao": "INDUTRIAL MORERO, NAVE 1",
       "quantidade": 10.0,
@@ -77,8 +60,8 @@
   ],
   "lines": [],
   "totals": {
-    "total_lines": 4,
-    "total_quantity": 19.0
+    "total_lines": 3,
+    "total_quantity": 18.0
   },
   "tipo_documento": "PEDIDO_ESPANHOL",
   "texto_completo": "Fecha\nPedido nº\nProveedor\nN.I.F.\nPag.\nAtendido por\n1\nPT500248800\n0000292\nPC5/0005051\n09/10/2025\nADMINISTRA\nPEDIDO\nCOSGUI D.M. S.L.\nB39031059\nPOLIGONO INDUTRIAL MORERO, NAVE 1 10\n39611\nGUARNIZO \n942252861\nNIF.\nfacturacion@cosgui.com\nCOLMOL COLCHOES SA\nZONA INDUSTRIAL DAS CAVADAS APART 119 RUA DO PROGR\n3721-\nVILA DE CUCUJAES\n4,00\nCOLCHON TOP VISCO 2019 135X190\nLUSTOPVS135190\n4,00\nCOLCHON TOP VISCO 2019 150X190\nLUSTOPVS150190\nDescripción\nCantidad\nCódigo\nSu Referencia\nNotas :",
