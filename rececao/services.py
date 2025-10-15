@@ -241,19 +241,17 @@ QUANTITY EXTRACTION RULES (CRITICAL):
   - If just [quantity] [unit] [price] → Standard format
 
 NUMBER FORMATTING (CRITICAL):
-⚠️ Values with ",000" (three zeros) = thousands format:
-  - "2,000" → 2000 (two thousand, NOT two point zero)
+⚠️ Values with 3 digits after comma = THOUSANDS format (remove comma):
+  - "1,880" → 1880 (one thousand eight hundred eighty)
+  - "0,150" → 150 (one hundred fifty)
+  - "2,000" → 2000 (two thousand)
   - "125,000" → 125000 (one hundred twenty-five thousand)
-  - "640,000" → 640000 (six hundred forty thousand)
-⚠️ Values with 3 non-zero decimal places = normal decimals:
-  - "1,880" → 1.88 (one point eighty-eight meters, NOT one thousand eight hundred eighty)
-  - "0,150" → 0.15 (zero point fifteen meters)
-  - "1,250" → 1.25 (one point two five, NOT one thousand two hundred fifty)
-⚠️ Values with 1-2 decimal places = normal decimals:
+⚠️ Values with 1-2 digits after comma = DECIMAL format (replace comma with dot):
+  - "1,88" → 1.88 (one point eighty-eight)
   - "2,5" → 2.5 (two point five)
   - "34,00" → 34.0 (thirty-four point zero)
 
-Rule: ONLY when the 3 digits after comma are "000", treat as thousands. Otherwise, treat as normal decimal.
+Rule: If there are exactly 3 digits after the comma, it's thousands format. If 1-2 digits, it's decimal format.
 
 EXAMPLES (quantity extraction):
 ✅ Correct Elastron (ignore volume):
@@ -401,19 +399,17 @@ ALWAYS return valid JSON with this exact structure:
 }
 
 NUMBER FORMATTING (CRITICAL):
-⚠️ Values with ",000" (three zeros) = thousands format:
-  - "2,000" → 2000 (two thousand, NOT two point zero)
+⚠️ Values with 3 digits after comma = THOUSANDS format (remove comma):
+  - "1,880" → 1880 (one thousand eight hundred eighty)
+  - "0,150" → 150 (one hundred fifty)
+  - "2,000" → 2000 (two thousand)
   - "125,000" → 125000 (one hundred twenty-five thousand)
-  - "640,000" → 640000 (six hundred forty thousand)
-⚠️ Values with 3 non-zero decimal places = normal decimals:
-  - "1,880" → 1.88 (one point eighty-eight meters, NOT one thousand eight hundred eighty)
-  - "0,150" → 0.15 (zero point fifteen meters)
-  - "1,250" → 1.25 (one point two five, NOT one thousand two hundred fifty)
-⚠️ Values with 1-2 decimal places = normal decimals:
+⚠️ Values with 1-2 digits after comma = DECIMAL format (replace comma with dot):
+  - "1,88" → 1.88 (one point eighty-eight)
   - "2,5" → 2.5 (two point five)
   - "34,00" → 34.0 (thirty-four point zero)
 
-Rule: ONLY when the 3 digits after comma are "000", treat as thousands. Otherwise, treat as normal decimal.
+Rule: If there are exactly 3 digits after the comma, it's thousands format. If 1-2 digits, it's decimal format.
 
 EXAMPLES:
 
