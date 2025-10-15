@@ -130,6 +130,152 @@ try:
 except ImportError:
     RAPIDFUZZ_AVAILABLE = False
 
+# --- Ollama LLM para Document Extraction (Level -1: Pós-processador Inteligente) ---
+
+def ollama_extract_document(file_path: str, ocr_text: str = None):
+    """
+    Ollama LLM Document Extractor - Level -1 (pós-processador inteligente)
+    
+    Usa LLM local/remoto (via Ollama) para extrair dados estruturados de documentos.
+    Combina vision (se disponível) ou texto OCR com prompt engineering.
+    
+    Args:
+        file_path: Caminho do PDF/imagem
+        ocr_text: Texto já extraído por OCR (opcional, melhora resultados)
+    
+    Returns:
+        dict com metadados + produtos ou None se falhar
+    """
+    ollama_url = os.environ.get('OLLAMA_API_URL')
+    ollama_model = os.environ.get('OLLAMA_MODEL', 'llama3.2-vision')  # Default vision model
+    
+    if not ollama_url:
+        print("⚠️ OLLAMA_API_URL não configurada - Ollama desabilitado")
+        return None
+    
+    try:
+        # Prompt estruturado para extração multi-idioma (PT/ES/FR)
+        system_prompt = """You are a document extraction expert. Extract structured data from invoices, delivery notes, and purchase orders in Portuguese, Spanish, or French.
+
+ALWAYS return valid JSON with this exact structure:
+{
+  "fornecedor": "supplier name",
+  "nif": "tax ID",
+  "numero_documento": "document number",
+  "data_documento": "YYYY-MM-DD",
+  "numero_encomenda": "purchase order number",
+  "iban": "bank account",
+  "produtos": [
+    {
+      "codigo": "product code/SKU",
+      "descricao": "product description",
+      "quantidade": 10.5,
+      "preco_unitario": 25.99,
+      "total": 272.40
+    }
+  ],
+  "total_geral": 272.40
+}
+
+Rules:
+- Extract ALL products from tables
+- Convert quantities/prices to numbers
+- Use null for missing fields
+- Maintain original language in descriptions
+- Return ONLY the JSON, no explanations"""
+
+        user_prompt = f"""Extract all data from this document.
+
+Document type: Invoice/Delivery Note/Purchase Order
+Expected format: Tabular data with products
+
+{f'OCR Text Preview:\\n{ocr_text[:1500]}' if ocr_text else 'No OCR text provided - analyze image'}
+
+Return the complete JSON structure with all products."""
+
+        # Preparar request para Ollama
+        payload = {
+            "model": ollama_model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            "stream": False,
+            "format": "json",  # Force JSON output
+            "options": {
+                "temperature": 0.1,  # Baixa criatividade para dados estruturados
+                "num_predict": 2000  # Tokens suficientes para documentos grandes
+            }
+        }
+        
+        # Se modelo suporta vision, adicionar imagem
+        if 'vision' in ollama_model.lower() and file_path.lower().endswith('.pdf'):
+            # Converter primeira página PDF para base64
+            try:
+                images = convert_from_path(file_path, first_page=1, last_page=1, dpi=150)
+                if images:
+                    img_buffer = BytesIO()
+                    images[0].save(img_buffer, format='PNG')
+                    img_base64 = base64.b64encode(img_buffer.getvalue()).decode('utf-8')
+                    
+                    payload["messages"][-1]["images"] = [img_base64]
+                    print(f"✅ Ollama vision: imagem adicionada ({len(img_base64)} bytes)")
+            except Exception as e:
+                print(f"⚠️ Erro ao converter PDF para imagem: {e}")
+        
+        # Chamar Ollama API
+        print(f"🤖 Ollama ({ollama_model}): processando documento...")
+        response = requests.post(
+            f"{ollama_url}/api/chat",
+            json=payload,
+            timeout=60  # 60s timeout para LLMs (mais lento que OCR)
+        )
+        
+        if response.status_code == 200:
+            result = response.json()
+            content = result.get('message', {}).get('content', '')
+            
+            if not content:
+                print("⚠️ Ollama retornou resposta vazia")
+                return None
+            
+            # Parse JSON da resposta
+            try:
+                # Limpar markdown code blocks se existirem
+                if '```json' in content:
+                    content = content.split('```json')[1].split('```')[0].strip()
+                elif '```' in content:
+                    content = content.split('```')[1].split('```')[0].strip()
+                
+                extracted_data = json.loads(content)
+                
+                # Validar estrutura mínima
+                if not isinstance(extracted_data, dict):
+                    print("⚠️ Ollama retornou JSON inválido (não é dict)")
+                    return None
+                
+                produtos_count = len(extracted_data.get('produtos', []))
+                print(f"✅ Ollama: {produtos_count} produtos extraídos")
+                print(f"   Fornecedor: {extracted_data.get('fornecedor', 'N/A')}")
+                print(f"   Doc: {extracted_data.get('numero_documento', 'N/A')}")
+                
+                return extracted_data
+                
+            except json.JSONDecodeError as e:
+                print(f"⚠️ Ollama retornou JSON inválido: {e}")
+                print(f"   Resposta: {content[:200]}...")
+                return None
+        else:
+            print(f"⚠️ Ollama HTTP {response.status_code}: {response.text[:200]}")
+            return None
+            
+    except requests.Timeout:
+        print("⚠️ Ollama timeout (60s) - fallback para OCR")
+        return None
+    except Exception as e:
+        print(f"⚠️ Ollama exception: {e}")
+        return None
+
 # --- PaddleOCR (lazy loading para evitar problemas no startup) ---
 _paddle_ocr_instance = None
 
@@ -2113,7 +2259,45 @@ def create_po_from_nota_encomenda(inbound: InboundDocument, payload: dict):
 
 @transaction.atomic
 def process_inbound(inbound: InboundDocument):
-    payload = real_ocr_extract(inbound.file.path)
+    # Estratégia híbrida: OCR rápido + Ollama pós-processamento
+    # 1. Primeiro: OCR rápido para obter texto (sempre disponível)
+    ocr_payload = real_ocr_extract(inbound.file.path)
+    ocr_text = ocr_payload.get('texto_completo', '')
+    
+    # 2. Depois: Tentar Ollama com texto OCR como contexto (melhora precisão)
+    ollama_data = ollama_extract_document(inbound.file.path, ocr_text=ocr_text)
+    
+    if ollama_data and ollama_data.get('produtos'):
+        # Ollama extraiu dados com sucesso - usar dados LLM
+        print(f"✅ Usando dados do Ollama LLM ({len(ollama_data.get('produtos', []))} produtos)")
+        
+        # Converter formato Ollama para formato esperado
+        payload = {
+            "fornecedor": ollama_data.get('fornecedor', ''),
+            "nif": ollama_data.get('nif', ''),
+            "numero_documento": ollama_data.get('numero_documento', ''),
+            "data_documento": ollama_data.get('data_documento', ''),
+            "po_number": ollama_data.get('numero_encomenda', ''),
+            "iban": ollama_data.get('iban', ''),
+            "produtos": [
+                {
+                    "artigo": p.get('codigo', ''),
+                    "descricao": p.get('descricao', ''),
+                    "quantidade": float(p.get('quantidade', 0)),
+                    "preco_unitario": float(p.get('preco_unitario', 0)),
+                    "total": float(p.get('total', 0))
+                }
+                for p in ollama_data.get('produtos', [])
+            ],
+            "total": ollama_data.get('total_geral', 0),
+            "texto_completo": ocr_text or "Dados extraídos via Ollama LLM",
+            "tipo_documento": ollama_data.get('tipo_documento', 'UNKNOWN_LLM'),
+            "extraction_method": "ollama_llm"
+        }
+    else:
+        # Fallback: Usar dados OCR diretamente
+        print("🔄 Ollama não disponível/falhou - usando dados OCR cascade")
+        payload = ocr_payload
 
     if payload.get("error"):
         ExceptionTask.objects.create(
