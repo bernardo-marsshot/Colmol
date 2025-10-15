@@ -21,8 +21,8 @@ class POLine(models.Model):
     internal_sku = models.CharField(max_length=120)  # código interno Colmol
     description = models.CharField(max_length=255, blank=True)
     unit = models.CharField(max_length=20, default='UN')
-    qty_ordered = models.DecimalField(max_digits=12, decimal_places=3)
-    tolerance = models.DecimalField(max_digits=6, decimal_places=3, default=0)  # tolerância admitida
+    qty_ordered = models.DecimalField(max_digits=12, decimal_places=2)
+    tolerance = models.DecimalField(max_digits=6, decimal_places=2, default=0)  # tolerância admitida
 
     class Meta:
         unique_together = ('po','internal_sku')
@@ -34,7 +34,7 @@ class CodeMapping(models.Model):
     supplier = models.ForeignKey(Supplier, on_delete=models.CASCADE, related_name='code_mappings')
     supplier_code = models.CharField(max_length=120)
     internal_sku = models.CharField(max_length=120)
-    qty_ordered = models.DecimalField(max_digits=12, decimal_places=3, default=0)
+    qty_ordered = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     confidence = models.FloatField(default=1.0)
 
     class Meta:
@@ -66,7 +66,7 @@ class ReceiptLine(models.Model):
     maybe_internal_sku = models.CharField(max_length=120, blank=True)  # resultado do mapping
     description = models.CharField(max_length=255, blank=True)
     unit = models.CharField(max_length=20, default='UN')
-    qty_received = models.DecimalField(max_digits=12, decimal_places=3, default=0)
+    qty_received = models.DecimalField(max_digits=12, decimal_places=2, default=0)
 
 class MatchResult(models.Model):
     inbound = models.OneToOneField(InboundDocument, on_delete=models.CASCADE, related_name='match_result')
@@ -79,6 +79,6 @@ class ExceptionTask(models.Model):
     line_ref = models.CharField(max_length=120)  # referência da linha (supplier_code / internal_sku)
     issue = models.CharField(max_length=255)  # descrição do problema
     suggested_internal_sku = models.CharField(max_length=120, blank=True)
-    suggested_qty = models.DecimalField(max_digits=12, decimal_places=3, null=True, blank=True)
+    suggested_qty = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     resolved = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
