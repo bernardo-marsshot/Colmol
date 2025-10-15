@@ -2844,7 +2844,7 @@ def process_inbound(inbound: InboundDocument):
                 continue
             
             # Comparar quantidade recebida (Guia) com quantidade encomendada (POLine)
-            qty_ordered = float(poline.quantity or 0)
+            qty_ordered = float(poline.qty_ordered or 0)
             if float(r.qty_received) > qty_ordered:
                 issues += 1
                 exceptions.append({
