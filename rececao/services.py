@@ -2668,13 +2668,27 @@ def process_inbound(inbound: InboundDocument):
             ).first()
             
             if not mapping:
-                issues += 1
-                exceptions.append({
-                    "line": r.article_code,
-                    "issue": "Código não mapeado para SKU interno",
-                    "suggested": "",
-                })
-                continue
+                # Auto-criar mapeamento para Notas de Encomenda (códigos novos são registados automaticamente)
+                # Validar se article_code não está vazio para evitar IntegrityError
+                if not r.article_code or r.article_code.strip() == '':
+                    issues += 1
+                    exceptions.append({
+                        "line": r.supplier_code or "VAZIO",
+                        "issue": "Código do produto vazio ou inválido",
+                    })
+                    continue
+                
+                # Usar get_or_create para evitar race conditions
+                mapping, created = CodeMapping.objects.get_or_create(
+                    supplier=inbound.supplier,
+                    supplier_code=r.article_code,
+                    defaults={
+                        'internal_sku': r.article_code,  # Usar o próprio código como SKU interno inicialmente
+                        'qty_ordered': r.qty_received  # Usar quantidade recebida como referência
+                    }
+                )
+                if created:
+                    print(f"✅ Auto-criado mapeamento para {r.article_code} (SKU: {r.article_code})")
             
             # Verificar se quantidade recebida EXCEDE a quantidade encomendada (do CodeMapping)
             qty_ordered = float(mapping.qty_ordered or 0)  # Proteção contra None
