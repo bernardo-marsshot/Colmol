@@ -40,16 +40,21 @@ Key architectural decisions and features include:
 
 ### October 15, 2025 - Bug Fix: Elastron Faturas - Corrigir Extração de Quantidade vs Volume
 - **Problem**: Fatura específica FWH_25EU_N5595 extraía valores da coluna "Vol." (volumes/rolos) em vez de "Quant." (quantidade real)
-  - Tabela Elastron tem: Artigo, Descrição, Lote, **Quant.**, Un., **Vol.**, Preço, Desconto, IVA, Total
-  - LLM confundia as duas colunas numéricas (ex: 34,00 ML vs 1 volume)
-- **Root Cause**: Groq LLM prompt não distinguia entre quantidade (metros/peças) e volumes (número de rolos)
-- **Solution**: Prompt atualizado com regras específicas para faturas Elastron:
-  - ⚠️ QUANTITY EXTRACTION RULES: "Quant." = quantidade real (usar) / "Vol." = volumes (ignorar)
-  - Preferir valores decimais (Quant.) sobre inteiros pequenos (Vol.)
-  - Exemplo: "Quant.: 34,00 ML | Vol.: 1" → quantidade = 34.0 (NOT 1)
-  - Documentada ordem correta das colunas Elastron no prompt
-- **Impact**: Faturas Elastron agora extraem quantidade correta mesmo quando têm coluna de volumes
-- **Testing**: Utilizador deve testar com documento FWH_25EU_N5595 via interface web Django
+  - Tabela Elastron: Artigo, Descrição, Lote, **Quant.**, Un., **Vol.**, Preço, Desconto, IVA, Total
+  - Exemplo: extraía "1" (volume) em vez de "34,00" (quantidade em ML)
+  - LLM confundia as duas colunas numéricas adjacentes
+- **Root Cause**: Groq LLM prompt não tinha regras para distinguir quantidade vs volumes
+- **Solution**: Prompt refinado com regras contextuais robustas (independentes de OCR perfeito):
+  - **Padrão detectado**: `[decimal] [UNIT] [small_integer] [price]` → decimal é quantidade, integer é volume
+  - **Regra contextual**: Número ANTES da unidade (ML/UN/MT) = quantidade | Número DEPOIS = volume (ignorar)
+  - **Exemplos explícitos**: ✅ "34,00 ML 1 3,99" → quantidade=34.0 (NOT 1)
+  - **Exemplos negativos**: ❌ "34,00 ML 1 3,99" → quantidade=1 ✗ (volume count, wrong!)
+  - **Proteção**: Regras aplicam-se apenas a padrão Elastron, outros docs inalterados
+- **Architect Review**: Aprovado após 3 iterações de refinamento para garantir robustez sem regressões
+- **Impact**: Faturas Elastron extraem quantidade correta mesmo com OCR parcial dos headers
+- **Testing**: Utilizador deve fazer upload de FWH_25EU_N5595 via interface web Django
+  - Esperado: quantidade=34.0, 30.8, 48.5, etc. (valores decimais corretos)
+  - Verificar que volumes (1, 2) são ignorados
 
 ### October 15, 2025 - Mini Códigos FPOL: Sistema de Mapeamento para Exportação Excel
 - **Feature**: Tabela de mini códigos FPOL adicionada à base de dados para simplificar exportações Excel
