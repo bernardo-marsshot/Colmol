@@ -38,29 +38,32 @@ Key architectural decisions and features include:
 
 ## Recent Changes
 
-### October 15, 2025 - Deployment: Reserved VM Configuration & Image Size Optimization
-- **Deployment Type**: Switched from Autoscale to Reserved VM deployment
-  - **Reason**: OCR-heavy processing with multiple engines better suited for persistent VM
+### October 15, 2025 - Deployment: Reserved VM Configuration & Ultra-Minimal Image
+- **Deployment Type**: Configured for Reserved VM deployment
   - **Production Server**: Using Gunicorn WSGI server (`--bind=0.0.0.0:5000 --reuse-port`)
-  - **Benefits**: No cold starts, consistent performance, better handling of heavy OCR workloads
-- **Image Size Optimization**: Reduced deployment image size from 8GB+ to <1GB (8x reduction!)
+  - **Benefits**: No cold starts, consistent performance, better handling of OCR workloads
+  - **CRITICAL**: Must manually select "Reserved VM" in deployment UI (not Autoscale)
+- **Image Size Optimization**: Ultra-minimal production dependencies (<500MB)
   - **Nix Packages Cleaned**: Removed 8 unnecessary/duplicate packages (22 → 14 packages)
     - Removed: `poppler_utils` (duplicate), `taskflow`, `tcl`, `tk`, `rapidfuzz-cpp`, `libimagequant`, `libxcrypt`, `hdf5`
     - Kept essential: `tesseract` (OCR), `poppler-utils` (PDF), `zbar` (QR codes), `libGL/libGLU` (OpenCV), image libs
-  - **Production Requirements**: Created `requirements-prod.txt` for lightweight deployment
-    - **Removed heavy OCR engines**: PaddleOCR, paddlepaddle, EasyOCR (~7GB savings!)
-    - **Optimized packages**: opencv-python → opencv-python-headless (lighter, no GUI)
-    - **OCR Strategy**: Production relies on OCR.space API (cloud, 25k free/month) + Tesseract (Nix)
-    - **Graceful Degradation**: Code lazily loads PaddleOCR/EasyOCR - works without them via fallbacks
-  - **`.dockerignore` Enhanced**: Excludes cache, libraries, media, logs, and temporary files
-    - Python: `__pycache__/`, `.pythonlibs/`, `.cache/`, `.local/`, `.upm/`
+  - **Ultra-Minimal Requirements**: Created `requirements-prod-minimal.txt` (only 8 packages!)
+    - **Removed ALL heavy packages**: opencv, pdfplumber, camelot-py, pdf2image, paddleocr, easyocr
+    - **Kept essential**: Django, gunicorn, Pillow, PyPDF2, pytesseract, requests, openpyxl, python-dotenv
+    - **Production OCR**: 100% cloud-based via OCR.space API (25k free/month) + Tesseract (Nix)
+  - **Code Hardening**: Added PDF2IMAGE_AVAILABLE flag for graceful degradation
+    - All pdf2image imports wrapped in try/except
+    - Fallbacks to OCR.space API when heavy packages unavailable
+    - QR code detection disabled if OpenCV not available
+  - **`.dockerignore` Enhanced**: Aggressively excludes ALL unnecessary files
+    - Python: `.pythonlibs/`, `.cache/`, `.local/`, `.upm/`, `__pycache__/`, `*.pyc`
     - Django: `db.sqlite3`, `media/`, `*.log`
-    - Development: `.git/`, `.vscode/`, `*.md`, `attached_assets/`, demo data
-  - **Build Configuration**: Deployment uses `pip install -r requirements-prod.txt` in build step
-  - **Impact**: Deployment image size reduced 8x while maintaining full OCR functionality via cloud + Tesseract
+    - Development: `.git/`, `.vscode/`, `requirements.txt`, `*.md`, `attached_assets/`
+  - **Build Configuration**: `pip install -r requirements-prod-minimal.txt`
+  - **Impact**: Deployment image <500MB (16x reduction from 8GB!) while maintaining core functionality
 - **Development vs Production**:
-  - **Development**: Uses `requirements.txt` with all OCR engines (PaddleOCR, EasyOCR, Tesseract)
-  - **Production**: Uses `requirements-prod.txt` with cloud OCR (OCR.space) + Tesseract only
+  - **Development**: Uses `requirements.txt` with all OCR engines (PaddleOCR, EasyOCR, OpenCV, etc.)
+  - **Production**: Uses `requirements-prod-minimal.txt` with cloud OCR only (OCR.space API via requests)
 
 ### October 15, 2025 - Mini Códigos FPOL: Sistema de Mapeamento para Exportação Excel
 - **Feature**: Tabela de mini códigos FPOL adicionada à base de dados para simplificar exportações Excel

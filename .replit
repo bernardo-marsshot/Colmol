@@ -52,6 +52,10 @@ localPort = 35973
 externalPort = 3000
 
 [[ports]]
+localPort = 45183
+externalPort = 4200
+
+[[ports]]
 localPort = 45731
 externalPort = 3003
 
@@ -62,4 +66,4 @@ externalPort = 3002
 [deployment]
 deploymentTarget = "vm"
 run = ["gunicorn", "--bind=0.0.0.0:5000", "--reuse-port", "colmolsite.wsgi:application"]
-build = ["pip", "install", "-r", "requirements-prod.txt"]
+build = ["pip", "install", "-r", "requirements-prod-minimal.txt"]
