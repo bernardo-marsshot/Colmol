@@ -10,16 +10,9 @@ import signal
 
 import PyPDF2
 import pytesseract
+from pdf2image import convert_from_path
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill
-
-# pdf2image (optional - for PDF to image conversion)
-try:
-    from pdf2image import convert_from_path
-    PDF2IMAGE_AVAILABLE = True
-except ImportError:
-    PDF2IMAGE_AVAILABLE = False
-    print("⚠️ pdf2image não disponível - funcionalidade de conversão PDF→imagem desativada")
 
 from django.conf import settings
 from django.http import HttpResponse
@@ -524,7 +517,7 @@ def extract_text_from_pdf(file_path: str):
             print(f"✅ PDF text extraction: {len(text)} chars")
             # Mesmo com texto embutido, tenta detectar QR codes
             qr_codes = []
-            if QR_CODE_ENABLED and PDF2IMAGE_AVAILABLE:
+            if QR_CODE_ENABLED:
                 try:
                     print("🔍 Procurando QR codes no PDF...")
                     pages = convert_from_path(file_path, dpi=300)
@@ -543,7 +536,7 @@ def extract_text_from_pdf(file_path: str):
         if ocr_text and len(ocr_text.strip()) > 50:
             # QR codes (se disponível)
             qr_codes = []
-            if QR_CODE_ENABLED and PDF2IMAGE_AVAILABLE:
+            if QR_CODE_ENABLED:
                 try:
                     print("🔍 Procurando QR codes no PDF...")
                     pages = convert_from_path(file_path, dpi=300)
@@ -713,12 +706,6 @@ def extract_text_from_pdf_with_ocr(file_path: str):
     """Converte todas as páginas para imagem e aplica PaddleOCR (ou Tesseract como fallback)."""
     import time
     import numpy as np
-    
-    # Se pdf2image não está disponível, usa Tesseract direto em página única
-    if not PDF2IMAGE_AVAILABLE:
-        print("⚠️ pdf2image não disponível - OCR de PDF limitado")
-        return "", []
-    
     try:
         # Tenta usar PaddleOCR primeiro
         paddle_ocr = get_paddle_ocr()
