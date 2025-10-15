@@ -1557,44 +1557,27 @@ def parse_pedido_espanhol(text: str):
                 precio_str = match1b.group(4).replace(',', '.')
                 cantidad_str = match1b.group(5).replace(',', '.')
                 
-                try:
-                    cantidad = float(cantidad_str)
-                    precio = float(precio_str)
-                    total = float(total_str)
-                    
-                    # Extrair dimensões
-                    dims = ""
-                    dim_match = re.search(r'(\d{2,3})[xX×](\d{2,3})', descripcion)
-                    if dim_match:
-                        dims = f"{dim_match.group(1)}x{dim_match.group(2)}"
-                    
-                    produtos.append({
-                        "artigo": codigo,
-                        "descricao": descripcion,
-                        "quantidade": cantidad,
-                        "unidade": "UN",
-                        "preco_unitario": precio,
-                        "total": total,
-                        "dimensoes": dims,
-                        "pedido_numero": pedido_num,
-                        "fecha": fecha,
-                        "proveedor": proveedor,
-                        "referencia_ordem": "",
-                        "lote_producao": "",
-                        "volume": 0,
-                        "peso": 0.0,
-                        "iva": 21.0  # IVA Espanha padrão
-                    })
+                # VALIDAÇÕES ANTI-FALSO-POSITIVO (igual buffer multi-linha)
+                # 1. Código não pode ser número puro
+                if re.match(r'^\d+$', codigo):
+                    i += 1
                     continue
-                except ValueError:
+                # 2. Código não pode começar com PT (NIFs)
+                if codigo.startswith('PT'):
+                    i += 1
+                    continue
+                # 3. Quantidade não pode ser > 100
+                try:
+                    if float(cantidad_str) > 100:
+                        i += 1
+                        continue
+                except:
                     pass
-            
-            elif match1:
-                codigo = match1.group(1)
-                descripcion = match1.group(2).strip()
-                cantidad_str = match1.group(3).replace(',', '.')
-                precio_str = match1.group(4).replace(',', '.')
-                total_str = match1.group(5).replace(',', '.')
+                # 4. Descrição não pode ter palavras de endereço
+                address_words = ['POLIGONO', 'NAVE', 'CALLE', 'RUA', 'AVENIDA', 'ZONA', 'INDUSTRIAL']
+                if any(word in descripcion.upper() for word in address_words):
+                    i += 1
+                    continue
                 
                 try:
                     cantidad = float(cantidad_str)
@@ -1624,6 +1607,69 @@ def parse_pedido_espanhol(text: str):
                         "peso": 0.0,
                         "iva": 21.0  # IVA Espanha padrão
                     })
+                    print(f"✅ Formato 1B extraído: {codigo} - {descripcion} - {cantidad}")
+                    continue
+                except ValueError:
+                    pass
+            
+            elif match1:
+                codigo = match1.group(1)
+                descripcion = match1.group(2).strip()
+                cantidad_str = match1.group(3).replace(',', '.')
+                precio_str = match1.group(4).replace(',', '.')
+                total_str = match1.group(5).replace(',', '.')
+                
+                # VALIDAÇÕES ANTI-FALSO-POSITIVO (igual buffer multi-linha)
+                # 1. Código não pode ser número puro
+                if re.match(r'^\d+$', codigo):
+                    i += 1
+                    continue
+                # 2. Código não pode começar com PT (NIFs)
+                if codigo.startswith('PT'):
+                    i += 1
+                    continue
+                # 3. Quantidade não pode ser > 100
+                try:
+                    if float(cantidad_str) > 100:
+                        i += 1
+                        continue
+                except:
+                    pass
+                # 4. Descrição não pode ter palavras de endereço
+                address_words = ['POLIGONO', 'NAVE', 'CALLE', 'RUA', 'AVENIDA', 'ZONA', 'INDUSTRIAL']
+                if any(word in descripcion.upper() for word in address_words):
+                    i += 1
+                    continue
+                
+                try:
+                    cantidad = float(cantidad_str)
+                    precio = float(precio_str)
+                    total = float(total_str)
+                    
+                    # Extrair dimensões
+                    dims = ""
+                    dim_match = re.search(r'(\d{2,3})[xX×](\d{2,3})', descripcion)
+                    if dim_match:
+                        dims = f"{dim_match.group(1)}x{dim_match.group(2)}"
+                    
+                    produtos.append({
+                        "artigo": codigo,
+                        "descricao": descripcion,
+                        "quantidade": cantidad,
+                        "unidade": "UN",
+                        "preco_unitario": precio,
+                        "total": total,
+                        "dimensoes": dims,
+                        "pedido_numero": pedido_num,
+                        "fecha": fecha,
+                        "proveedor": proveedor,
+                        "referencia_ordem": "",
+                        "lote_producao": "",
+                        "volume": 0,
+                        "peso": 0.0,
+                        "iva": 21.0  # IVA Espanha padrão
+                    })
+                    print(f"✅ Formato 1 extraído: {codigo} - {descripcion} - {cantidad}")
                     continue
                 except ValueError:
                     pass
