@@ -1242,11 +1242,18 @@ def parse_guia_generica(text: str):
     """
     Parser genérico para extrair produtos de qualquer formato de guia de remessa.
     Usa heurísticas para detectar tabelas com produtos.
+    
+    Suporta formatos complexos onde descrição contém números:
+    - CBAGD00067 CX EUROSPUMA 3044 VE 125,000 UN 1,880 0,150 0,080 84,600 KG
+    - Extrai quantidade correta (125,000) ignorando números na descrição (3044)
     """
     produtos = []
     lines = text.split("\n")
     
     pedido_atual = ""
+    
+    # Unidades conhecidas (ordenadas por especificidade)
+    UNIDADES_CONHECIDAS = r'\b(UN|UNI|UNID|UNIDADES|MT|M2|M²|M3|M³|KG|G|ML|L|CX|PC|PCS|PAR|SET|RL|FD|PAC)\b'
     
     for i, line in enumerate(lines):
         stripped = line.strip()
@@ -1258,6 +1265,73 @@ def parse_guia_generica(text: str):
             pedido_atual = pedido_match.group(1)
             continue
         
+        # Estratégia 1: Procurar código (8+ chars) + UNIDADE conhecida + pegar número ANTES da unidade
+        # Exemplo: CBAGD00067 CX EUROSPUMA 3044 VE 125,000 UN ...
+        # Captura: código=CBAGD00067, tudo até UN, quantidade=125,000, unidade=UN
+        codigo_match = re.match(r'^([A-Z0-9]{8,})\s+(.+)', stripped, re.IGNORECASE)
+        if codigo_match:
+            codigo = codigo_match.group(1).strip()
+            resto_linha = codigo_match.group(2).strip()
+            
+            # Procurar UNIDADE conhecida
+            unidade_match = re.search(UNIDADES_CONHECIDAS, resto_linha, re.IGNORECASE)
+            if unidade_match:
+                unidade = unidade_match.group(1).upper()
+                pos_unidade = unidade_match.start()
+                
+                # Pegar tudo ANTES da unidade
+                antes_unidade = resto_linha[:pos_unidade].strip()
+                
+                # Extrair a DESCRIÇÃO e QUANTIDADE
+                # A quantidade é o ÚLTIMO número antes da unidade
+                # Exemplo: "CX EUROSPUMA 3044 VE 125,000" → descrição="CX EUROSPUMA 3044 VE", quantidade=125,000
+                partes = antes_unidade.split()
+                if len(partes) >= 2:
+                    # Tentar pegar o último token como quantidade
+                    possivel_qtd = partes[-1]
+                    
+                    # Verificar se é número
+                    if re.match(r'^[\d,\.]+$', possivel_qtd):
+                        quantidade_str = possivel_qtd
+                        descricao = ' '.join(partes[:-1])
+                        
+                        try:
+                            # Converter quantidade (formato PT: 125,000 ou 125.000)
+                            if ',' in quantidade_str:
+                                # Formato 125,000 (europeu com vírgula decimal)
+                                quantidade = float(quantidade_str.replace('.', '').replace(',', '.'))
+                            else:
+                                # Formato 125.000 (milhares) ou 125 (inteiro)
+                                if quantidade_str.count('.') == 1 and len(quantidade_str.split('.')[1]) == 3:
+                                    # 125.000 (milhares) → 125000
+                                    quantidade = float(quantidade_str.replace('.', ''))
+                                else:
+                                    # 125.5 (decimal) → 125.5
+                                    quantidade = float(quantidade_str)
+                            
+                            dims = ""
+                            dim_match = re.search(r'(\d{3,4})[xX×](\d{3,4})[xX×](\d{3,4})', descricao)
+                            if dim_match:
+                                dims = f"{float(dim_match.group(1))/1000:.2f}x{float(dim_match.group(2))/1000:.2f}x{float(dim_match.group(3))/1000:.2f}"
+                            
+                            produtos.append({
+                                "referencia_ordem": pedido_atual or "",
+                                "artigo": codigo,
+                                "descricao": descricao,
+                                "lote_producao": "",
+                                "quantidade": quantidade,
+                                "unidade": unidade,
+                                "volume": 0,
+                                "dimensoes": dims,
+                                "peso": 0.0,
+                                "iva": 23.0,
+                                "total": 0.0
+                            })
+                            continue
+                        except ValueError:
+                            pass
+        
+        # Estratégia 2 (fallback): Regex original para formatos simples
         produto_match = re.match(
             r'^([A-Z0-9]{8,})\s+'
             r'(.+?)\s+'
