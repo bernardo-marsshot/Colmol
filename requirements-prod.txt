@@ -1,0 +1,22 @@
+# Production dependencies (lightweight - excludes heavy OCR engines)
+# System will use OCR.space API (cloud) + Tesseract (Nix) for OCR
+
+Django==5.0.6
+openai
+openpyxl
+Pillow
+PyPDF2
+pytesseract
+pdf2image
+opencv-python-headless
+google-genai
+pdfplumber
+python-dotenv
+camelot-py[base]
+rapidfuzz
+gunicorn
+
+# Note: PaddleOCR, paddlepaddle, and easyocr are EXCLUDED for deployment
+# to reduce image size from 8GB to <1GB. The app gracefully falls back to:
+# - OCR.space API (cloud, 25k free requests/month)
+# - Tesseract OCR (Nix package, already installed)

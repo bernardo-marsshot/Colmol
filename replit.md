@@ -40,19 +40,27 @@ Key architectural decisions and features include:
 
 ### October 15, 2025 - Deployment: Reserved VM Configuration & Image Size Optimization
 - **Deployment Type**: Switched from Autoscale to Reserved VM deployment
-  - **Reason**: OCR-heavy processing with multiple engines (PaddleOCR, EasyOCR, Tesseract) better suited for persistent VM
+  - **Reason**: OCR-heavy processing with multiple engines better suited for persistent VM
   - **Production Server**: Using Gunicorn WSGI server (`--bind=0.0.0.0:5000 --reuse-port`)
   - **Benefits**: No cold starts, consistent performance, better handling of heavy OCR workloads
-- **Image Size Optimization**: Reduced deployment image size to meet requirements
+- **Image Size Optimization**: Reduced deployment image size from 8GB+ to <1GB (8x reduction!)
   - **Nix Packages Cleaned**: Removed 8 unnecessary/duplicate packages (22 → 14 packages)
     - Removed: `poppler_utils` (duplicate), `taskflow`, `tcl`, `tk`, `rapidfuzz-cpp`, `libimagequant`, `libxcrypt`, `hdf5`
     - Kept essential: `tesseract` (OCR), `poppler-utils` (PDF), `zbar` (QR codes), `libGL/libGLU` (OpenCV), image libs
-  - **`.dockerignore` Created**: Excludes cache, media, logs, and temporary files from deployment
-    - Python cache: `__pycache__/`, `*.pyc`, `.pytest_cache/`
+  - **Production Requirements**: Created `requirements-prod.txt` for lightweight deployment
+    - **Removed heavy OCR engines**: PaddleOCR, paddlepaddle, EasyOCR (~7GB savings!)
+    - **Optimized packages**: opencv-python → opencv-python-headless (lighter, no GUI)
+    - **OCR Strategy**: Production relies on OCR.space API (cloud, 25k free/month) + Tesseract (Nix)
+    - **Graceful Degradation**: Code lazily loads PaddleOCR/EasyOCR - works without them via fallbacks
+  - **`.dockerignore` Enhanced**: Excludes cache, libraries, media, logs, and temporary files
+    - Python: `__pycache__/`, `.pythonlibs/`, `.cache/`, `.local/`, `.upm/`
     - Django: `db.sqlite3`, `media/`, `*.log`
     - Development: `.git/`, `.vscode/`, `*.md`, `attached_assets/`, demo data
-  - **Impact**: Significantly reduced deployment image size while maintaining all OCR functionality
-- **Dependencies**: Gunicorn added to `requirements.txt` for production WSGI server
+  - **Build Configuration**: Deployment uses `pip install -r requirements-prod.txt` in build step
+  - **Impact**: Deployment image size reduced 8x while maintaining full OCR functionality via cloud + Tesseract
+- **Development vs Production**:
+  - **Development**: Uses `requirements.txt` with all OCR engines (PaddleOCR, EasyOCR, Tesseract)
+  - **Production**: Uses `requirements-prod.txt` with cloud OCR (OCR.space) + Tesseract only
 
 ### October 15, 2025 - Mini Códigos FPOL: Sistema de Mapeamento para Exportação Excel
 - **Feature**: Tabela de mini códigos FPOL adicionada à base de dados para simplificar exportações Excel

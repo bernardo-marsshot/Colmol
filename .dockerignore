@@ -1,9 +1,13 @@
-# Python cache
+# Python cache and libraries (CRITICAL - these are huge!)
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
+.pythonlibs/
+.cache/
+.local/
+.upm/
 
 # Django
 *.log
