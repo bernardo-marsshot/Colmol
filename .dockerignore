@@ -62,3 +62,31 @@ tmp/
 # Demo/attached assets (if not needed in production)
 attached_assets/
 extracao.json
+
+# Additional exclusions for deployment
+*.pyc
+*.pyo
+*.pyd
+__pycache__
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.coverage.*
+.hypothesis/
+*.egg
+*.egg-info
+dist/
+build/
+*.so
+*.dylib
+
+# Development only
+requirements.txt
+README.md
+.replit
+replit.md
+
+# Keep only production requirements
+!requirements-prod.txt
