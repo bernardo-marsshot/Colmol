@@ -1401,22 +1401,86 @@ def parse_pedido_espanhol(text: str):
     
     in_product_section = False
     
-    for i, line in enumerate(lines):
-        stripped = line.strip()
+    # Multi-line buffer: tentar juntar 3 linhas para formato COSGUI (qty, desc, code em linhas separadas)
+    i = 0
+    while i < len(lines):
+        stripped = lines[i].strip()
         if not stripped:
+            i += 1
             continue
         
         # Detectar início da seção de produtos (keywords podem vir em linhas separadas)
-        if re.search(r'Artículo|Descripción|Cantidad', stripped, re.IGNORECASE):
+        if re.search(r'Artículo|Descripción|Cantidad|Código', stripped, re.IGNORECASE):
             in_product_section = True
+            i += 1
             continue
         
         # Detectar fim da seção
         if re.search(r'^Total|^Importe neto|^Notas|^Plazo|^Base I\.V\.A', stripped, re.IGNORECASE):
             in_product_section = False
+            i += 1
             continue
         
-        if in_product_section:
+        # NOVO: Buffer multi-linha para formato COSGUI (quantidade, descrição, código em linhas separadas)
+        # Tentar juntar próximas 3 linhas se parecerem ser: QTY + DESC + CODE
+        if i + 2 < len(lines):
+            line1 = lines[i].strip()
+            line2 = lines[i+1].strip()
+            line3 = lines[i+2].strip()
+            
+            # Padrão: linha1=quantidade, linha2=descrição, linha3=código
+            if (re.match(r'^[\d,]+$', line1) and  # Quantidade pura
+                len(line2) > 10 and  # Descrição tem texto
+                re.match(r'^[A-Z0-9]{6,}$', line3)):  # Código alfanumérico
+                
+                # Reconstruir linha no formato esperado: CÓDIGO DESCRIPCIÓN CANTIDAD
+                reconstructed = f"{line3} {line2} {line1}"
+                print(f"🔧 Buffer multi-linha: '{line1}' + '{line2}' + '{line3}' → '{reconstructed}'")
+                
+                # Tentar match no formato 2
+                match2 = re.match(
+                    r'^([A-Z0-9]{6,})\s+(.+?)\s+([\d,]+)$',
+                    reconstructed
+                )
+                
+                if match2:
+                    codigo = match2.group(1)
+                    descripcion = match2.group(2).strip()
+                    cantidad_str = match2.group(3).replace(',', '.')
+                    
+                    try:
+                        cantidad = float(cantidad_str)
+                        
+                        # Extrair dimensões
+                        dims = ""
+                        dim_match = re.search(r'(\d{2,3})[xX×](\d{2,3})', descripcion)
+                        if dim_match:
+                            dims = f"{dim_match.group(1)}x{dim_match.group(2)}"
+                        
+                        produtos.append({
+                            "artigo": codigo,
+                            "descricao": descripcion,
+                            "quantidade": cantidad,
+                            "unidade": "UN",
+                            "preco_unitario": 0.0,
+                            "total": 0.0,
+                            "dimensoes": dims,
+                            "pedido_numero": pedido_num,
+                            "fecha": fecha,
+                            "proveedor": proveedor,
+                            "referencia_ordem": "",
+                            "lote_producao": "",
+                            "volume": 0,
+                            "peso": 0.0,
+                            "iva": 21.0
+                        })
+                        print(f"✅ Produto multi-linha extraído: {codigo} - {descripcion} - {cantidad}")
+                        i += 3  # Pular as 3 linhas processadas
+                        continue
+                    except ValueError:
+                        pass
+        
+        if in_product_section or True:  # SEMPRE tentar parsear (headers podem vir depois)
             # Formato 1B: DESCRIPCIÓN CÓDIGO TOTAL PRECIO UNIDADES (formato invertido NATURCOLCHON)
             # Exemplo: COLCHON PRAGA DE 150X200 CM*NUEVO* COPR1520 875,00 175,00 5,00
             # VERIFICAR PRIMEIRO pois tem 3 números (mais específico)
@@ -1551,6 +1615,9 @@ def parse_pedido_espanhol(text: str):
                     })
                 except ValueError:
                     pass
+        
+        # Incrementar contador (se não houve continue antes)
+        i += 1
     
     return produtos
 

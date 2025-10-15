@@ -73,17 +73,27 @@ Key architectural decisions and features include:
 - **Cost**: 100% grátis (OCR.space free tier + engines locais offline)
 - **Known Limitations**: Universal table extraction pode mapear colunas incorretamente em tabelas mal formatadas (ex: PC5_0005051.pdf captura endereço em vez de produto). Requer validação adicional de heurísticas de coluna.
 
+### October 15, 2025 - Multi-Line Buffer for PEDIDO_ESPANHOL (COSGUI Format)
+- **Problem Solved**: COSGUI format has qty, description, code on **separate lines** (not captured by single-line regex)
+- **Multi-Line Buffer**: Parser now joins 3 consecutive lines if pattern matches:
+  - Line 1: pure number (quantity) `4,00`
+  - Line 2: text description `COLCHON TOP VISCO 2019 135X190`
+  - Line 3: alphanumeric code `LUSTOPVS135190`
+- **Reconstruction**: Builds format `CODIGO DESCRIPCION CANTIDAD` from 3-line pattern
+- **Always Active**: Parser tries multi-line buffer **even without header detection** (headers may appear after products)
+- **Tested**: PC5_0005051.pdf (COSGUI) - now extracts 2/2 products ✅
+- **Compatibility**: Works with all Spanish formats (NATURCOLCHON, COSGUI)
+
 ### October 13, 2025 - PEDIDO_ESPANHOL Parser for Spanish Purchase Orders
 - **New Document Type**: Added "PEDIDO_ESPANHOL" detection and parser for Spanish purchase order documents
-- **Multi-Format Support**: Handles 2 Spanish format variations:
+- **Multi-Format Support**: Handles 3 Spanish format variations:
   - **Format 1 (Standard)**: CÓDIGO DESCRIPCIÓN UNIDADES PRECIO IMPORTE
   - **Format 1B (Inverted NATURCOLCHON)**: DESCRIPCIÓN CÓDIGO TOTAL PRECIO UNIDADES ✅
-  - **Format 2 (Simple)**: CÓDIGO DESCRIPCIÓN CANTIDAD (partial - needs multi-line buffer)
+  - **Format 2 (COSGUI Multi-Line)**: CANTIDAD + DESCRIPCIÓN + CÓDIGO (3 separate lines) ✅
 - **Priority-Based Matching**: Format 1B checked FIRST (3 numbers, more specific) to prevent false positives
-- **Product Extraction**: Successfully extracts código, descripción, cantidad, precio unitario, total from NATURCOLCHON format
+- **Product Extraction**: Successfully extracts código, descripción, cantidad, precio unitario, total
 - **Metadata Extraction**: Pedido número, Fecha, Proveedor, Dimension auto-detection (150x200)
-- **Successfully Tested**: 177.pdf (NATURCOLCHON) - 1/1 products extracted ✅
-- **Pending Format**: PC5_0005051.pdf (COSGUI) - requires multi-line buffer (qty, desc, code on separate lines)
+- **Successfully Tested**: 177.pdf (NATURCOLCHON) 1/1 ✅, PC5_0005051.pdf (COSGUI) 2/2 ✅
 - **IVA Rate**: Defaults to 21% (Spanish VAT standard rate)
 - **Integration**: Seamlessly integrated into existing OCR pipeline
 
