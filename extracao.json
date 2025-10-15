@@ -1,56 +1,69 @@
 {
   "numero_requisicao": "",
-  "document_number": "/DELIVERY",
-  "po_number": "/DELIVERY",
-  "supplier_name": "",
-  "delivery_date": "09-10-2025",
-  "qr_codes": [
+  "document_number": "",
+  "po_number": "",
+  "supplier_name": "N.I.F.\nPag.\nAtendido por",
+  "delivery_date": "09/10/2025",
+  "qr_codes": [],
+  "produtos": [
     {
-      "data": {
-        "nif_emitente": "500117063",
-        "nif_adquirente": "500248800",
-        "pais_adquirente": "PT",
-        "tipo_documento": "GR",
-        "estado_documento": "F",
-        "data_documento": "20251009",
-        "identificacao_documento": "0 GR4/0246881",
-        "atcud": "JFFWWF96-0246881",
-        "espaco_fiscal": "",
-        "total_impostos": "0.00",
-        "total_documento": "0.00",
-        "hash": "9qCJ",
-        "certificado": "1767"
-      },
-      "raw_data": "A:500117063*B:500248800*C:PT*D:GR*E:F*F:20251009*G:0 GR4/0246881*H:JFFWWF96-0246881*I1:*N:0.00*O:0.00*Q:9qCJ*R:1767",
-      "page": 1
+      "artigo": "POLIGONO",
+      "descricao": "INDUTRIAL MORERO, NAVE 1",
+      "quantidade": 10.0,
+      "unidade": "UN",
+      "preco_unitario": 0.0,
+      "total": 0.0,
+      "dimensoes": "",
+      "pedido_numero": "",
+      "fecha": "",
+      "proveedor": "N.I.F.\nPag.\nAtendido por",
+      "referencia_ordem": "",
+      "lote_producao": "",
+      "volume": 0,
+      "peso": 0.0,
+      "iva": 21.0
     },
     {
-      "data": {
-        "nif_emitente": "500117063",
-        "nif_adquirente": "500248800",
-        "pais_adquirente": "PT",
-        "tipo_documento": "GR",
-        "estado_documento": "F",
-        "data_documento": "20251009",
-        "identificacao_documento": "0 GR4/0246881",
-        "atcud": "JFFWWF96-0246881",
-        "espaco_fiscal": "",
-        "total_impostos": "0.00",
-        "total_documento": "0.00",
-        "hash": "9qCJ",
-        "certificado": "1767"
-      },
-      "raw_data": "A:500117063*B:500248800*C:PT*D:GR*E:F*F:20251009*G:0 GR4/0246881*H:JFFWWF96-0246881*I1:*N:0.00*O:0.00*Q:9qCJ*R:1767",
-      "page": 2
+      "artigo": "LUSTOPVS135190",
+      "descricao": "COLCHON TOP VISCO 2019 135X190",
+      "quantidade": 4.0,
+      "unidade": "UN",
+      "preco_unitario": 0.0,
+      "total": 0.0,
+      "dimensoes": "135x190",
+      "pedido_numero": "",
+      "fecha": "",
+      "proveedor": "N.I.F.\nPag.\nAtendido por",
+      "referencia_ordem": "",
+      "lote_producao": "",
+      "volume": 0,
+      "peso": 0.0,
+      "iva": 21.0
+    },
+    {
+      "artigo": "LUSTOPVS150190",
+      "descricao": "COLCHON TOP VISCO 2019 150X190",
+      "quantidade": 4.0,
+      "unidade": "UN",
+      "preco_unitario": 0.0,
+      "total": 0.0,
+      "dimensoes": "150x190",
+      "pedido_numero": "",
+      "fecha": "",
+      "proveedor": "N.I.F.\nPag.\nAtendido por",
+      "referencia_ordem": "",
+      "lote_producao": "",
+      "volume": 0,
+      "peso": 0.0,
+      "iva": 21.0
     }
   ],
-  "produtos": [],
   "lines": [],
   "totals": {
-    "total_lines": 0,
-    "total_quantity": 0
+    "total_lines": 3,
+    "total_quantity": 18.0
   },
-  "tipo_documento": "GUIA_COLMOL",
-  "texto_completo": "Incoterms Carga/Pick Transporte/Shipment Vend./Vendor N.Forn./Supplier Code Código AT/AT CodePágina/Page /   2\nGuia/Delivery Note\nData/DateOriginal\nEste documento não serve de Fatura - INTERNALATCUD:\nNIF/VAT ID:\nNOME CLIENTE / CUSTOMER NAME\nNIF/VAT ID:PONTO ENVIO / SHIP TOSociedade Anonima - Capital Social 557.440,48 - Ins. na Cons. do Reg.Com.de S.J.Madra sob nº1686/990510\nPEDIDO/ORDER CÓDIGO/PART NUMBER DESCRIÇÃO/DESCRIPTION LOTE/BATCH N.SÉRIE/SERIAL NR. QUANT./QUANTITY \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n *N4/0246881*\n   1\n0 GR4/0246881\n09-10-2025\nGuia de Remessa\n9qCJ-Processado por programa Certificado Nº 1767/AT\nJFFWWF96-0246881\nDAP\n170384\n4\nROAD\n18026254649\nFLEXIPOL-ESPUMAS SINTETICAS,SA\nDEVESA VELHA\n3700-122\nSÃO JOÃO DA MADEIRA\nPORTUGAL\nPT 500117063\n10000646\nCOLMOL - COLCHOES SA\nZONA INDUSTRIAL DE CAVADAS\nAP.115\n3721-908\nVILA DE CUCUJAES\nPORTUGAL\nPT 500248800\n1\nCOLMOL - COLCHOES SA\nZONA INDUSTRIAL DE CAVADAS\nAP.115\n3721-908\nVILA DE CUCUJAES\nPORTUGAL\nContinua\n4765\n4826\n4828\n4847\nKDG120M210009,0\nKZJ040M210015,0\nNIF128001500070\nNIJ119005800100\nNND198013800030\nNND198015800030\nNPZ189008800120\nNPZ189008800170\nNPZ189010300170\nNPZ199010300170\nNPZ199013300170\nROLO POLIETER        2100X09,0\nROLO POLIETER        2100X15,0\nPLACA           1280x0150x0070\nPLACA           1190x0580x0100\nPLACA           1980x1380x0030\nPLACA           1980x1580x0030\nPLACA           1890x0880x0120\nPLACA           1890x0880x0170\nPLACA           1890x1030x0170\nPLACA           1990x1030x0170\nPLACA           1990x1330x0170\n18 M BR\nVISTEC 40 M BR\n23 DD LA\n23 M Az\n28 D VR\n28 D VR\n30 M LA\n30 M LA\n30 M LA\n30 M LA\n30 M LA\n215,000\n120,000\n75,000\n1,000\n2,000\n2,000\n2,000\n4,000\n1,000\n5,000\n2,000\nML\nML\nUN\nUN\nUN\nUN\nUN\nUN\nUN\nUN\nUN\n120636/04\n120636/04\n120877/02\n120877/02\n120877/02\n19616570/01\n19616570/01\n19616570/01\n09615406/01\n19615957/01\n19614023/01\n19615943/01\n19609314/01\n19609314/01\n19609314/01\n19615764/01\n19615945/01\n19615944/01\n19615944/01\n19615944/01\n19608011/01\n2003321064\n2003321071\n2003346529\n2003346597\n2003346648\n2003360659\n2003360660\n2003360661\n2003360642\n2003358805\n2003348502\n2003358658\n2003320811\n2003320812\n2003320813\n2003353715\n2003358659\n2003358660\n2003358661\n2003358662\n2003313673\n110,000\n105,000\n40,000\n40,000\n40,000\n25,000\n25,000\n25,000\n1,000\n2,000\n2,000\n2,000\n1,000\n1,000\n1,000\n1,000\n1,000\n1,000\n2,000\n2,000\n2,000\nTot Volumes        2\nTot Volumes        3\nTot Volumes        3\nTot Volumes        1\nTot Volumes        1\nTot Volumes        1\nTot Volumes        1\nTot Volumes        4\nTot Volumes        1\nTot Volumes        3\nTot Volumes        1\nTotal Cont.:   2\nTotal Cont.:   3\nTotal Cont.:   3\nTotal Cont.:   1\nTotal Cont.:   1\nTotal Cont.:   1\nTotal Cont.:   1\nTotal Cont.:   3\nTotal Cont.:   1\nTotal Cont.:   1\nTotal Cont.:   3\nTotal Cont.:   1\nTotal Lote/Batch:      215,000\nTotal Lote/Batch:      120,000\nTotal Lote/Batch:       75,000\nTotal Lote/Batch:        1,000\nTotal Lote/Batch:        2,000\nTotal Lote/Batch:        2,000\nTotal Lote/Batch:        2,000\nTotal Lote/Batch:        3,000\nTotal Lote/Batch:        1,000\nTotal Lote/Batch:        1,000\nTotal Lote/Batch:        5,000\nTotal Lote/Batch:        2,000\n\nIncoterms Carga/Pick Transporte/Shipment Vend./Vendor N.Forn./Supplier Code Código AT/AT CodePágina/Page /   2\nGuia/Delivery Note\nData/DateOriginal\nEste documento não serve de Fatura - INTERNALATCUD:\nNIF/VAT ID:\nNOME CLIENTE / CUSTOMER NAME\nNIF/VAT ID:PONTO ENVIO / SHIP TOSociedade Anonima - Capital Social 557.440,48 - Ins. na Cons. do Reg.Com.de S.J.Madra sob nº1686/990510\nPEDIDO/ORDER CÓDIGO/PART NUMBER DESCRIÇÃO/DESCRIPTION LOTE/BATCH N.SÉRIE/SERIAL NR. QUANT./QUANTITY \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n *N4/0246881*\n   2\n0 GR4/0246881\n09-10-2025\nGuia de Remessa\n9qCJ-Processado por programa Certificado Nº 1767/AT\nJFFWWF96-0246881\nDAP\n170384\n4\nROAD\n18026254649\nFLEXIPOL-ESPUMAS SINTETICAS,SA\nDEVESA VELHA\n3700-122\nSÃO JOÃO DA MADEIRA\nPORTUGAL\nPT 500117063\n10000646\nCOLMOL - COLCHOES SA\nZONA INDUSTRIAL DE CAVADAS\nAP.115\n3721-908\nVILA DE CUCUJAES\nPORTUGAL\nPT 500248800\n1\nCOLMOL - COLCHOES SA\nZONA INDUSTRIAL DE CAVADAS\nAP.115\n3721-908\nVILA DE CUCUJAES\nPORTUGAL\nContinuação\n4862\nNUF189013300200\nNUF189014800200\nNUF199011800200\nNIU188015800030\nPLACA            1890x1330x0200\nPLACA            1890x1480x0200\nPLACA           1990x1180x0200\nPLACA           1880x1580x0030\nHR 35 D BG\nHR 35 D BG\nHR 35 D BG\n23 D Az\n4,000\n4,000\n1,000\n2,000\nUN\nUN\nUN\nUN\n19615949/01\n19615949/01\n19615949/01\n19615949/01\n19615948/01\n19615948/01\n19615948/01\n19615948/01\n19615959/01\n19615952/01\n2003358915\n2003358916\n2003358917\n2003358918\n2003358919\n2003358920\n2003358921\n2003358922\n2003358816\n2003358809\n1,000\n1,000\n1,000\n1,000\n1,000\n1,000\n1,000\n1,000\n1,000\n2,000\nTot Volumes        4\nTot Volumes        4\nTot Volumes        1\nTot Volumes        1\nTotal Cont.:   4\nTotal Cont.:   4\nTotal Cont.:   1\nTotal Cont.:   1\nTotal Lote/Batch:        4,000\nTotal Lote/Batch:        4,000\nTotal Lote/Batch:        1,000\nTotal Lote/Batch:        2,000\nDt Expedição  09-10-2025\nTempo Exped   05:56:09\nTransp        Mat.\nNr Vol     31\nTot PB (KG)        571,126\nTot PL (KG)        563,283\nNr Cont\nSelo\nEXPEDIÇÃO\n3701-910  S.JOAO DA MADEIRA\nPlast.Kg 19,950",
+  "tipo_documento": "PEDIDO_ESPANHOL",
+  "texto_completo": "Fecha\nPedido nº\nProveedor\nN.I.F.\nPag.\nAtendido por\n1\nPT500248800\n0000292\nPC5/0005051\n09/10/2025\nADMINISTRA\nPEDIDO\nCOSGUI D.M. S.L.\nB39031059\nPOLIGONO INDUTRIAL MORERO, NAVE 1 10\n39611\nGUARNIZO \n942252861\nNIF.\nfacturacion@cosgui.com\nCOLMOL COLCHOES SA\nZONA INDUSTRIAL DAS CAVADAS APART 119 RUA DO PROGR\n3721-\nVILA DE CUCUJAES\n4,00\nCOLCHON TOP VISCO 2019 135X190\nLUSTOPVS135190\n4,00\nCOLCHON TOP VISCO 2019 150X190\nLUSTOPVS150190\nDescripción\nCantidad\nCódigo\nSu Referencia\nNotas :",
   "baixa_qualidade_texto": false
 }
