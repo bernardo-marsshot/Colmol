@@ -1293,6 +1293,8 @@ def parse_guia_generica(text: str):
                 pos_qtd_inicio = qtd_match.start()
                 descricao = resto_linha[:pos_qtd_inicio].strip()
                 
+                print(f"✅ Parser genérico Estratégia 1: {codigo} | {descricao} | {quantidade_str} {unidade}")
+                
                 try:
                     # Converter quantidade (formato PT: 125,000 ou 125.000)
                     if ',' in quantidade_str:
@@ -1326,7 +1328,8 @@ def parse_guia_generica(text: str):
                         "total": 0.0
                     })
                     continue
-                except ValueError:
+                except ValueError as e:
+                    print(f"⚠️ Erro conversão quantidade: {e}")
                     pass
         
         # Estratégia 2 (fallback): Regex original para formatos simples
