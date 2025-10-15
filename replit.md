@@ -41,17 +41,19 @@ Key architectural decisions and features include:
   - **Step 2**: Ollama LLM processes text + vision to extract structured JSON
   - **Fallback**: If Ollama unavailable/fails, uses OCR data directly
 - **Ollama Features**:
-  - Multi-language support (PT/ES/FR) via prompt engineering
+  - Multi-language support (PT/ES/FR) via prompt engineering with concrete examples
   - JSON-forced output with schema validation
-  - Vision model support (converts PDF to image for visual analysis)
-  - Intelligent product extraction from tables (even malformed ones)
-  - Timeout: 60s (slower than OCR but more accurate)
+  - Vision model support (llava:latest - converts PDF to image for visual analysis)
+  - Intelligent product extraction from tables (even malformed/multi-line ones)
+  - Enhanced prompting: extracts EVERY product even if incomplete data
+  - Timeout: 60s, 4000 tokens max response
 - **Configuration**:
-  - `OLLAMA_API_URL`: Ollama server endpoint (required)
-  - `OLLAMA_MODEL`: Model name (default: llama3.2-vision)
+  - `OLLAMA_API_URL`: Ollama server endpoint (current: http://localhost:3000)
+  - `OLLAMA_MODEL`: Model name (current: llava:latest)
+  - **To activate**: Start Ollama server locally or point to remote instance
 - **Cost**: Free (uses local/remote Ollama without API keys)
-- **Accuracy**: LLM post-processing significantly improves extraction for complex/malformed documents
-- **Integration**: Seamlessly integrated in `process_inbound()` - OCR+LLM hybrid approach
+- **Accuracy**: LLM post-processing significantly improves extraction for complex/malformed documents (when available)
+- **Integration**: Seamlessly integrated in `process_inbound()` - OCR+LLM hybrid approach with graceful fallback
 
 ### October 13, 2025 - Universal Document Extraction System (OCR.space + Fuzzy Matching + Table Extraction)
 - **4-Level OCR Cascade**: Implementado sistema híbrido cloud + local para máxima taxa de sucesso
