@@ -2869,13 +2869,20 @@ def process_inbound(inbound: InboundDocument):
             ).first()
             
             if not mapping:
-                issues += 1
-                exceptions.append({
-                    "line": r.article_code,
-                    "issue": "Código não mapeado para SKU interno",
-                    "suggested": "",
-                })
-                continue
+                # Criar CodeMapping automaticamente para produtos desconhecidos
+                # Tentar obter quantidade encomendada da ReceiptLine ou usar 0 como padrão
+                qty_ordered = float(r.qty_received) if r.qty_received else 0.0
+                
+                # Criar o mapping usando article_code como internal_sku
+                mapping = CodeMapping.objects.create(
+                    supplier=inbound.supplier,
+                    supplier_code=r.article_code,
+                    internal_sku=r.article_code,  # Usar o próprio código como SKU interno
+                    qty_ordered=qty_ordered,
+                    confidence=0.5  # Baixa confiança - criado automaticamente
+                )
+                print(f"🆕 CodeMapping criado automaticamente: {r.article_code} → {r.article_code} (qty: {qty_ordered})")
+                # Não adicionar exceção - continuar o processamento normalmente
             
             # Verificar se quantidade recebida EXCEDE a quantidade encomendada (do CodeMapping)
             qty_ordered = float(mapping.qty_ordered or 0)  # Proteção contra None
