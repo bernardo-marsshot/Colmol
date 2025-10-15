@@ -184,12 +184,15 @@ Rules:
 - Maintain original language in descriptions
 - Return ONLY the JSON, no explanations"""
 
+        # Preparar preview do texto OCR (sem backslash em f-string)
+        ocr_preview = f"OCR Text Preview:\n{ocr_text[:1500]}" if ocr_text else "No OCR text provided - analyze image"
+        
         user_prompt = f"""Extract all data from this document.
 
 Document type: Invoice/Delivery Note/Purchase Order
 Expected format: Tabular data with products
 
-{f'OCR Text Preview:\\n{ocr_text[:1500]}' if ocr_text else 'No OCR text provided - analyze image'}
+{ocr_preview}
 
 Return the complete JSON structure with all products."""
 

@@ -35,6 +35,24 @@ Key architectural decisions and features include:
 
 ## Recent Changes
 
+### October 15, 2025 - Ollama LLM Integration (Hybrid OCR + LLM Post-Processing)
+- **Hybrid Strategy**: OCR first (fast text extraction) → Ollama LLM second (intelligent structuring)
+  - **Step 1**: OCR cascade extracts raw text (Level 0-3: OCR.space → PaddleOCR → EasyOCR → Tesseract)
+  - **Step 2**: Ollama LLM processes text + vision to extract structured JSON
+  - **Fallback**: If Ollama unavailable/fails, uses OCR data directly
+- **Ollama Features**:
+  - Multi-language support (PT/ES/FR) via prompt engineering
+  - JSON-forced output with schema validation
+  - Vision model support (converts PDF to image for visual analysis)
+  - Intelligent product extraction from tables (even malformed ones)
+  - Timeout: 60s (slower than OCR but more accurate)
+- **Configuration**:
+  - `OLLAMA_API_URL`: Ollama server endpoint (required)
+  - `OLLAMA_MODEL`: Model name (default: llama3.2-vision)
+- **Cost**: Free (uses local/remote Ollama without API keys)
+- **Accuracy**: LLM post-processing significantly improves extraction for complex/malformed documents
+- **Integration**: Seamlessly integrated in `process_inbound()` - OCR+LLM hybrid approach
+
 ### October 13, 2025 - Universal Document Extraction System (OCR.space + Fuzzy Matching + Table Extraction)
 - **4-Level OCR Cascade**: Implementado sistema híbrido cloud + local para máxima taxa de sucesso
   - **Level 0 (OCR.space API)**: Cloud OCR gratuito (25k/mês), preciso para tabelas multi-idioma
