@@ -2542,9 +2542,9 @@ def process_inbound(inbound: InboundDocument):
                 {
                     "artigo": p.get('codigo', ''),
                     "descricao": p.get('descricao', ''),
-                    "quantidade": float(p.get('quantidade', 0)),
-                    "preco_unitario": float(p.get('preco_unitario', 0)),
-                    "total": float(p.get('total', 0))
+                    "quantidade": float(p.get('quantidade') or 0),
+                    "preco_unitario": float(p.get('preco_unitario') or 0),
+                    "total": float(p.get('total') or 0)
                 }
                 for p in ollama_data.get('produtos', [])
             ],
