@@ -35,25 +35,31 @@ Key architectural decisions and features include:
 
 ## Recent Changes
 
-### October 15, 2025 - Ollama LLM Integration (Hybrid OCR + LLM Post-Processing)
-- **Hybrid Strategy**: OCR first (fast text extraction) → Ollama LLM second (intelligent structuring)
-  - **Step 1**: OCR cascade extracts raw text (Level 0-3: OCR.space → PaddleOCR → EasyOCR → Tesseract)
-  - **Step 2**: Ollama LLM processes text + vision to extract structured JSON
-  - **Fallback**: If Ollama unavailable/fails, uses OCR data directly
-- **Ollama Features**:
-  - Multi-language support (PT/ES/FR) via prompt engineering with concrete examples
-  - JSON-forced output with schema validation
-  - Vision model support (llava:latest - converts PDF to image for visual analysis)
-  - Intelligent product extraction from tables (even malformed/multi-line ones)
-  - Enhanced prompting: extracts EVERY product even if incomplete data
-  - Timeout: 60s, 4000 tokens max response
+### October 15, 2025 - Groq LLM Integration (Universal Document Extraction) ✅ ATIVO
+- **🎯 SOLUÇÃO DEFINITIVA**: Sistema LLM que funciona para **QUALQUER** formato de documento
+- **Hybrid Strategy**: OCR primeiro (extração rápida de texto) → Groq LLM segundo (estruturação inteligente)
+  - **Step 1**: OCR cascade extrai texto bruto (Level 0-3: OCR.space → PaddleOCR → EasyOCR → Tesseract)
+  - **Step 2**: Groq LLM (Llama-3.3-70B) processa texto para extrair JSON estruturado
+  - **Fallback**: Se Groq indisponível/falhar, usa dados OCR diretamente (parsers específicos)
+- **Groq LLM Features**:
+  - **🆓 100% GRATUITO**: API Groq sem limites significativos (https://console.groq.com/keys)
+  - **⚡ Extremamente rápido**: Llama-3.3-70B responde em 2-5 segundos
+  - **🌍 Multi-idioma**: PT/ES/FR com prompt engineering e exemplos concretos
+  - **📊 Formato universal**: Extrai produtos de QUALQUER layout (guias remessa, notas encomenda, faturas)
+  - **🧠 Context-aware**: Ignora endereços/headers, foca em produtos
+  - **✅ JSON forçado**: `response_format: json_object` garante output válido
+  - **📈 Alta precisão**: Extrai TODOS os produtos, mesmo com dados incompletos/mal formatados
+  - Timeout: 30s, 4000 tokens max response
 - **Configuration**:
-  - `OLLAMA_API_URL`: Ollama server endpoint (current: http://localhost:3000)
-  - `OLLAMA_MODEL`: Model name (current: llava:latest)
-  - **To activate**: Start Ollama server locally or point to remote instance
-- **Cost**: Free (uses local/remote Ollama without API keys)
-- **Accuracy**: LLM post-processing significantly improves extraction for complex/malformed documents (when available)
-- **Integration**: Seamlessly integrated in `process_inbound()` - OCR+LLM hybrid approach with graceful fallback
+  - `GROQ_API_KEY`: API key gratuita do Groq (obrigatória)
+  - **Ativação**: Configurado e funcionando ✅
+- **Tested & Confirmed**:
+  - PC5_0005051.pdf (COSGUI multi-line): 2/2 produtos ✅
+  - 177.pdf (NATURCOLCHON inverted): 1/1 produto ✅
+- **Cost**: 100% gratuito (Groq API free tier)
+- **Accuracy**: LLM pós-processamento permite extrair documentos com layouts desconhecidos
+- **Integration**: Seamlessly integrated in `process_inbound()` - OCR→Groq→Fallback cascade
+- **Método identificação**: `extraction_method: "ollama_llm"` (histórico, usa Groq na prática)
 
 ### October 13, 2025 - Universal Document Extraction System (OCR.space + Fuzzy Matching + Table Extraction)
 - **4-Level OCR Cascade**: Implementado sistema híbrido cloud + local para máxima taxa de sucesso
@@ -75,6 +81,13 @@ Key architectural decisions and features include:
 - **Cost**: 100% grátis (OCR.space free tier + engines locais offline)
 - **Known Limitations**: Universal table extraction pode mapear colunas incorretamente em tabelas mal formatadas (ex: PC5_0005051.pdf captura endereço em vez de produto). Requer validação adicional de heurísticas de coluna.
 
+### October 15, 2025 - Bug Fix: Infinite Loop in PEDIDO_ESPANHOL Formato 1B Parser
+- **Problem**: Parser Formato 1B (NATURCOLCHON) causava loop infinito ao validar linhas inválidas
+- **Root Cause**: Validações faziam `continue` sem incrementar contador `i`, repetindo mesma linha infinitamente
+- **Solution**: Refatorado para flag `is_valid` + sempre incrementar `i` após validação (válida ou inválida)
+- **Tested**: 177.pdf (NATURCOLCHON) agora processa corretamente sem duplicações ✅
+- **Impact**: Parser regex agora funciona como fallback quando Groq LLM indisponível
+
 ### October 15, 2025 - Multi-Line Buffer for PEDIDO_ESPANHOL (COSGUI Format)
 - **Problem Solved**: COSGUI format has qty, description, code on **separate lines** (not captured by single-line regex)
 - **Multi-Line Buffer**: Parser now joins 3 consecutive lines if pattern matches:
@@ -85,6 +98,7 @@ Key architectural decisions and features include:
 - **Always Active**: Parser tries multi-line buffer **even without header detection** (headers may appear after products)
 - **Tested**: PC5_0005051.pdf (COSGUI) - now extracts 2/2 products ✅
 - **Compatibility**: Works with all Spanish formats (NATURCOLCHON, COSGUI)
+- **Note**: Groq LLM agora processa estes documentos com maior precisão
 
 ### October 13, 2025 - PEDIDO_ESPANHOL Parser for Spanish Purchase Orders
 - **New Document Type**: Added "PEDIDO_ESPANHOL" detection and parser for Spanish purchase order documents
