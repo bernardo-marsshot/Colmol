@@ -1,39 +1,69 @@
 {
   "numero_requisicao": "",
-  "document_number": "AMA",
-  "po_number": "AMA",
-  "supplier_name": "",
-  "delivery_date": "01/10/2025",
-  "qr_codes": [
+  "document_number": "",
+  "po_number": "",
+  "supplier_name": "N.I.F.\nPag.\nAtendido por",
+  "delivery_date": "09/10/2025",
+  "qr_codes": [],
+  "produtos": [
     {
-      "data": {
-        "nif_emitente": "501400354",
-        "nif_adquirente": "500248800",
-        "pais_adquirente": "PT",
-        "tipo_documento": "FT",
-        "estado_documento": "N",
-        "data_documento": "20251001",
-        "identificacao_documento": "VIT 2025/2754",
-        "atcud": "JJWFDDF8-2754",
-        "espaco_fiscal": "PT",
-        "base_tributavel_taxa_normal": "3620.10",
-        "total_iva_taxa_normal": "832.62",
-        "total_impostos": "832.62",
-        "total_documento": "4452.72",
-        "hash": "fAKI",
-        "certificado": "993"
-      },
-      "raw_data": "A:501400354*B:500248800*C:PT*D:FT*E:N*F:20251001*G:VIT 2025/2754*H:JJWFDDF8-2754*I1:PT*I7:3620.10*I8:832.62*N:832.62*O:4452.72*Q:fAKI*R:993",
-      "page": 1
+      "artigo": "POLIGONO",
+      "descricao": "INDUTRIAL MORERO, NAVE 1",
+      "quantidade": 10.0,
+      "unidade": "UN",
+      "preco_unitario": 0.0,
+      "total": 0.0,
+      "dimensoes": "",
+      "pedido_numero": "",
+      "fecha": "",
+      "proveedor": "N.I.F.\nPag.\nAtendido por",
+      "referencia_ordem": "",
+      "lote_producao": "",
+      "volume": 0,
+      "peso": 0.0,
+      "iva": 21.0
+    },
+    {
+      "artigo": "LUSTOPVS135190",
+      "descricao": "COLCHON TOP VISCO 2019 135X190",
+      "quantidade": 4.0,
+      "unidade": "UN",
+      "preco_unitario": 0.0,
+      "total": 0.0,
+      "dimensoes": "135x190",
+      "pedido_numero": "",
+      "fecha": "",
+      "proveedor": "N.I.F.\nPag.\nAtendido por",
+      "referencia_ordem": "",
+      "lote_producao": "",
+      "volume": 0,
+      "peso": 0.0,
+      "iva": 21.0
+    },
+    {
+      "artigo": "LUSTOPVS150190",
+      "descricao": "COLCHON TOP VISCO 2019 150X190",
+      "quantidade": 4.0,
+      "unidade": "UN",
+      "preco_unitario": 0.0,
+      "total": 0.0,
+      "dimensoes": "150x190",
+      "pedido_numero": "",
+      "fecha": "",
+      "proveedor": "N.I.F.\nPag.\nAtendido por",
+      "referencia_ordem": "",
+      "lote_producao": "",
+      "volume": 0,
+      "peso": 0.0,
+      "iva": 21.0
     }
   ],
-  "produtos": [],
   "lines": [],
   "totals": {
-    "total_lines": 0,
-    "total_quantity": 0
+    "total_lines": 3,
+    "total_quantity": 18.0
   },
-  "tipo_documento": "FATURA_GENERICA",
-  "texto_completo": "EL PLASTIRSO\tData\tPágina\t01/10/2025 FACTURA _ VIT/20252754\tConds, pag. 60 Dias\t\r\nFÁBRICA DE PLÁSTICOS, S.A.\t\r\nEx.mo(s).Senhor (es)\t\r\nPLASTIRSO-Fabrica de Plasticos, S.A.\tCOLMOL\t\r\n2. IND.PATEIRAS, TRAV.IND. 15-16 4785-623 TROFA\tZONA INDUSTRIAL DAS CAVADAS\t\r\nNIF: 501400354\tAPART. 115\t\r\nN° Registo SIRER: PT01103525\t3721-908 VILA DE CUCUJÃES\t\r\nCliente\t102428\tNIF\t500248800\t\r\nUnd.\tDesconto\t\r\nQtd.\tUnd. Artigo\tDescrição\tPreço\tIVA\t\r\nOrdem de venda: 226354\tV/ Encomenda : 4212\t\r\n550,000 kg: 710270091 FIIME PEB 270×0.09,BOB.55 KG MÁX.\t1, 4800/kg\t23,08\t\r\n110,000 kg 7101101212 FILME PEB 110x0.12, ANTI-ESTATICO, BOB. 55KG\t1,5300/kg\t123,08\t\r\n220,000 kg 710205124 FILME PEB 205X0.12, ANTI-ESTATICO, BOB. 55KG\t1,5300/kg\t23,08\t\r\nOrdem de venda:226355\tV/ Encomenda : 4263\t\r\n2100,000 kg 710270091 FILME PEB 2700.09, BOB. 55 KG MÁX.\t1,4800/kg\t23,08\t\r\nordem de venda: 226682\tV/ Encomenda : 4501\t\r\n220,000 kg 710160121 FILME PEB 160×0.12, ANTI-ESTATICO, BOB. 55KG\t1,5300/kg\t23,08\t\r\nOrdem de venda: 226751\tV/ Encomenda : 4656\t\r\n220,000 kg 710205124 FILME PEB 205x0.12, ANTI-ESTATICO, BOB. 55KG\t1,5300/kg\t23,08\t\r\nSalvo especificação em contrario, desconhecemos\t\r\no fim a que se destinam os produtos aqui facturados.\t\r\nEmbalagens: 1 Euro.; 4 Pal.\t\r\nCARGA\tDESCARGA\t\r\nData / Hora: 01/10/25 / 08:13\tData\tARTIGOS\tIVA\t\r\nLocal Carga: N/ Instalações\tLocal Descarga: Direcção Indicada\t3620,10\t832,62\t\r\nNOTA: Em caso de defeito só nos responsabilizamos pela substituição do material defei\t\r\nAs mercadorias viajam por conta e risco do cliente. Reclamações só serão atendi\t\r\ndo prazo de 8 dias. Em caso de litígio o foro competente é o da comarca de Sant\t\r\nDados Bancarios para pagamento: IBAN: PT50000706050035861000076\tSWIFT:\t\r\nATCUD: JJWEDDE8-2754\tfAKI-Processado por programa certificado\t\r\nPLASTIRSO Fábrica de Plásticos, S.A.\tTelef.: +351 252 403 090 - Fax: +351 252 403 099 «chamada para a rede fixa nacional»\t\r\nTravessa da Indústria, 15 e 16\tE-mail: plastirso@plastirso.pt - www.plastirso.pt\t\r\n9 Loteamento Industrial das Pateiras\t\r\nApartado 74 - S. Tiago de Bougado\tContribuinte N.° PT 501 400 354 - Matriculada na C. R. C. da Trofa\t\r\n4786-909 TROFA - PORTUGAL\tCapital Social 50.000 €",
+  "tipo_documento": "PEDIDO_ESPANHOL",
+  "texto_completo": "Fecha\nPedido nº\nProveedor\nN.I.F.\nPag.\nAtendido por\n1\nPT500248800\n0000292\nPC5/0005051\n09/10/2025\nADMINISTRA\nPEDIDO\nCOSGUI D.M. S.L.\nB39031059\nPOLIGONO INDUTRIAL MORERO, NAVE 1 10\n39611\nGUARNIZO \n942252861\nNIF.\nfacturacion@cosgui.com\nCOLMOL COLCHOES SA\nZONA INDUSTRIAL DAS CAVADAS APART 119 RUA DO PROGR\n3721-\nVILA DE CUCUJAES\n4,00\nCOLCHON TOP VISCO 2019 135X190\nLUSTOPVS135190\n4,00\nCOLCHON TOP VISCO 2019 150X190\nLUSTOPVS150190\nDescripción\nCantidad\nCódigo\nSu Referencia\nNotas :",
   "baixa_qualidade_texto": false
 }
