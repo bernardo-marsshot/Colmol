@@ -2735,7 +2735,8 @@ def process_inbound(inbound: InboundDocument):
 def extract_dimensions_from_text(text: str) -> str:
     """Extrai dimensões de uma descrição usando regex.
     
-    Procura padrões como: 150x200, 135x190x20, 150 x 200, etc.
+    Procura padrões como: 150x200, 1980x0880x0030, 135 x 190, etc.
+    Suporta 2-4 dígitos por dimensão.
     Retorna a dimensão encontrada ou string vazia.
     """
     if not text:
@@ -2744,8 +2745,8 @@ def extract_dimensions_from_text(text: str) -> str:
     import re
     
     patterns = [
-        r'(\d{2,3})\s*[xX×]\s*(\d{2,3})\s*[xX×]\s*(\d{1,3})',
-        r'(\d{2,3})\s*[xX×]\s*(\d{2,3})',
+        r'(\d{2,4})\s*[xX×]\s*(\d{2,4})\s*[xX×]\s*(\d{1,4})',
+        r'(\d{2,4})\s*[xX×]\s*(\d{2,4})',
     ]
     
     for pattern in patterns:

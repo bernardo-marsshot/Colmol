@@ -42,10 +42,11 @@ Key architectural decisions and features include:
   - **Dimensões (LxCxE)**: Dimensões do produto (com extração automática)
   - **Quantidade**: Quantidade recebida
 - **Intelligent Fallback**: Se campo dimensões estiver vazio, extrai automaticamente da descrição:
-  - `extract_dimensions_from_text()`: Regex para padrões "150x200", "135X190x20", "90 x 190", etc.
+  - `extract_dimensions_from_text()`: Regex para padrões com 2-4 dígitos por dimensão
+  - Exemplos: "150x200", "1980x0880x0030", "135 x 190", etc.
   - Suporta 2D e 3D: largura×comprimento ou largura×comprimento×espessura
-  - Insensitive a case e espaços: "150X200", "150 x 200", "150x200" → "150x200"
-- **Tested**: ✅ Valida extração de múltiplos formatos (maiúsculas, espaços, 2D/3D)
+  - Insensitive a case e espaços: "150X200", "150 x 200", "1980x0880x0030" → formato normalizado
+- **Tested**: ✅ Valida extração de múltiplos formatos (2-4 dígitos, maiúsculas, espaços, 2D/3D)
 - **Impact**: Excel sempre contém dimensões, mesmo quando parser OCR não as detectou explicitamente
 - **Removed Columns**: Nº Requisição, Código Fornecedor, Descrição (conforme solicitado)
 
