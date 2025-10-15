@@ -2425,20 +2425,20 @@ def map_supplier_codes(supplier, payload):
             referencia = produto.get("referencia_ordem", "")
             supplier_code = referencia.split(" ")[0] if referencia else ""
             
-            # Artigo/SKU do produto
-            article_code = produto.get("artigo", "")
+            # Artigo/SKU do produto (garantir que não é None)
+            article_code = produto.get("artigo") or ""
             
             # IMPORTANTE: Lookup usando article_code, não supplier_code!
             # supplier_code (ex:"1ECWH") é igual para todas as linhas deste fornecedor
             # article_code (ex:"E0748001901") é único por produto
             mapping = CodeMapping.objects.filter(
-                supplier=supplier, supplier_code=article_code).first()
+                supplier=supplier, supplier_code=article_code).first() if article_code else None
             mapped.append({
-                "supplier_code": supplier_code,
-                "article_code": article_code,
-                "description": produto.get("descricao", ""),
-                "unit": produto.get("unidade", "UN"),
-                "qty": produto.get("quantidade", 0),
+                "supplier_code": supplier_code or "",
+                "article_code": article_code or "UNKNOWN",
+                "description": produto.get("descricao") or "",
+                "unit": produto.get("unidade") or "UN",
+                "qty": produto.get("quantidade") or 0,
                 "internal_sku": (mapping.internal_sku if mapping else None),
                 "confidence": (mapping.confidence if mapping else 0.0),
             })
@@ -2492,11 +2492,11 @@ def create_po_from_nota_encomenda(inbound: InboundDocument, payload: dict):
     # Criar POLines para cada produto
     lines_created = 0
     for produto in produtos:
-        # Extrair dados do produto
-        article_code = produto.get("artigo", produto.get("supplier_code", ""))
-        description = produto.get("descricao", produto.get("description", ""))
-        unit = produto.get("unidade", produto.get("unit", "UN"))
-        qty_ordered = float(produto.get("quantidade", produto.get("qty", 0)))
+        # Extrair dados do produto (garantir que não são None)
+        article_code = produto.get("artigo") or produto.get("codigo") or produto.get("supplier_code") or ""
+        description = produto.get("descricao") or produto.get("description") or ""
+        unit = produto.get("unidade") or produto.get("unit") or "UN"
+        qty_ordered = float(produto.get("quantidade") or produto.get("qty") or 0)
         
         if not article_code or qty_ordered <= 0:
             continue
@@ -2616,13 +2616,13 @@ def process_inbound(inbound: InboundDocument):
         # Verificar se produtos têm dados válidos
         produtos_invalidos = 0
         for produto in produtos_extraidos:
-            codigo = produto.get('artigo', '')
+            codigo = produto.get('artigo') or ''
             quantidade = produto.get('quantidade', 0)
             
             # Produto inválido se:
-            # - Código muito curto (<5 chars) ou vazio
+            # - Código muito curto (<5 chars), vazio, ou None
             # - Quantidade = 0 ou inválida
-            if len(codigo) < 5 or quantidade <= 0:
+            if not codigo or len(str(codigo)) < 5 or quantidade <= 0:
                 produtos_invalidos += 1
         
         # Se >50% dos produtos são inválidos, ficheiro está desformatado
@@ -2705,8 +2705,8 @@ def process_inbound(inbound: InboundDocument):
     if exceptions:
         for idx, item in enumerate(doc_items, 1):
             # Tenta ambos os campos (artigo para produtos, supplier_code para lines)
-            item_code = item.get("artigo", item.get("supplier_code", ""))
-            if any(item_code in ex.get("line", "") for ex in exceptions):
+            item_code = item.get("artigo") or item.get("supplier_code") or ""
+            if item_code and any(item_code in ex.get("line", "") for ex in exceptions):
                 first_error_line = idx
                 break
 

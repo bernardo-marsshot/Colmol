@@ -35,7 +35,21 @@ Key architectural decisions and features include:
 
 ## Recent Changes
 
-### October 15, 2025 - Groq LLM Integration (Universal Document Extraction) ✅ ATIVO
+### October 15, 2025 - Bug Fix: None Handling in Product Validation and Mapping
+- **Problem**: TypeError when processing documents with missing product codes (None values)
+  - `TypeError: object of type 'NoneType' has no len()` when validating product quality
+  - `IntegrityError: NOT NULL constraint failed: rececao_receiptline.article_code` when creating receipt lines
+  - `TypeError: 'in <string>' requires string as left operand, not NoneType` when matching exceptions
+- **Root Cause**: Groq LLM pode retornar produtos com campos `None` em vez de strings vazias
+- **Solution**: Comprehensive None-safety added to all product processing functions:
+  - **Validation**: `codigo = produto.get('artigo') or ''` + `if not codigo or len(str(codigo)) < 5`
+  - **Mapping**: `article_code or "UNKNOWN"` fallback para garantir valor válido
+  - **PO Creation**: `produto.get("artigo") or produto.get("codigo") or ""` com multiple fallbacks
+  - **Exception Matching**: `item_code = item.get("artigo") or item.get("supplier_code") or ""`
+- **Tested**: BON DE COMMANDE francês agora processa sem erros (4 produtos, 4 linhas receção)
+- **Impact**: Sistema agora robusto para documentos sem códigos explícitos (ex: tabelas francesas com apenas descrição)
+
+### October 15, 2025 - Groq LLM Multi-Page Document Processing ✅ ATIVO
 - **🎯 SOLUÇÃO DEFINITIVA**: Sistema LLM que funciona para **QUALQUER** formato de documento
 - **Hybrid Strategy**: OCR primeiro (extração rápida de texto) → Groq LLM segundo (estruturação inteligente)
   - **Step 1**: OCR cascade extrai texto bruto (Level 0-3: OCR.space → PaddleOCR → EasyOCR → Tesseract)
