@@ -252,11 +252,6 @@ def ollama_extract_document(file_path: str, ocr_text: str = None):
 
 CRITICAL: Extract EVERY product line, even if incomplete or malformed.
 
-IMPORTANT COLUMN NAMES:
-- "Quant." or "Quantidade" = CORRECT quantity (use this!)
-- "Vol." or "Volume" = package count (DO NOT use as quantity!)
-- If both exist, ALWAYS use "Quant./Quantidade", NEVER "Vol./Volume"
-
 ALWAYS return valid JSON with this exact structure:
 {
   "fornecedor": "supplier name or null",
@@ -278,10 +273,6 @@ ALWAYS return valid JSON with this exact structure:
 }
 
 EXAMPLES:
-
-Table with Vol. and Quant. columns:
-E0748001901 | 131.59 | 1 | 34.00 | 3.00 | ML | 3.99 | ...
-(Vol=1, Quant=34.00) → Use quantidade=34.0, NOT 1
 
 Portuguese document:
 COLCHAO VISCO 150X190 | 2 UN | 199.00€ | 398.00€
@@ -1088,19 +1079,16 @@ def parse_fatura_elastron(text: str):
                         unidade_idx = idx
                         break
                 
-                if unidade_idx < 4:
+                if unidade_idx < 3:
                     continue
                 
-                # Estrutura OCR Tesseract: TOTAL | VOL | QUANT | DESC | UN | PRECO | IVA | LOTE | DESCRICAO
-                # Exemplo: 131,59 1 34,00 3,00 ML 3,99 23,00 5159-250602064 BALTIC fb, TOFFEE
+                # Campos antes da unidade: TOTAL VOL QUANT DESC
+                total = float(parts[0].replace(',', '.'))
+                volume = int(parts[1]) if parts[1].isdigit() else 1
+                quantidade = float(parts[2].replace(',', '.'))
+                desconto = float(parts[3].replace(',', '.'))
                 
-                # ANTES da unidade: TOTAL VOL QUANT DESC
-                total = float(parts[0].replace(',', '.')) if len(parts) > 0 else 0.0
-                volume = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else 1
-                quantidade = float(parts[2].replace(',', '.')) if len(parts) > 2 else 0.0
-                desconto = float(parts[3].replace(',', '.')) if len(parts) > 3 else 0.0
-                
-                # DEPOIS da unidade: PRECO IVA LOTE DESCRICAO
+                # Campos depois da unidade: PRECO IVA LOTE ... DESCRICAO
                 preco_un = float(parts[unidade_idx + 1].replace(',', '.')) if unidade_idx + 1 < len(parts) else 0.0
                 iva = float(parts[unidade_idx + 2].replace(',', '.')) if unidade_idx + 2 < len(parts) else 23.0
                 
@@ -2535,58 +2523,45 @@ def create_po_from_nota_encomenda(inbound: InboundDocument, payload: dict):
 
 @transaction.atomic
 def process_inbound(inbound: InboundDocument):
-    # Estratégia CORRIGIDA: Parser específico primeiro, Groq LLM apenas como fallback
-    # 1. Primeiro: OCR + Parser específico (Elastron, BON_COMMANDE, etc)
+    # Estratégia híbrida: OCR rápido + Ollama pós-processamento
+    # 1. Primeiro: OCR rápido para obter texto (sempre disponível)
     ocr_payload = real_ocr_extract(inbound.file.path)
     ocr_text = ocr_payload.get('texto_completo', '')
-    parser_produtos = ocr_payload.get('produtos', [])
     
-    # 2. Verificar se parser específico extraiu produtos com sucesso
-    if parser_produtos and len(parser_produtos) > 0:
-        # Parser específico funcionou - usar esses dados (PRIORIDADE)
-        parser_type = ocr_payload.get('tipo_documento', 'UNKNOWN')
-        print(f"✅ Usando dados do parser específico ({len(parser_produtos)} produtos)")
-        payload = ocr_payload
-        # Garantir extraction_method para auditoria
-        if 'extraction_method' not in payload:
-            payload['extraction_method'] = f'parser_{parser_type.lower()}'
-    else:
-        # Parser falhou/vazio - tentar Groq LLM como fallback
-        print("🔄 Parser específico não extraiu produtos - tentando Groq LLM...")
-        ollama_data = ollama_extract_document(inbound.file.path, ocr_text=ocr_text)
+    # 2. Depois: Tentar Ollama com texto OCR como contexto (melhora precisão)
+    ollama_data = ollama_extract_document(inbound.file.path, ocr_text=ocr_text)
+    
+    if ollama_data and ollama_data.get('produtos'):
+        # Ollama extraiu dados com sucesso - usar dados LLM
+        print(f"✅ Usando dados do Ollama LLM ({len(ollama_data.get('produtos', []))} produtos)")
         
-        if ollama_data and ollama_data.get('produtos'):
-            # Groq extraiu dados com sucesso - usar dados LLM
-            print(f"✅ Usando dados do Groq LLM fallback ({len(ollama_data.get('produtos', []))} produtos)")
-            
-            # Converter formato Groq para formato esperado
-            payload = {
-                "fornecedor": ollama_data.get('fornecedor', ''),
-                "nif": ollama_data.get('nif', ''),
-                "numero_documento": ollama_data.get('numero_documento', ''),
-                "data_documento": ollama_data.get('data_documento', ''),
-                "po_number": ollama_data.get('numero_encomenda', ''),
-                "iban": ollama_data.get('iban', ''),
-                "produtos": [
-                    {
-                        "artigo": p.get('artigo') or p.get('codigo') or '',
-                        "descricao": p.get('descricao', ''),
-                        "quantidade": float(p.get('quantidade') or 0),
-                        "unidade": p.get('unidade') or p.get('unit') or 'UN',
-                        "preco_unitario": float(p.get('preco_unitario') or 0),
-                        "total": float(p.get('total') or 0)
-                    }
-                    for p in ollama_data.get('produtos', [])
-                ],
-                "total": ollama_data.get('total_geral', 0),
-                "texto_completo": ocr_text or "Dados extraídos via Groq LLM",
-                "tipo_documento": ollama_data.get('tipo_documento', 'UNKNOWN_LLM'),
-                "extraction_method": "ollama_llm"
-            }
-        else:
-            # Ambos falharam - usar dados OCR mesmo sem produtos
-            print("⚠️ Groq LLM também falhou - usando dados OCR (sem produtos)")
-            payload = ocr_payload
+        # Converter formato Ollama para formato esperado
+        payload = {
+            "fornecedor": ollama_data.get('fornecedor', ''),
+            "nif": ollama_data.get('nif', ''),
+            "numero_documento": ollama_data.get('numero_documento', ''),
+            "data_documento": ollama_data.get('data_documento', ''),
+            "po_number": ollama_data.get('numero_encomenda', ''),
+            "iban": ollama_data.get('iban', ''),
+            "produtos": [
+                {
+                    "artigo": p.get('codigo', ''),
+                    "descricao": p.get('descricao', ''),
+                    "quantidade": float(p.get('quantidade') or 0),
+                    "preco_unitario": float(p.get('preco_unitario') or 0),
+                    "total": float(p.get('total') or 0)
+                }
+                for p in ollama_data.get('produtos', [])
+            ],
+            "total": ollama_data.get('total_geral', 0),
+            "texto_completo": ocr_text or "Dados extraídos via Ollama LLM",
+            "tipo_documento": ollama_data.get('tipo_documento', 'UNKNOWN_LLM'),
+            "extraction_method": "ollama_llm"
+        }
+    else:
+        # Fallback: Usar dados OCR diretamente
+        print("🔄 Ollama não disponível/falhou - usando dados OCR cascade")
+        payload = ocr_payload
 
     if payload.get("error"):
         ExceptionTask.objects.create(

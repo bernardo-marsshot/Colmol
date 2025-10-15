@@ -35,28 +35,6 @@ Key architectural decisions and features include:
 
 ## Recent Changes
 
-### October 15, 2025 - CRITICAL FIX: Parser Priority Over Groq LLM ✅ RESOLVED
-- **Problem**: Groq LLM was overwriting correct parser data with incorrect extractions
-  - Elastron parser extracted quantity 34.0 ML correctly (from "Quant." column)
-  - Groq LLM then re-processed and extracted quantity 1.0 (from "Vol." column)
-  - System used Groq data, losing correct parser extractions
-- **Root Cause**: `process_inbound()` prioritized Groq LLM over format-specific parsers
-- **Architecture Fix**: Reversed priority logic
-  - **NEW FLOW**: Parser específico PRIMEIRO → Groq LLM apenas como FALLBACK
-  - If parser extracts products → USE parser data (authoritative)
-  - If parser fails/empty → Try Groq LLM (fallback)
-  - If both fail → Use OCR data without products
-- **Code Changes**:
-  - Modified `process_inbound()` to check `parser_produtos` first
-  - Groq LLM now only executes when parser returns 0 products
-  - Prevents LLM from overwriting validated parser data
-- **Tested**: Elastron invoice FWH_25EU_N5595 ✅
-  - E0748001901: 34.0 ML (CORRECT - from parser)
-  - 13/13 products extracted with correct quantities
-  - Groq LLM not executed (parser succeeded)
-- **Impact**: All format-specific parsers (Elastron, BON_COMMANDE, PEDIDO_ESPANHOL) now have priority
-- **Reliability**: LLM used only for unknown formats, preventing data corruption
-
 ### October 15, 2025 - Bug Fix: None Handling in Product Validation and Mapping
 - **Problem**: TypeError when processing documents with missing product codes (None values)
   - `TypeError: object of type 'NoneType' has no len()` when validating product quality
