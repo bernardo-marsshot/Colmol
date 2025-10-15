@@ -160,14 +160,42 @@ Return valid JSON:
   ]
 }
 
-EXAMPLES:
-- Spanish multi-line: "4,00 / COLCHON TOP VISCO 135X190 / LUSTOPVS135190" → extract all 3 fields
-- Portuguese: "COLCHAO VISCO 150X190 | 2 UN | 199€" → extract code, desc, qty, price
-- French: "MATELAS 140x200 | Qté: 2 | 245€" → extract all fields
+QUANTITY EXTRACTION RULES (CRITICAL):
+⚠️ Elastron invoices pattern (with or without perfect header OCR):
+  - Typical pattern: [decimal] [UNIT] [small_integer] [price]
+  - Example: "34,00 ML 1 3,99" → quantidade=34.00 ML (NOT 1)
+  - Column order: Artigo, Descrição, Lote, **Quant.**, Un., **Vol.**, Preço, Desconto, IVA, Total
+  - The number BEFORE the unit (ML/UN/MT) = quantity (use this)
+  - The number AFTER the unit = volume count (ignore this)
+  - Even if "Vol." header missing, if pattern is [decimal][unit][1-3 digit integer], the decimal is quantity
+
+⚠️ Contextual rules (work even with partial OCR):
+  - If you see: [number] + [ML|UN|MT|M²] + [small integer 1-99] → first number is quantity, ignore integer
+  - If you see: [decimal like 34,00] + [unit] + [integer like 1] + [price] → decimal=quantity (NOT integer)
+  - Volume indicators: usually 1, 2, or 3 (number of rolls/packages) - IGNORE THESE
+  - Quantity indicators: usually decimals with units (34,00 ML, 150,5 MT) - USE THESE
+
+⚠️ For non-Elastron documents:
+  - Normal pattern: [quantity] [unit] [price]
+  - Extract quantity as is (integer or decimal)
+  - No volume column to worry about
+
+EXAMPLES (quantity extraction):
+✅ Correct:
+- "34,00 ML 1 3,99" → quantidade=34.0 (Elastron: ignore the "1")
+- "E0748001901 BALTIC | 30,80 ML 1 5,99" → quantidade=30.8 (NOT 1)
+- "OPERA fb PEARL | 48,50 ML 1 2,49" → quantidade=48.5 (NOT 1)
+- "COLCHAO 150X190 | 2 UN | 199€" → quantidade=2 (normal: no volume column)
+- "MATELAS 140x200 | Qté: 5 | 245€" → quantidade=5
+
+❌ Wrong (avoid these):
+- "34,00 ML 1 3,99" → quantidade=1 ✗ (volume count, not quantity!)
+- "30,80 ML 1 5,99" → quantidade=1 ✗ (wrong column!)
 
 Rules:
-- Extract EVERY product, ignore addresses/headers
-- Convert quantities/prices to numbers
+- Extract EVERY product line
+- When [decimal][unit][integer] pattern exists, decimal=quantity
+- Convert to numbers correctly
 - Use null for missing fields"""
 
         user_prompt = f"""Extract ALL products from this document (PT/ES/FR):

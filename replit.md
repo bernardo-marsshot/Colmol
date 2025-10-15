@@ -35,3 +35,39 @@ Key architectural decisions and features include:
     -   **pdfplumber**: Advanced PDF parsing and table detection.
     -   **rapidfuzz**: Fuzzy string matching for multi-language field detection.
 -   **Database**: SQLite (db.sqlite3).
+
+## Recent Changes
+
+### October 15, 2025 - Bug Fix: Elastron Faturas - Corrigir Extração de Quantidade vs Volume
+- **Problem**: Fatura específica FWH_25EU_N5595 extraía valores da coluna "Vol." (volumes/rolos) em vez de "Quant." (quantidade real)
+  - Tabela Elastron tem: Artigo, Descrição, Lote, **Quant.**, Un., **Vol.**, Preço, Desconto, IVA, Total
+  - LLM confundia as duas colunas numéricas (ex: 34,00 ML vs 1 volume)
+- **Root Cause**: Groq LLM prompt não distinguia entre quantidade (metros/peças) e volumes (número de rolos)
+- **Solution**: Prompt atualizado com regras específicas para faturas Elastron:
+  - ⚠️ QUANTITY EXTRACTION RULES: "Quant." = quantidade real (usar) / "Vol." = volumes (ignorar)
+  - Preferir valores decimais (Quant.) sobre inteiros pequenos (Vol.)
+  - Exemplo: "Quant.: 34,00 ML | Vol.: 1" → quantidade = 34.0 (NOT 1)
+  - Documentada ordem correta das colunas Elastron no prompt
+- **Impact**: Faturas Elastron agora extraem quantidade correta mesmo quando têm coluna de volumes
+- **Testing**: Utilizador deve testar com documento FWH_25EU_N5595 via interface web Django
+
+### October 15, 2025 - Mini Códigos FPOL: Sistema de Mapeamento para Exportação Excel
+- **Feature**: Tabela de mini códigos FPOL adicionada à base de dados para simplificar exportações Excel
+- **Modelo MiniCodigo**: Nova tabela com 177 registos importados do Excel do utilizador
+  - Campos: `familia`, `mini_codigo` (unique), `referencia`, `designacao`, `identificador` (db_index), `tipo`
+  - Mapeia códigos de fornecedor (identificador) → mini códigos simplificados
+  - Admin Django: filtros por familia/tipo, busca por mini_codigo/designacao/identificador
+- **Comando Django**: `import_mini_codigos` para importar/atualizar mini códigos de ficheiros Excel
+  - Validação: mini_codigo obrigatório, update_or_create automático
+  - Logging: progresso cada 100 registos + sumário final
+  - Teste: 177 códigos importados com sucesso
+- **Exportação Excel Modificada**: Nova hierarquia de priorização
+  - **🎯 PRIORIDADE 1**: Consulta BD usando `article_code` → `identificador`
+  - **PRIORIDADE 2**: Se não encontrar, consulta BD usando `supplier_code` → `identificador`
+  - **Fallback 3**: Mini código do payload (documento OCR)
+  - **Fallback 4**: `maybe_internal_sku`
+  - **Fallback 5**: `article_code` original
+  - **Bonus**: Se encontrar na BD e sem descrição, usa `designacao` da BD
+- **Colunas Excel**: Mini Código, Dimensões (LxCxE), Quantidade
+- **Impact**: Exportações agora usam mini códigos padronizados da BD em vez de códigos internos variáveis
+- **Performance**: Acceptable para volumes típicos (2 queries por linha), pode otimizar com cache se necessário
