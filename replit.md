@@ -35,40 +35,30 @@ Key architectural decisions and features include:
 
 ## Recent Changes
 
-### October 15, 2025 - Groq LLM Multi-Page Document Processing ✅ ATIVO
-- **🎯 SOLUÇÃO DEFINITIVA**: Sistema LLM que funciona para **QUALQUER** formato de documento (incluindo multi-página)
-- **Page-by-Page Processing**: Documentos multi-página agora processados página-por-página
-  - **Step 1**: OCR cascade extrai texto com marcadores "--- Página X ---" para separar páginas
-  - **Step 2**: Texto OCR dividido em páginas individuais (reutiliza OCR, sem duplicação)
-  - **Step 3**: Cada página enviada separadamente ao Groq LLM (Llama-3.3-70B)
-  - **Step 4**: Produtos de todas as páginas concatenados
-  - **Step 5**: Deduplicação automática (remove produtos repetidos entre páginas)
-- **Performance Optimization**:
-  - **Zero duplo OCR**: Reutiliza texto OCR já extraído, dividindo por marcadores de página
-  - **Processamento paralelo**: Cada página processada independentemente pelo LLM
-  - **Deduplicação inteligente**: Compara código + descrição para eliminar duplicatas
+### October 15, 2025 - Groq LLM Integration (Universal Document Extraction) ✅ ATIVO
+- **🎯 SOLUÇÃO DEFINITIVA**: Sistema LLM que funciona para **QUALQUER** formato de documento
 - **Hybrid Strategy**: OCR primeiro (extração rápida de texto) → Groq LLM segundo (estruturação inteligente)
+  - **Step 1**: OCR cascade extrai texto bruto (Level 0-3: OCR.space → PaddleOCR → EasyOCR → Tesseract)
+  - **Step 2**: Groq LLM (Llama-3.3-70B) processa texto para extrair JSON estruturado
   - **Fallback**: Se Groq indisponível/falhar, usa dados OCR diretamente (parsers específicos)
 - **Groq LLM Features**:
   - **🆓 100% GRATUITO**: API Groq sem limites significativos (https://console.groq.com/keys)
-  - **⚡ Extremamente rápido**: Llama-3.3-70B responde em 2-5 segundos por página
+  - **⚡ Extremamente rápido**: Llama-3.3-70B responde em 2-5 segundos
   - **🌍 Multi-idioma**: PT/ES/FR com prompt engineering e exemplos concretos
   - **📊 Formato universal**: Extrai produtos de QUALQUER layout (guias remessa, notas encomenda, faturas)
   - **🧠 Context-aware**: Ignora endereços/headers, foca em produtos
   - **✅ JSON forçado**: `response_format: json_object` garante output válido
-  - **📈 Alta precisão**: Extrai TODOS os produtos de TODAS as páginas, mesmo com dados incompletos
-  - **♾️ Sem limite de páginas**: Processa documentos com qualquer número de páginas
-  - Timeout: 30s por página, 4000 tokens max response por página
+  - **📈 Alta precisão**: Extrai TODOS os produtos, mesmo com dados incompletos/mal formatados
+  - Timeout: 30s, 4000 tokens max response
 - **Configuration**:
   - `GROQ_API_KEY`: API key gratuita do Groq (obrigatória)
   - **Ativação**: Configurado e funcionando ✅
 - **Tested & Confirmed**:
   - PC5_0005051.pdf (COSGUI multi-line): 2/2 produtos ✅
   - 177.pdf (NATURCOLCHON inverted): 1/1 produto ✅
-  - 10000646_40245927_20250910 (5 páginas): Multi-page processing ✅
 - **Cost**: 100% gratuito (Groq API free tier)
 - **Accuracy**: LLM pós-processamento permite extrair documentos com layouts desconhecidos
-- **Integration**: Seamlessly integrated in `process_inbound()` - OCR→Page Split→Groq (per page)→Concat→Dedupe→Fallback
+- **Integration**: Seamlessly integrated in `process_inbound()` - OCR→Groq→Fallback cascade
 - **Método identificação**: `extraction_method: "ollama_llm"` (histórico, usa Groq na prática)
 
 ### October 13, 2025 - Universal Document Extraction System (OCR.space + Fuzzy Matching + Table Extraction)
