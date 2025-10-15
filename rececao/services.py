@@ -2458,6 +2458,87 @@ def map_supplier_codes(supplier, payload):
     return mapped
 
 
+def find_matching_po(supplier, produtos_guia):
+    """
+    Encontra automaticamente a Purchase Order correspondente baseado em:
+    1. Fornecedor (obrigatório)
+    2. Matching de produtos (SKUs) entre Guia e POLines
+    
+    Retorna: (PO, score, detalhes) ou (None, 0, {}) se não encontrar match >= 70%
+    """
+    from .models import PurchaseOrder, POLine
+    
+    if not produtos_guia:
+        return None, 0, {}
+    
+    # Extrair SKUs dos produtos da Guia (suporta múltiplos formatos)
+    skus_guia = set()
+    for produto in produtos_guia:
+        sku = (produto.get("artigo") or 
+               produto.get("codigo") or 
+               produto.get("supplier_code") or 
+               produto.get("article_code") or "").strip()
+        if sku:
+            skus_guia.add(sku)
+    
+    if not skus_guia:
+        print("⚠️ Nenhum SKU válido encontrado nos produtos da Guia")
+        return None, 0, {}
+    
+    print(f"🔍 Procurando PO para fornecedor {supplier.name} com {len(skus_guia)} produtos: {list(skus_guia)[:3]}...")
+    
+    # Buscar todas as POs do fornecedor (ordenadas por mais recente)
+    pos_fornecedor = PurchaseOrder.objects.filter(supplier=supplier).order_by('-id')
+    
+    if not pos_fornecedor.exists():
+        print(f"❌ Nenhuma PO encontrada para fornecedor {supplier.name}")
+        return None, 0, {}
+    
+    # Calcular score de matching para cada PO
+    best_po = None
+    best_score = 0
+    best_details = {}
+    
+    for po in pos_fornecedor:
+        # Pegar SKUs das POLines desta PO
+        po_lines = POLine.objects.filter(po=po)
+        skus_po = set(line.internal_sku for line in po_lines if line.internal_sku)
+        
+        if not skus_po:
+            continue
+        
+        # Calcular produtos coincidentes
+        produtos_coincidentes = skus_guia.intersection(skus_po)
+        
+        # Score = (produtos que batem / total produtos da guia) * 100
+        score = (len(produtos_coincidentes) / len(skus_guia)) * 100
+        
+        print(f"  PO {po.number}: {len(produtos_coincidentes)}/{len(skus_guia)} produtos coincidem (score: {score:.1f}%)")
+        
+        if score > best_score:
+            best_score = score
+            best_po = po
+            best_details = {
+                'produtos_coincidentes': list(produtos_coincidentes),
+                'produtos_guia': list(skus_guia),
+                'produtos_po': list(skus_po),
+                'total_coincidentes': len(produtos_coincidentes),
+                'total_guia': len(skus_guia),
+                'total_po': len(skus_po)
+            }
+    
+    # Retornar apenas se score >= 70%
+    if best_score >= 70:
+        print(f"✅ PO encontrada: {best_po.number} (score: {best_score:.1f}%)")
+        return best_po, best_score, best_details
+    elif best_po:
+        print(f"⚠️ Melhor PO ({best_po.number}) tem score baixo: {best_score:.1f}% (mínimo: 70%)")
+        return None, best_score, best_details
+    else:
+        print("❌ Nenhuma PO com produtos coincidentes encontrada")
+        return None, 0, {}
+
+
 @transaction.atomic
 def create_po_from_nota_encomenda(inbound: InboundDocument, payload: dict):
     """
@@ -2635,6 +2716,17 @@ def process_inbound(inbound: InboundDocument):
             )
 
     # criar linhas de receção
+    # Verificar se fornecedor está definido (obrigatório para processar linhas)
+    if not inbound.supplier:
+        print("❌ Fornecedor não definido - documento não pode ser processado completamente")
+        ExceptionTask.objects.create(
+            inbound=inbound,
+            line_ref="SUPPLIER",
+            issue="Fornecedor não identificado - selecione o fornecedor manualmente no upload ou verifique se o documento contém NIF válido"
+        )
+        # Retornar early - não pode processar sem fornecedor
+        return inbound
+    
     inbound.lines.all().delete()
     mapped_lines = map_supplier_codes(inbound.supplier, payload)
     for ml in mapped_lines:
@@ -2649,7 +2741,55 @@ def process_inbound(inbound: InboundDocument):
         )
 
     # ligar à PO (se existir)
-    po = PurchaseOrder.objects.filter(number=payload.get("po_number")).first()
+    # 1. Tentar pelo número da PO extraído do documento
+    po_number = payload.get("po_number") or ""
+    po = PurchaseOrder.objects.filter(number=po_number).first() if po_number else None
+    
+    # 2. Se não encontrou PO pelo número E não é Nota de Encomenda → Matching inteligente
+    if not po and inbound.doc_type != 'FT':
+        print(f"🔍 PO não identificada pelo número. Tentando matching inteligente...")
+        
+        # Extrair produtos do payload
+        produtos_guia = payload.get("produtos", [])
+        if not produtos_guia:
+            produtos_guia = payload.get("lines", [])
+        
+        # Tentar encontrar PO baseado em fornecedor + produtos
+        # (fornecedor já está garantido pela verificação anterior)
+        matched_po, score, details = find_matching_po(inbound.supplier, produtos_guia)
+        
+        if matched_po:
+            print(f"✅ PO identificada automaticamente: {matched_po.number} (score: {score:.1f}%)")
+            po = matched_po
+            
+            # Registar detalhes do matching no payload para auditoria
+            payload['po_matching'] = {
+                'method': 'intelligent_matching',
+                'po_number': matched_po.number,
+                'score': score,
+                'details': details
+            }
+            inbound.parsed_payload = payload
+        else:
+            # Não encontrou PO com score suficiente
+            if score > 0:
+                # Encontrou PO mas score < 70%
+                print(f"⚠️ PO encontrada mas score insuficiente: {score:.1f}% (mínimo: 70%)")
+                ExceptionTask.objects.create(
+                    inbound=inbound,
+                    line_ref="MATCHING",
+                    issue=f"PO não identificada com certeza (melhor match: {score:.1f}%, mínimo: 70%). Produtos: {details.get('total_coincidentes', 0)}/{details.get('total_guia', 0)} coincidem"
+                )
+            else:
+                # Nenhuma PO encontrada
+                print("❌ Nenhuma PO encontrada para este fornecedor e produtos")
+                ExceptionTask.objects.create(
+                    inbound=inbound,
+                    line_ref="MATCHING",
+                    issue=f"PO não identificada - nenhuma PO encontrada para fornecedor {inbound.supplier.name} com produtos correspondentes"
+                )
+    
+    # Vincular documento à PO encontrada
     if po:
         inbound.po = po
         inbound.save()
