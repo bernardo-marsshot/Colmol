@@ -82,3 +82,24 @@ class ExceptionTask(models.Model):
     suggested_qty = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     resolved = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
+
+class MiniCodigo(models.Model):
+    """
+    Tabela de mini códigos FPOL para exportação Excel.
+    
+    Mapeia códigos de fornecedor (identificador) para mini códigos simplificados.
+    """
+    familia = models.CharField(max_length=50, blank=True)
+    mini_codigo = models.CharField(max_length=120, unique=True, db_index=True)
+    referencia = models.CharField(max_length=120, blank=True)
+    designacao = models.CharField(max_length=500)
+    identificador = models.CharField(max_length=120, blank=True, null=True, db_index=True)
+    tipo = models.CharField(max_length=50, blank=True)
+    
+    class Meta:
+        verbose_name = 'Mini Código'
+        verbose_name_plural = 'Mini Códigos'
+        ordering = ['familia', 'mini_codigo']
+    
+    def __str__(self):
+        return f"{self.mini_codigo} - {self.designacao}"

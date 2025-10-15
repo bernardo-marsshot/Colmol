@@ -2759,6 +2759,8 @@ def extract_dimensions_from_text(text: str) -> str:
 
 def export_document_to_excel(inbound_id: int) -> HttpResponse:
     """Exporta para Excel no formato pedido (Mini Código, Dimensões, Quantidade)."""
+    from .models import MiniCodigo
+    
     inbound = InboundDocument.objects.get(id=inbound_id)
 
     wb = Workbook()
@@ -2781,8 +2783,9 @@ def export_document_to_excel(inbound_id: int) -> HttpResponse:
 
     for row, linha in enumerate(inbound.lines.all(), 2):
         dimensoes = ""
-        mini_codigo = ""
+        mini_codigo_from_payload = ""
         descricao = ""
+        article_code_from_doc = linha.article_code
 
         # Formato Guia de Remessa (novo): procura em 'produtos' usando article_code
         if inbound.parsed_payload.get("produtos"):
@@ -2801,7 +2804,7 @@ def export_document_to_excel(inbound_id: int) -> HttpResponse:
                             dimensoes = f"{larg}x{comp}x{esp}"
                         elif larg and comp:
                             dimensoes = f"{larg}x{comp}"
-                    mini_codigo = produto.get("mini_codigo", "")
+                    mini_codigo_from_payload = produto.get("mini_codigo", "")
                     descricao = produto.get("descricao", "")
                     break
         
@@ -2821,15 +2824,48 @@ def export_document_to_excel(inbound_id: int) -> HttpResponse:
                             dimensoes = f"{larg}x{comp}x{esp}"
                         elif larg and comp:
                             dimensoes = f"{larg}x{comp}"
-                    mini_codigo = payload_line.get("mini_codigo", "")
+                    mini_codigo_from_payload = payload_line.get("mini_codigo", "")
                     descricao = payload_line.get("description", "")
                     break
 
         # Fallback: se não houver dimensões, tenta extrair da descrição
         if not dimensoes:
             dimensoes = extract_dimensions_from_text(descricao or linha.description)
+        
+        # 🎯 PRIORIDADE 1: MAPEAR MINI CÓDIGO DA BASE DE DADOS
+        # Tenta mapear usando article_code → identificador na BD
+        mini_codigo_from_db = None
+        if article_code_from_doc:
+            try:
+                mini_obj = MiniCodigo.objects.filter(identificador=article_code_from_doc).first()
+                if mini_obj:
+                    mini_codigo_from_db = mini_obj.mini_codigo
+                    # Se não temos designação do documento, usa da BD
+                    if not descricao:
+                        descricao = mini_obj.designacao
+            except Exception as e:
+                print(f"⚠️ Erro ao mapear mini código por article_code: {e}")
+        
+        # Fallback: tenta mapear usando supplier_code se article_code não funcionou
+        if not mini_codigo_from_db and linha.supplier_code:
+            try:
+                mini_obj = MiniCodigo.objects.filter(identificador=linha.supplier_code).first()
+                if mini_obj:
+                    mini_codigo_from_db = mini_obj.mini_codigo
+                    if not descricao:
+                        descricao = mini_obj.designacao
+            except Exception as e:
+                print(f"⚠️ Erro ao mapear mini código por supplier_code: {e}")
+        
+        # Hierarquia de fallback: BD → payload → maybe_internal_sku → article_code
+        final_mini_codigo = (
+            mini_codigo_from_db or 
+            mini_codigo_from_payload or 
+            linha.maybe_internal_sku or 
+            article_code_from_doc
+        )
 
-        ws.cell(row=row, column=1, value=mini_codigo or linha.maybe_internal_sku)
+        ws.cell(row=row, column=1, value=final_mini_codigo)
         ws.cell(row=row, column=2, value=dimensoes)
         ws.cell(row=row, column=3, value=float(linha.qty_received))
 
