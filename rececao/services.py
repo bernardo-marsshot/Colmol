@@ -161,42 +161,49 @@ Return valid JSON:
 }
 
 QUANTITY EXTRACTION RULES (CRITICAL):
-⚠️ Elastron invoices pattern (with or without perfect header OCR):
-  - Typical pattern: [decimal] [UNIT] [small_integer] [price]
-  - Example: "34,00 ML 1 3,99" → quantidade=34.00 ML (NOT 1)
-  - Column order: Artigo, Descrição, Lote, **Quant.**, Un., **Vol.**, Preço, Desconto, IVA, Total
-  - The number BEFORE the unit (ML/UN/MT) = quantity (use this)
-  - The number AFTER the unit = volume count (ignore this)
-  - Even if "Vol." header missing, if pattern is [decimal][unit][1-3 digit integer], the decimal is quantity
+⚠️ Elastron invoices ONLY (detect by small INTEGER after unit):
+  - Pattern: [decimal] [UNIT] [INTEGER ≤3] [price]
+  - Example: "34,00 ML 1 3,99" → quantidade=34.0 (NOT 1)
+  - The INTEGER after unit (1, 2, or 3) = volume count (number of rolls) → IGNORE
+  - The DECIMAL before unit = quantity in meters/units → USE THIS
+  - This rule applies ONLY when: number after unit is INTEGER ≤3 (volumes are 1, 2, or 3)
 
-⚠️ Contextual rules (work even with partial OCR):
-  - If you see: [number] + [ML|UN|MT|M²] + [small integer 1-99] → first number is quantity, ignore integer
-  - If you see: [decimal like 34,00] + [unit] + [integer like 1] + [price] → decimal=quantity (NOT integer)
-  - Volume indicators: usually 1, 2, or 3 (number of rolls/packages) - IGNORE THESE
-  - Quantity indicators: usually decimals with units (34,00 ML, 150,5 MT) - USE THESE
+⚠️ Eurospuma/other invoices (decimals after unit = dimensions, not volumes):
+  - Pattern: [quantity] [UNIT] [decimal dimensions...]
+  - Example: "125,000 UN 1,880 0,150 0,080" → quantidade=125.0 (NOT 1.880)
+  - Example: "640,000 MT 320,000 0,260" → quantidade=640.0 (NOT 320.0)
+  - Numbers after unit are DECIMALS (dimensions/measurements) → DO NOT confuse with quantity
+  - The quantity is the FIRST number before the unit
 
-⚠️ For non-Elastron documents:
-  - Normal pattern: [quantity] [unit] [price]
-  - Extract quantity as is (integer or decimal)
-  - No volume column to worry about
+⚠️ Detection logic:
+  - If pattern is [decimal] [unit] [INTEGER 1-3] [price] → Elastron format, ignore integer
+  - If pattern is [decimal] [unit] [DECIMAL >3 OR with comma] → Normal format, use first decimal as quantity
+  - If just [quantity] [unit] [price] → Standard format
 
 EXAMPLES (quantity extraction):
-✅ Correct:
-- "34,00 ML 1 3,99" → quantidade=34.0 (Elastron: ignore the "1")
-- "E0748001901 BALTIC | 30,80 ML 1 5,99" → quantidade=30.8 (NOT 1)
-- "OPERA fb PEARL | 48,50 ML 1 2,49" → quantidade=48.5 (NOT 1)
-- "COLCHAO 150X190 | 2 UN | 199€" → quantidade=2 (normal: no volume column)
-- "MATELAS 140x200 | Qté: 5 | 245€" → quantidade=5
+✅ Correct Elastron (ignore volume):
+- "34,00 ML 1 3,99" → quantidade=34.0 (ignore "1" = volume)
+- "104,00 ML 2 1,98" → quantidade=104.0 (ignore "2" = volume)
+- "48,50 ML 1 2,49" → quantidade=48.5 (ignore "1" = volume)
 
-❌ Wrong (avoid these):
-- "34,00 ML 1 3,99" → quantidade=1 ✗ (volume count, not quantity!)
-- "30,80 ML 1 5,99" → quantidade=1 ✗ (wrong column!)
+✅ Correct Eurospuma (ignore dimensions):
+- "125,000 UN 1,880 0,150 0,080" → quantidade=125.0 (NOT 1.880)
+- "640,000 MT 320,000 0,260" → quantidade=640.0 (NOT 320.0)
+- "300,000 MT 30,000 2,100" → quantidade=300.0 (NOT 30.0)
+
+✅ Correct normal:
+- "COLCHAO | 2 UN | 199€" → quantidade=2
+- "MATELAS | Qté: 5 | 245€" → quantidade=5
+
+❌ Wrong:
+- "34,00 ML 1" → quantidade=1 ✗ (should be 34.0)
+- "125,000 UN 1,880" → quantidade=1.880 ✗ (should be 125.0)
 
 Rules:
 - Extract EVERY product line
-- When [decimal][unit][integer] pattern exists, decimal=quantity
-- Convert to numbers correctly
-- Use null for missing fields"""
+- INTEGER ≤3 after unit = volume (Elastron only) → ignore
+- DECIMAL after unit = dimension → don't use as quantity
+- First number before unit = quantity (always)"""
 
         user_prompt = f"""Extract ALL products from this document (PT/ES/FR):
 
