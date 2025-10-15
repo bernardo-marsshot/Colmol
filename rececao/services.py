@@ -2830,8 +2830,21 @@ def process_inbound(inbound: InboundDocument):
                 if created:
                     print(f"✅ Auto-criado mapeamento para {r.article_code} (SKU: {r.article_code})")
             
-            # Verificar se quantidade recebida EXCEDE a quantidade encomendada (do CodeMapping)
-            qty_ordered = float(mapping.qty_ordered or 0)  # Proteção contra None
+            # Verificar se quantidade recebida EXCEDE a quantidade encomendada (da Purchase Order)
+            # Buscar a POLine correspondente usando internal_sku do mapping
+            poline = inbound.po.lines.filter(internal_sku=mapping.internal_sku).first()
+            
+            if not poline:
+                # Produto não consta na PO
+                issues += 1
+                exceptions.append({
+                    "line": r.article_code,
+                    "issue": f"Produto não consta na Purchase Order {inbound.po.number}",
+                })
+                continue
+            
+            # Comparar quantidade recebida (Guia) com quantidade encomendada (POLine)
+            qty_ordered = float(poline.quantity or 0)
             if float(r.qty_received) > qty_ordered:
                 issues += 1
                 exceptions.append({
