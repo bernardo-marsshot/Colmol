@@ -114,3 +114,28 @@ The project is built on Django 5.0.6 using Python 3.11, with SQLite for the data
 - **Logs**: Mostram qual PO foi usada: "🔍 Produto X → PO específica Y"
 - **Compatibilidade**: GR com encomenda única continua funcionando (usa `inbound.po`)
 - **Architect Review**: Fluxo aprovado - matching parcial funciona, sem regressões
+
+### October 16, 2025 - Feature: Notas de Encomenda no Dashboard
+- **Nova Funcionalidade**: Dashboard agora mostra TODOS os documentos (FT + GR)
+- **Implementação**:
+  - **views.py**: Removido filtro `doc_type='GR'`, agora usa `InboundDocument.objects.all()`
+  - **KPIs focados em GR**: Processado/Exceções/Erro/Pendente contam apenas GR (matching)
+  - **Total de Documentos**: Conta todos (FT + GR) para visibilidade completa
+  - **template**: Diferenciação visual clara entre tipos:
+    - **FT (Nota de Encomenda)**: ícone 📝, PO mostra ✨ (PO criada)
+    - **GR (Guia de Remessa)**: ícone 📦, PO mostra 📋 (PO vinculada)
+  - **Status separados**:
+    - FT: `data-status="ft_success"` ou `data-status="ft_error"` (não conflita com filtros)
+    - GR: `data-status="matched|exceptions|error|pending"` (filtros normais)
+- **Lógica de Status**:
+  - **FT**: ✓ (sucesso) se tem PO criada, ✗ (erro) se não tem PO
+  - **GR**: usa `match_result.status` normal
+- **Comportamento dos Filtros**:
+  - Clicar em "Processado" → filtra apenas GR matched (não FT)
+  - Clicar em "Erro" → filtra apenas GR error (não FT sem PO)
+  - FT sempre visível na lista, mas não afeta/conflita com filtros de GR
+- **Benefícios**:
+  - Visibilidade completa do fluxo: Nota de Encomenda → cria PO → Guia de Remessa → matching
+  - KPIs claros e focados (apenas matching de GR)
+  - Não mistura tipos diferentes de problemas
+- **Architect Review**: Aprovado - KPIs isolados corretamente, filtros funcionam sem conflitos
