@@ -135,7 +135,18 @@ def inbound_detail(request, pk):
     })
 
 def po_list(request):
-    pos = PurchaseOrder.objects.all().order_by('-id')
+    from django.db.models import Prefetch
+    from .models import InboundDocument
+    
+    pos = PurchaseOrder.objects.all().order_by('-id').prefetch_related(
+        'lines',
+        Prefetch(
+            'inbound_docs',
+            queryset=InboundDocument.objects.filter(doc_type='GR').order_by('-received_at'),
+            to_attr='guias_remessa'
+        )
+    )
+    
     return render(request, 'po_list.html', {'pos': pos})
 
 def export_excel(request, pk):

@@ -2861,40 +2861,58 @@ def process_inbound(inbound: InboundDocument):
     ok = 0
     issues = 0
     exceptions = []
-    if inbound.po:
+    
+    if inbound.doc_type == 'FT':
+        print("📋 Nota de Encomenda: SKIP matching (PO criada, aguarda guias de remessa)")
+        doc_items = payload.get("produtos", payload.get("lines", []))
+        ok = len(doc_items)
+    elif inbound.po:
+        from .models import POLine
+        
         for r in inbound.lines.all():
-            # Verificar se código não está mapeado
-            # IMPORTANTE: Lookup usando article_code (SKU do produto), não supplier_code (referência da ordem)
             mapping = CodeMapping.objects.filter(
                 supplier=inbound.supplier,
                 supplier_code=r.article_code
             ).first()
             
             if not mapping:
-                # Criar CodeMapping automaticamente para produtos desconhecidos
-                # Tentar obter quantidade encomendada da ReceiptLine ou usar 0 como padrão
                 qty_ordered = float(r.qty_received) if r.qty_received else 0.0
-                
-                # Criar o mapping usando article_code como internal_sku
                 mapping = CodeMapping.objects.create(
                     supplier=inbound.supplier,
                     supplier_code=r.article_code,
-                    internal_sku=r.article_code,  # Usar o próprio código como SKU interno
+                    internal_sku=r.article_code,
                     qty_ordered=qty_ordered,
-                    confidence=0.5  # Baixa confiança - criado automaticamente
+                    confidence=0.5
                 )
                 print(f"🆕 CodeMapping criado automaticamente: {r.article_code} → {r.article_code} (qty: {qty_ordered})")
-                # Não adicionar exceção - continuar o processamento normalmente
             
-            # Verificar se quantidade recebida EXCEDE a quantidade encomendada (do CodeMapping)
-            qty_ordered = float(mapping.qty_ordered or 0)  # Proteção contra None
-            if float(r.qty_received) > qty_ordered:
+            internal_sku = mapping.internal_sku
+            po_line = POLine.objects.filter(po=inbound.po, internal_sku=internal_sku).first()
+            
+            if not po_line:
                 issues += 1
                 exceptions.append({
                     "line": r.article_code,
-                    "issue": f"Quantidade excedida (recebida {r.qty_received} vs encomendada {qty_ordered})",
+                    "issue": f"Produto {internal_sku} não encontrado na PO {inbound.po.number}",
                 })
                 continue
+            
+            qty_ordered = float(po_line.qty_ordered)
+            qty_already_received = float(po_line.qty_received)
+            qty_new = float(r.qty_received)
+            qty_total_received = qty_already_received + qty_new
+            
+            if qty_total_received > qty_ordered:
+                issues += 1
+                exceptions.append({
+                    "line": r.article_code,
+                    "issue": f"Quantidade excedida: recebida {qty_total_received} vs pedida {qty_ordered}",
+                })
+                continue
+            
+            po_line.qty_received = qty_total_received
+            po_line.save()
+            print(f"✅ {internal_sku}: recebida {qty_new}, total {qty_total_received}/{qty_ordered}")
             
             ok += 1
     else:

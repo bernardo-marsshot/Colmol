@@ -8,39 +8,47 @@
     <tbody>
       {% for p in pos %}
       <tr>
-        <td><strong>{{ p.number }}</strong></td>
+        <td>
+          <strong>{{ p.number }}</strong>
+          {% if p.is_complete %}
+            <span class="badge bg-success">✓</span>
+          {% endif %}
+        </td>
         <td>{{ p.supplier.name }}</td>
         <td>
           <ul class="mb-0">
           {% for l in p.lines.all %}
-            <li>{{ l.internal_sku }} — pedida {{ l.qty_ordered }} ± {{ l.tolerance }}</li>
+            <li>
+              {{ l.internal_sku }} — pedida {{ l.qty_ordered|floatformat:2 }} ± {{ l.tolerance|floatformat:2 }}
+              {% if l.is_complete %}
+                <span class="badge bg-success">✓</span>
+              {% endif %}
+            </li>
           {% endfor %}
           </ul>
         </td>
         <td>
-          {% with guias=p.inbound_docs.all %}
-            {% if guias %}
-              <ul class="mb-0">
-              {% for guia in guias %}
-                <li>
-                  <a href="/inbound/{{ guia.id }}/" class="text-decoration-none">
-                    {{ guia.get_doc_type_display }} {{ guia.number }}
-                  </a>
-                  <small class="text-muted">({{ guia.received_at|date:"d/m/Y H:i" }})</small>
-                  {% if guia.match_result %}
-                    {% if guia.match_result.status == 'matched' %}
-                      <span class="badge bg-success">✓</span>
-                    {% elif guia.match_result.status == 'exceptions' %}
-                      <span class="badge bg-warning">!</span>
-                    {% endif %}
+          {% if p.guias_remessa %}
+            <ul class="mb-0">
+            {% for guia in p.guias_remessa %}
+              <li>
+                <a href="/inbound/{{ guia.id }}/" class="text-decoration-none">
+                  {{ guia.get_doc_type_display }} {{ guia.number }}
+                </a>
+                <small class="text-muted">({{ guia.received_at|date:"d/m/Y H:i" }})</small>
+                {% if guia.match_result %}
+                  {% if guia.match_result.status == 'matched' %}
+                    <span class="badge bg-success">✓</span>
+                  {% elif guia.match_result.status == 'exceptions' %}
+                    <span class="badge bg-warning">!</span>
                   {% endif %}
-                </li>
-              {% endfor %}
-              </ul>
-            {% else %}
-              <small class="text-muted">Nenhuma guia recebida</small>
-            {% endif %}
-          {% endwith %}
+                {% endif %}
+              </li>
+            {% endfor %}
+            </ul>
+          {% else %}
+            <small class="text-muted">Nenhuma guia recebida</small>
+          {% endif %}
         </td>
       </tr>
       {% empty %}
