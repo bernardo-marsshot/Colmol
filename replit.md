@@ -54,18 +54,6 @@ The project is built on Django 5.0.6 using Python 3.11, with SQLite for the data
 
 ## Recent Changes
 
-### October 16, 2025 - CORREÇÃO CRÍTICA: Integração da Detecção de Headers para Forçar OCR.space
-- **Bug Crítico Resolvido**: Função `has_only_headers_no_products()` estava implementada mas NÃO era chamada
-- **Problema**: 
-  - PyPDF2 extraía headers mas produtos vinham em linhas separadas (desorganizados)
-  - Sistema retornava texto PyPDF2 direto SEM verificar se eram apenas headers
-  - OCR.space nunca era forçado → produtos de páginas 2+ perdidos
-- **Correção** (linhas 659-820 em `rececao/services.py`):
-  - `remove_repeated_headers()` (659-695): Remove headers duplicados e "continua"
-  - `has_only_headers_no_products()` (698-759): Detecta headers sem produtos estruturados
-  - `extract_text_from_pdf()` (762+): **AGORA verifica** headers e força OCR.space
-- **Resultado**: Documentos Flexibol multipáginas processados com OCR.space automaticamente
-
 ### October 16, 2025 - Correção: Normalização Consistente de Números em Todos os Parsers
 - **Problema Identificado**: Função `normalize_number` aninhada em `parse_fatura_elastron` sobrescrevia a função global
 - **Função Aninhada Removida** (linhas 1109-1128):

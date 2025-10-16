@@ -653,109 +653,6 @@ def real_ocr_extract(file_path: str):
     return result
 
 
-def remove_repeated_headers(text: str) -> str:
-    """
-    Remove cabeçalhos repetidos e palavra 'continua' de documentos multipáginas.
-    Útil após OCR.space para limpar headers que aparecem em todas as páginas.
-    """
-    import re
-    
-    lines = text.split('\n')
-    cleaned_lines = []
-    seen_headers = set()
-    
-    # Palavras de cabeçalho para detectar e filtrar duplicados
-    header_keywords = [
-        'PEDIDO/ORDER', 'CÓDIGO/PART NUMBER', 'DESCRIÇÃO/DESCRIPTION',
-        'LOTE/BATCH', 'QUANT./QUANTITY', 'GUIA DE REMESSA', 'DELIVERY NOTE',
-        'INCOTERMS', 'CARGA/PICK', 'TRANSPORTE/SHIPMENT', 'PÁGINA/PAGE'
-    ]
-    
-    for line in lines:
-        line_upper = line.strip().upper()
-        
-        # Remove linhas com "continua" ou "continuation"
-        if 'CONTINUA' in line_upper or 'CONTINUATION' in line_upper:
-            continue
-        
-        # Verifica se é um cabeçalho
-        is_header = any(keyword in line_upper for keyword in header_keywords)
-        
-        if is_header:
-            # Se já vimos este header antes, pular
-            if line_upper in seen_headers:
-                continue
-            seen_headers.add(line_upper)
-        
-        cleaned_lines.append(line)
-    
-    return '\n'.join(cleaned_lines)
-
-
-def has_only_headers_no_products(text: str) -> bool:
-    """
-    Detecta se o texto extraído tem apenas cabeçalhos mas não tem dados de produtos ESTRUTURADOS.
-    
-    PyPDF2 pode extrair headers e dados separadamente (em linhas diferentes), mas os parsers
-    precisam de linhas estruturadas com código+descrição+quantidade juntos.
-    
-    Esta função detecta quando o texto tem headers mas os produtos não estão estruturados.
-    
-    Retorna True se:
-    - Tem palavras-chave de cabeçalho (PEDIDO, CÓDIGO, DESCRIÇÃO, etc.)
-    - MAS não tem linhas estruturadas com código+descrição+quantidade na mesma linha
-    """
-    import re
-    
-    text_upper = text.upper()
-    lines = text.split('\n')
-    
-    # Palavras-chave de cabeçalho
-    header_keywords = [
-        'PEDIDO/ORDER', 'CÓDIGO/PART NUMBER', 'DESCRIÇÃO/DESCRIPTION',
-        'LOTE/BATCH', 'QUANT./QUANTITY', 'PART NUMBER', 'DESCRIPTION'
-    ]
-    
-    # Verifica se tem cabeçalhos
-    has_headers = any(keyword in text_upper for keyword in header_keywords)
-    
-    if not has_headers:
-        return False
-    
-    # Procura por linhas ESTRUTURADAS com dados de produto
-    # Uma linha estruturada deve ter: SKU + descrição + quantidade REAL (não dimensões)
-    # Ex: "ABC123 PRODUTO TESTE 100 UN" ou "19607542/01 PLACA ESPUMA 25000 UN"
-    structured_line_count = 0
-    
-    for line in lines:
-        line_stripped = line.strip()
-        if len(line_stripped) < 20:  # Linha muito curta
-            continue
-        
-        # Procura por SKU/código de produto
-        # Aceita: ABC123, 19607542/01, E0748001901, etc.
-        sku_match = re.search(r'([A-Z]+\d+[A-Z0-9]*|\d{5,}/\d+|[A-Z]{2,}\d{3,})', line_stripped, re.IGNORECASE)
-        has_sku = bool(sku_match)
-        
-        # Procura por descrição (palavra com letras, mínimo 4 chars)
-        has_description = bool(re.search(r'[A-Za-z]{4,}', line_stripped))
-        
-        # Procura por quantidade REAL (número isolado com unidade obrigatória ou padrão específico)
-        # DEVE ter espaço antes do número e unidade depois (evita dimensões tipo 1980x0880)
-        # Ex: " 100 UN", " 25,000 KG", " 1.5 M", " 50 CX"
-        has_real_quantity = bool(re.search(r'\s+\d+[,.]?\d*\s+(UN|KG|M[L]?|L|PC|PCS|CX|UNID|UNIDADES|CAIXA)\b', line_stripped, re.IGNORECASE))
-        
-        # Linha estruturada = tem SKU + descrição + quantidade REAL com unidade
-        if has_sku and has_description and has_real_quantity:
-            structured_line_count += 1
-    
-    # Se tem headers mas nenhuma linha estruturada = só headers (forçar OCR)
-    if has_headers and structured_line_count == 0:
-        return True
-    
-    return False
-
-
 def extract_text_from_pdf(file_path: str):
     """
     Cascata de extração de PDF (4 níveis):
@@ -774,37 +671,6 @@ def extract_text_from_pdf(file_path: str):
 
         if text.strip() and len(text.strip()) > 50:
             print(f"✅ PDF text extraction: {len(text)} chars")
-            
-            # Verifica se PyPDF2 extraiu apenas headers sem produtos estruturados
-            if has_only_headers_no_products(text):
-                num_pages = len(PyPDF2.PdfReader(open(file_path, "rb")).pages)
-                print(f"⚠️ PyPDF2 extraiu apenas cabeçalhos ({num_pages} páginas) - forçando OCR.space para ler produtos...")
-                
-                # Força OCR.space para ler TODAS as páginas
-                ocr_text = ocr_space_api(file_path, language='por')
-                
-                if ocr_text and len(ocr_text.strip()) > 50:
-                    # Remove headers repetidos e palavra "continua"
-                    ocr_text_clean = remove_repeated_headers(ocr_text)
-                    print(f"✅ OCR.space extraiu texto completo: {len(ocr_text_clean)} chars (limpo de headers repetidos)")
-                    
-                    # QR codes
-                    qr_codes = []
-                    if QR_CODE_ENABLED:
-                        try:
-                            print("🔍 Procurando QR codes no PDF...")
-                            pages = convert_from_path(file_path, dpi=300)
-                            for page_num, page_img in enumerate(pages, start=1):
-                                page_qr = detect_and_read_qrcodes(page_img, page_number=page_num)
-                                qr_codes.extend(page_qr)
-                        except Exception as e:
-                            print(f"⚠️ Erro ao buscar QR codes: {e}")
-                    
-                    return ocr_text_clean.strip(), qr_codes
-                else:
-                    print("⚠️ OCR.space falhou, usando texto PyPDF2 mesmo com headers apenas")
-            
-            # Texto PyPDF2 tem produtos estruturados, usar normalmente
             # Mesmo com texto embutido, tenta detectar QR codes
             qr_codes = []
             if QR_CODE_ENABLED:
@@ -1302,8 +1168,6 @@ def detect_document_type(text: str):
         return "ORDEM_COMPRA"
     elif "elastron" in text_lower and "fatura" in text_lower:
         return "FATURA_ELASTRON"
-    elif "flexipol" in text_lower or ("tot volumes" in text_lower and "lote/batch" in text_lower):
-        return "GUIA_FLEXIBOL"
     elif "colmol" in text_lower and ("guia" in text_lower or "comunicação de saída" in text_lower):
         return "GUIA_COLMOL"
     elif "fatura" in text_lower or "ft" in text_lower:
@@ -1314,119 +1178,6 @@ def detect_document_type(text: str):
         return "RECIBO"
     else:
         return "DOCUMENTO_GENERICO"
-
-
-def parse_flexibol(text: str):
-    """
-    Parser específico para Guias de Remessa Flexipol.
-    Extrai cada volume/lote individual como produto separado.
-    
-    Formato OCR (pode estar concatenado):
-    NUF189013300200PLACA1890x1330x0200HR 35 D BG4,000 UN
-    Tot Volumes419615949/0120033589151,000  <- lote concatenado
-    19615949/0120033589161,000               <- lote isolado
-    Total Cont.: 4Total Lote/Batch: 4,00019615949/012003358918  <- lote no fim
-    """
-    produtos = []
-    lines = text.split("\n")
-    
-    current_product = None
-    current_pedido = ""
-    
-    for i, line in enumerate(lines):
-        line_stripped = line.strip()
-        
-        # Detectar número de pedido/ordem
-        pedido_match = re.search(r'PEDIDO/ORDER[:\s]*(\d+)', line_stripped, re.IGNORECASE)
-        if pedido_match:
-            current_pedido = pedido_match.group(1)
-            continue
-        
-        # Detectar linha de produto principal (código + descrição + quantidade total + unidade)
-        # Formato: NIU188015800030PLACA1880x1580x003023 D Az2,000 UN
-        # Padrão: [3 LETRAS][12+ DÍGITOS][DESCRIÇÃO][QUANTIDADE] [UNIDADE]
-        product_match = re.match(
-            r'^([A-Z]{3}\d{12}[A-Z0-9]*)\s*(.+?)\s+([\d,\.]+)\s+(UN|ML|MT|KG|M|L|PC|PCS|CX)\s*$',
-            line_stripped,
-            re.IGNORECASE
-        )
-        
-        if product_match:
-            codigo = product_match.group(1).strip()
-            descricao = product_match.group(2).strip()
-            quantidade_total = normalize_number(product_match.group(3))
-            unidade = product_match.group(4).strip().upper()
-            
-            current_product = {
-                'codigo': codigo,
-                'descricao': descricao,
-                'quantidade_total': quantidade_total,
-                'unidade': unidade,
-                'pedido': current_pedido
-            }
-            print(f"  🔵 Produto principal: {codigo} ({quantidade_total} {unidade})")
-            # NÃO fazer continue! Continuar testando para lotes na mesma linha
-        
-        # Detectar linhas de lote individual (podem estar concatenadas com "Tot Volumes", "Total Cont.", etc.)
-        # Extrair TODOS os pares (lote/batch + quantidade) da linha
-        # Padrão: [8-10 dígitos]/[2 dígitos][10+ dígitos][quantidade]
-        # Exemplos: 
-        #   "Tot Volumes2120636/042003321064110,000" → lote=120636/042003321064, qtd=110,000
-        #   "19615949/0120033589161,000"             → lote=19615949/012003358916, qtd=1,000
-        
-        if current_product:
-            # Procurar todos os pares (lote + quantidade) na linha
-            # Padrão: (8 dígitos / 2 dígitos / 10-12 dígitos) + (quantidade: \d+,\d{3})
-            # Exemplo: Tot Volumes319616570/01200336065925,000 → lote=19616570/0120033606592, qtd=5,000
-            print(f"  🔍 Testando linha (current_product={current_product['codigo'][:10]}...): '{line_stripped[:60]}'")
-            
-            # Regex mais preciso: 8 dígitos / 2 dígitos / EXATAMENTE 10 dígitos (não ganancioso)
-            # Exemplo: 19615949/012003358916 + 1,000 → lote tem 20 chars fixos
-            lote_matches = re.findall(
-                r'(\d{8}/\d{2}\d{10})(\d+,\d{3})',
-                line_stripped
-            )
-            
-            if lote_matches:
-                print(f"  🟢 {len(lote_matches)} lote(s) encontrado(s) na linha")
-            else:
-                print(f"    ❌ Nenhum lote encontrado nesta linha")
-            
-            for lote, qtd_str in lote_matches:
-                quantidade_individual = normalize_number(qtd_str)
-                
-                # Filtrar quantidades muito baixas (provavelmente não são quantidades reais)
-                if quantidade_individual < 0.1:
-                    print(f"    ⚠️ Qtd muito baixa ignorada: {quantidade_individual}")
-                    continue
-                
-                print(f"    ✅ Lote adicionado: {lote} ({quantidade_individual})")
-                
-                # Criar produto individual para este lote
-                produtos.append({
-                    "referencia_ordem": current_product['pedido'],
-                    "artigo": current_product['codigo'],
-                    "descricao": current_product['descricao'],
-                    "lote_producao": lote,
-                    "quantidade": quantidade_individual,
-                    "unidade": current_product['unidade'],
-                    "volume": 1,  # Cada lote é 1 volume
-                    "preco_unitario": 0.0,
-                    "total": 0.0
-                })
-        
-        # Reset current_product apenas se novo produto (não resetar em linhas vazias)
-        # if not line_stripped or (re.match(r'^[A-Z]{3}\d{12}', line_stripped) and current_product):
-        #     current_product = None
-        # 
-        # NOTA: Não resetar current_product - deixar ativo até encontrar todos os lotes
-    
-    if produtos:
-        print(f"✅ Parser Flexibol: {len(produtos)} volumes/lotes individuais extraídos")
-    else:
-        print("⚠️ Parser Flexibol: 0 produtos extraídos")
-    
-    return produtos
 
 
 def parse_fatura_elastron(text: str):
@@ -2603,14 +2354,6 @@ def parse_portuguese_document(text: str, qr_codes=None, texto_pdfplumber_curto=F
                 result["document_number"] = produtos[0]["contremarque"]
         else:
             print("⚠️ Parser Bon de Commande retornou 0 produtos")
-    elif doc_type == "GUIA_FLEXIBOL":
-        produtos = parse_flexibol(text)
-        if produtos:
-            result["produtos"] = produtos
-            result["supplier_name"] = "Flexipol - Espumas Sintéticas, SA"
-            print(f"✅ Extraídos {len(produtos)} volumes/lotes individuais da Guia Flexibol")
-        else:
-            print("⚠️ Parser Flexibol retornou 0 produtos")
     elif doc_type == "ORDEM_COMPRA":
         produtos = parse_ordem_compra(text)
         if produtos:
