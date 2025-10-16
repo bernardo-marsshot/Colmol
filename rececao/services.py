@@ -653,15 +653,72 @@ def real_ocr_extract(file_path: str):
     return result
 
 
+def extract_text_with_pymupdf(file_path: str):
+    """
+    Extrai texto de PDF usando PyMuPDF (fitz) mantendo layout original.
+    Ideal para documentos com tabelas e estruturas complexas.
+    Percorre todas as páginas do documento preservando espaços em branco.
+    
+    Returns:
+        tuple: (texto_completo, lista_qr_codes)
+    """
+    try:
+        import fitz
+        
+        doc = fitz.open(file_path)
+        text_parts = []
+        
+        for page_num, page in enumerate(doc, start=1):
+            # Usa flags para preservar espaços em branco e layout (importante para tabelas)
+            page_text = page.get_text("text", flags=fitz.TEXT_PRESERVE_WHITESPACE | fitz.TEXT_PRESERVE_LIGATURES | fitz.TEXT_PRESERVE_IMAGES)
+            
+            if page_text.strip():
+                text_parts.append(f"--- Página {page_num} ---\n{page_text}\n")
+        
+        doc.close()
+        
+        full_text = "\n".join(text_parts)
+        
+        if full_text.strip() and len(full_text.strip()) > 50:
+            print(f"✅ PyMuPDF extraction: {len(full_text)} chars from {len(text_parts)} pages")
+            
+            qr_codes = []
+            if QR_CODE_ENABLED:
+                try:
+                    print("🔍 Procurando QR codes no PDF...")
+                    pages = convert_from_path(file_path, dpi=300)
+                    for page_num, page_img in enumerate(pages, start=1):
+                        page_qr = detect_and_read_qrcodes(page_img, page_number=page_num)
+                        qr_codes.extend(page_qr)
+                except Exception as e:
+                    print(f"⚠️ Erro ao buscar QR codes: {e}")
+            
+            return full_text.strip(), qr_codes
+        else:
+            print("⚠️ PyMuPDF não extraiu texto suficiente")
+            return None, []
+            
+    except Exception as e:
+        print(f"⚠️ PyMuPDF falhou: {e}")
+        return None, []
+
+
 def extract_text_from_pdf(file_path: str):
     """
-    Cascata de extração de PDF (4 níveis):
-    1. Texto embutido (PyPDF2) - mais rápido
+    Cascata de extração de PDF (5 níveis):
+    0. PyMuPDF (fitz) - mantém layout original, ideal para tabelas
+    1. Texto embutido (PyPDF2) - fallback rápido
     2. OCR.space API - cloud, preciso, grátis 25k/mês
     3. PaddleOCR/EasyOCR/Tesseract - local, offline
     """
     try:
-        # LEVEL 1: Tenta texto embutido primeiro (mais rápido)
+        # LEVEL 0: PyMuPDF - preserva layout original (melhor para tabelas)
+        pymupdf_text, pymupdf_qr = extract_text_with_pymupdf(file_path)
+        if pymupdf_text:
+            return pymupdf_text, pymupdf_qr
+        
+        # LEVEL 1: PyPDF2 - texto embutido (fallback rápido)
+        print("📄 PyMuPDF não extraiu texto suficiente - tentando PyPDF2...")
         text = ""
         with open(file_path, "rb") as f:
             reader = PyPDF2.PdfReader(f)
@@ -670,7 +727,7 @@ def extract_text_from_pdf(file_path: str):
                 text += page_text + "\n"
 
         if text.strip() and len(text.strip()) > 50:
-            print(f"✅ PDF text extraction: {len(text)} chars")
+            print(f"✅ PyPDF2 text extraction: {len(text)} chars")
             # Mesmo com texto embutido, tenta detectar QR codes
             qr_codes = []
             if QR_CODE_ENABLED:
