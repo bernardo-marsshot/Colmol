@@ -92,3 +92,25 @@ The project is built on Django 5.0.6 using Python 3.11, with SQLite for the data
   - Número da PO extraído é mostrado mesmo quando não encontrada
   - Evita tentativas de matching sem PO vinculada
 - **Architect Review**: Bug de exceção deletada corrigido - exceção é preservada corretamente
+
+### October 16, 2025 - Feature: Matching por Linha para GR com Múltiplas POs
+- **Nova Funcionalidade**: GR pode fazer matching usando PO específica de cada produto
+- **Implementação**:
+  - Adicionado campo `po_number_extracted` em `ReceiptLine` (migration 0006)
+  - LLM extrai `numero_encomenda` por produto e salva em `po_number_extracted`
+  - Loop de matching busca PO específica para cada linha:
+    - Se linha tem `po_number_extracted` → busca essa PO
+    - Se PO específica encontrada → usa para matching
+    - Senão → usa `inbound.po` padrão (fallback)
+    - Se nenhuma PO disponível → cria exceção por linha
+- **Fluxo Corrigido**:
+  - GR sem `inbound.po` agora entra no matching (removido bloqueio antecipado)
+  - Cada linha busca sua PO independentemente
+  - Exceções criadas por linha, não bloqueiam outras
+- **Exemplo**: GR com produtos das encomendas 11-161050 e 11-161594
+  - Produto A (`po_number_extracted="11-161050"`) → matching com PO 11-161050
+  - Produto B (`po_number_extracted="11-161594"`) → matching com PO 11-161594
+  - Quantidades decrementadas nas POs corretas
+- **Logs**: Mostram qual PO foi usada: "🔍 Produto X → PO específica Y"
+- **Compatibilidade**: GR com encomenda única continua funcionando (usa `inbound.po`)
+- **Architect Review**: Fluxo aprovado - matching parcial funciona, sem regressões
