@@ -3006,7 +3006,27 @@ def process_inbound(inbound: InboundDocument):
                 first_error_line = idx
                 break
 
-    res.status = "matched" if issues == 0 else "exceptions"
+    # Verificar se há erros de OCR/parsing (falhas críticas de processamento)
+    ocr_errors_exist = inbound.exceptions.filter(line_ref="OCR").exists()
+    
+    # Deletar apenas exceções de matching antigas (preservar exceções de OCR)
+    inbound.exceptions.exclude(line_ref="OCR").delete()
+    
+    # Criar novas exceções de matching
+    for ex in exceptions:
+        ExceptionTask.objects.create(inbound=inbound,
+                                     line_ref=ex["line"],
+                                     issue=ex["issue"])
+    
+    # Definir status baseado no tipo de problema:
+    # - error: falha no OCR/parsing (ficheiro ilegível, OCR falhou, etc.)
+    # - exceptions: problemas no matching (divergências, SKU não encontrado)
+    # - matched: tudo OK
+    if ocr_errors_exist:
+        res.status = "error"
+    else:
+        res.status = "matched" if issues == 0 else "exceptions"
+    
     res.summary = {
         "lines_ok": ok,
         "lines_issues": issues,
@@ -3018,12 +3038,6 @@ def process_inbound(inbound: InboundDocument):
     res.certified_id = hashlib.sha256(
         (str(inbound.id) + str(payload)).encode()).hexdigest()[:16]
     res.save()
-
-    inbound.exceptions.all().delete()
-    for ex in exceptions:
-        ExceptionTask.objects.create(inbound=inbound,
-                                     line_ref=ex["line"],
-                                     issue=ex["issue"])
 
     return res
 
