@@ -54,6 +54,22 @@ The project is built on Django 5.0.6 using Python 3.11, with SQLite for the data
 
 ## Recent Changes
 
+### October 16, 2025 - Correção: Extração de Produtos de TODAS as Páginas PDF (Fornecedores Multipáginas)
+- **Problema Identificado**: Função `universal_table_extract` só executava pdfplumber quando Camelot não encontrava produtos
+- **Comportamento Anterior**:
+  - Se Camelot encontrasse produtos na página 1, pdfplumber nunca era executado
+  - Produtos nas páginas 2, 3, etc. eram ignorados
+  - Especialmente problemático para fornecedores como Flexibol com documentos multipáginas
+- **Correção Aplicada** (linha 2127 em `rececao/services.py`):
+  - Removida condição `and len(produtos) == 0` da verificação do pdfplumber
+  - **Antes**: `if PDFPLUMBER_AVAILABLE and file_path.lower().endswith('.pdf') and len(produtos) == 0:`
+  - **Depois**: `if PDFPLUMBER_AVAILABLE and file_path.lower().endswith('.pdf'):`
+  - Agora pdfplumber SEMPRE processa TODAS as páginas do PDF
+- **Benefícios**:
+  - Extração completa de produtos de documentos multipáginas
+  - Camelot e pdfplumber trabalham em conjunto para máxima cobertura
+  - Resolve problema específico de fornecedores como Flexibol que enviam documentos com múltiplas páginas de produtos
+
 ### October 16, 2025 - Correção: Normalização Consistente de Números em Todos os Parsers
 - **Problema Identificado**: Função `normalize_number` aninhada em `parse_fatura_elastron` sobrescrevia a função global
 - **Função Aninhada Removida** (linhas 1109-1128):
