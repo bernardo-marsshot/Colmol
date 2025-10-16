@@ -2659,7 +2659,7 @@ def map_supplier_codes(supplier, payload):
                 "qty": produto.get("quantidade") or 0,
                 "internal_sku": (mapping.internal_sku if mapping else None),
                 "confidence": (mapping.confidence if mapping else 0.0),
-                "po_number_extracted": produto.get("numero_encomenda", ""),  # Preservar numero_encomenda
+                "po_number_extracted": (produto.get("numero_encomenda") or ""),  # Protege contra None
             })
     # Formato antigo com 'lines' (no formato antigo, supplier_code era o SKU do produto)
     elif "lines" in payload:
@@ -2672,6 +2672,7 @@ def map_supplier_codes(supplier, payload):
                 "article_code": supplier_code,  # No formato antigo, supplier_code era o artigo/SKU
                 "internal_sku": (mapping.internal_sku if mapping else None),
                 "confidence": (mapping.confidence if mapping else 0.0),
+                "po_number_extracted": "",  # Formato antigo não tem este campo
             })
 
     return mapped
@@ -2697,7 +2698,8 @@ def create_po_from_nota_encomenda(inbound: InboundDocument, payload: dict):
     
     for produto in produtos:
         # Extrair numero_encomenda do produto (se existir)
-        po_number = produto.get("numero_encomenda", "").strip()
+        # Protege contra None: (None or "") retorna ""
+        po_number = (produto.get("numero_encomenda") or "").strip()
         
         # Se não tem numero_encomenda no produto, usar fallback do documento
         if not po_number:

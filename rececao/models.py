@@ -86,7 +86,7 @@ class ReceiptLine(models.Model):
     description = models.CharField(max_length=255, blank=True)
     unit = models.CharField(max_length=20, default='UN')
     qty_received = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    po_number_extracted = models.CharField(max_length=120, blank=True)  # numero_encomenda extraído do produto
+    po_number_extracted = models.CharField(max_length=120, blank=True, default='')  # numero_encomenda extraído do produto
 
 class MatchResult(models.Model):
     inbound = models.OneToOneField(InboundDocument, on_delete=models.CASCADE, related_name='match_result')
