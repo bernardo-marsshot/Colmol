@@ -56,6 +56,23 @@ The project is built on Django 5.0.6 using Python 3.11, with SQLite for the data
 
 ## Recent Changes
 
+### October 16, 2025 - CORREÇÃO: Quantidades Corretas em Notas de Encomenda
+- **Problemas Corrigidos**:
+  1. **Ordem de Compra**: Parser não extraía quantidades no formato "1.000 UN 2025-10-17" quando OCR retornava texto sem separação adequada
+  2. **Bon de Commande**: Parser genérico estava a extrair endereços como produtos (exemplo: "TERTRES" com quantidade "10410")
+  3. **Parser Genérico**: Extraía códigos postais como quantidades e palavras de endereço como produtos
+- **Melhorias Implementadas**:
+  - **Parser Ordem de Compra Melhorado**: Suporta dois formatos:
+    - Linhas separadas: Referência + Descrição / Quantidade + Unidade
+    - Linha única (OCR mal separado): `CÓDIGO DESCRIÇÃO QUANTIDADE UNIDADE DATA`
+    - Usa `normalize_number()` para converter "1.000" → 1000, "1,5" → 1.5
+  - **Filtros de Validação no Parser Genérico**:
+    - Rejeita quantidades > 9999 (evita códigos postais como 10410)
+    - Filtra palavras de endereço (tertres, moissons, rue, rua, adresse, etc)
+    - Rejeita artigos muito curtos ou genéricos
+  - **Parser Bon de Commande**: Já existia e funciona corretamente, agora não é sobrescrito por dados inválidos do genérico
+- **Resultado**: Quantidades agora são extraídas corretamente de documentos portugueses, franceses e espanhóis
+
 ### October 16, 2025 - CORREÇÃO CRÍTICA: OCR Prioridade sobre LLM
 - **Bug Crítico Corrigido**: LLM estava sobrescrevendo dados corretos do OCR
   - **Antes**: Sistema extraía 51 produtos com OCR → LLM retornava 9 produtos → Sistema usava só os 9 do LLM ❌

@@ -1584,8 +1584,10 @@ def parse_guia_generica(text: str):
 
 def parse_ordem_compra(text: str):
     """
-    Parser específico para Ordens de Compra com linhas separadas.
-    Formato: Referência + Descrição numa linha, Quantidade + Unidade + Data noutra linha.
+    Parser específico para Ordens de Compra portuguesas.
+    Suporta dois formatos:
+    1. Linhas separadas: Referência + Descrição / Quantidade + Unidade
+    2. Linha única: REFERÊNCIA DESCRIÇÃO QUANTIDADE UNIDADE DATA
     """
     produtos = []
     lines = text.split("\n")
@@ -1599,32 +1601,66 @@ def parse_ordem_compra(text: str):
         if not stripped:
             continue
         
-        # Detectar linha de quantidade + unidade PRIMEIRO (mais específico)
+        # Formato 1: Linha completa tudo junto
+        # Exemplo: 26.100145COLCHAO 1,95X1,40=27"SPA CHERRY VISCO"COLMOL1.000 UN2025-10-17
+        # Padrão: CÓDIGO (números.números) + DESCRIÇÃO (texto) + QUANTIDADE (número.número) + UNIDADE + DATA
+        combined_match = re.match(
+            r'^(\d+\.\d+)(.+?)([\d,\.]+)\s+([A-Z]{2,4})(?:\s*(\d{4}-\d{2}-\d{2}))?',
+            stripped,
+            re.IGNORECASE
+        )
+        
+        if combined_match:
+            codigo = combined_match.group(1)
+            descricao = combined_match.group(2).strip()
+            quantidade_str = combined_match.group(3)
+            unidade = combined_match.group(4).upper()
+            data_entrega = combined_match.group(5) if combined_match.group(5) else ""
+            
+            # Validar unidade
+            unidades_validas = {'UN', 'UNI', 'UNID', 'PC', 'PCS', 'KG', 'G', 'M', 'M2', 'M3', 'L', 'ML', 'CX', 'PAR', 'PAC', 'SET', 'RL', 'FD'}
+            if unidade in unidades_validas:
+                try:
+                    quantidade = normalize_number(quantidade_str)
+                    
+                    # Extrair dimensões
+                    dims = ""
+                    dim_match = re.search(r'(\d),(\d{2})[xX×](\d),(\d{2})', descricao)
+                    if dim_match:
+                        dims = f"{dim_match.group(1)}.{dim_match.group(2)}x{dim_match.group(3)}.{dim_match.group(4)}"
+                    
+                    produtos.append({
+                        "artigo": codigo,
+                        "descricao": descricao,
+                        "quantidade": quantidade,
+                        "unidade": unidade,
+                        "data_entrega": data_entrega,
+                        "dimensoes": dims,
+                        "referencia_ordem": "",
+                        "lote_producao": "",
+                        "volume": 0,
+                        "peso": 0.0,
+                        "iva": 23.0,
+                        "total": 0.0
+                    })
+                    continue
+                except (ValueError, IndexError):
+                    pass
+        
+        # Formato 2a: Detectar linha de quantidade + unidade PRIMEIRO (mais específico)
         # Formato: 1.000 UN 2025-10-17 [texto opcional]
-        # Aceita: uppercase/lowercase units, data opcional, texto trailing opcional
-        # Exemplo: "1.000 UN 2025-10-17", "1.000 un", "3.5 KG 2025-10-17 RECEBIDO"
         qty_match = re.match(r'^([\d,\.]+)\s+([A-Za-z]{2,4})(?:\s+(\d{4}-\d{2}-\d{2}))?', stripped)
         if qty_match:
             quantidade_str = qty_match.group(1)
             unidade = qty_match.group(2).upper()
             data_entrega = qty_match.group(3) if qty_match.group(3) else ""
             
-            # Validar unidade: lista de unidades conhecidas OU tem data (evita false positives)
             unidades_validas = {'UN', 'UNI', 'UNID', 'PC', 'PCS', 'KG', 'G', 'M', 'M2', 'M3', 'L', 'ML', 'CX', 'PAR', 'PAC', 'SET', 'RL', 'FD'}
             is_valid_unit = unidade in unidades_validas or data_entrega
             
             if is_valid_unit:
                 try:
-                    # Converter quantidade (formato PT: 1.000 = 1000)
-                    if '.' in quantidade_str and ',' not in quantidade_str:
-                        # Formato 1.000 (mil)
-                        quantidade = float(quantidade_str.replace('.', ''))
-                    elif ',' in quantidade_str:
-                        # Formato 1,5 (um e meio)
-                        quantidade = float(quantidade_str.replace(',', '.'))
-                    else:
-                        quantidade = float(quantidade_str)
-                        
+                    quantidade = normalize_number(quantidade_str)
                     quantidades.append({
                         'quantidade': quantidade,
                         'unidade': unidade,
@@ -1634,9 +1670,8 @@ def parse_ordem_compra(text: str):
                 except ValueError:
                     pass
         
-        # Detectar linha de referência + descrição (menos específico)
+        # Formato 2b: Detectar linha de referência + descrição (menos específico)
         # Formato: 26.100145 COLCHAO 1,95X1,40=27"SPA CHERRY VISCO"COLMOL
-        # Só faz match se NÃO for linha de quantidade (já verificado acima)
         ref_match = re.match(r'^(\d+\.\d+)\s+(.+)$', stripped)
         if ref_match:
             referencias.append({
@@ -1645,24 +1680,25 @@ def parse_ordem_compra(text: str):
             })
             continue
     
-    # Validar emparelhamento de referências e quantidades
+    # Se já extraiu produtos no formato 1, retornar
+    if produtos:
+        return produtos
+    
+    # Formato 2: Combinar referências com quantidades (ordem sequencial 1:1)
     if len(referencias) != len(quantidades):
         print(f"⚠️ Contagem inconsistente: {len(referencias)} referências vs {len(quantidades)} quantidades")
         print(f"   Referências: {[r['codigo'] for r in referencias]}")
         qtys_str = ["{} {}".format(q['quantidade'], q['unidade']) for q in quantidades]
         print(f"   Quantidades: {qtys_str}")
-        # Usar o mínimo para evitar IndexError
         min_count = min(len(referencias), len(quantidades))
         print(f"   Processando apenas {min_count} produtos emparelhados")
     
-    # Combinar referências com quantidades (ordem sequencial 1:1)
     paired_count = min(len(referencias), len(quantidades))
     for i in range(paired_count):
         ref = referencias[i]
         if i < len(quantidades):
             qty_info = quantidades[i]
             
-            # Extrair dimensões da descrição se existirem
             dims = ""
             dim_match = re.search(r'(\d),(\d{2})[xX×](\d),(\d{2})', ref['descricao'])
             if dim_match:
@@ -2298,10 +2334,40 @@ def universal_table_extract(file_path: str):
         except Exception as e:
             print(f"⚠️ pdfplumber falhou: {e}")
     
-    if produtos:
-        print(f"✅ Extração universal de tabelas: {len(produtos)} produtos")
+    # Filtrar produtos inválidos (endereços, códigos postais, etc)
+    produtos_validos = []
+    palavras_invalidas = {
+        'tertres', 'moissons', 'maxiliterie', 'colmol', 'adresse', 'livraison',
+        'zone', 'commercial', 'rue', 'rua', 'avenida', 'street', 'avenue',
+        'cidade', 'city', 'codigo', 'postal', 'telefone', 'phone', 'tel',
+        'fax', 'email', 'e-mail', 'cliente', 'customer', 'fornecedor', 'supplier'
+    }
     
-    return produtos
+    for p in produtos:
+        artigo = str(p.get('artigo', '')).lower()
+        descricao = str(p.get('descricao', '')).lower()
+        quantidade = p.get('quantidade', 0)
+        
+        # Filtro 1: Evitar códigos postais como quantidades (>= 5 dígitos)
+        if quantidade > 9999:
+            continue
+        
+        # Filtro 2: Evitar palavras de endereço no artigo ou descrição
+        texto_completo = f"{artigo} {descricao}"
+        if any(palavra in texto_completo for palavra in palavras_invalidas):
+            continue
+        
+        # Filtro 3: Artigo muito curto ou genérico
+        if artigo and len(artigo) < 2:
+            continue
+        
+        # Produto válido
+        produtos_validos.append(p)
+    
+    if produtos_validos:
+        print(f"✅ Extração universal de tabelas: {len(produtos_validos)} produtos válidos (filtrados {len(produtos) - len(produtos_validos)})")
+    
+    return produtos_validos
 
 
 def parse_generic_document(text: str, file_path: str = None):
