@@ -657,21 +657,28 @@ def extract_text_from_pdf(file_path: str):
     """
     Cascata de extração de PDF (4 níveis):
     1. Texto embutido (PyPDF2) - mais rápido
-    2. OCR.space API - cloud, preciso, grátis 25k/mês
+    2. OCR.space API - cloud, preciso, grátis 25k/mês  
     3. PaddleOCR/EasyOCR/Tesseract - local, offline
+    
+    IMPORTANTE: PyPDF2 pode extrair texto mas falhar em tabelas.
+    Sistema sempre tenta OCR para garantir extração completa de todas as páginas.
     """
     try:
-        # LEVEL 1: Tenta texto embutido primeiro (mais rápido)
+        # LEVEL 1: Texto embutido (PyPDF2) - SEMPRE tenta OCR depois para tabelas
         text = ""
+        num_pages = 0
         with open(file_path, "rb") as f:
             reader = PyPDF2.PdfReader(f)
+            num_pages = len(reader.pages)
             for page in reader.pages:
                 page_text = page.extract_text() or ""
                 text += page_text + "\n"
 
-        if text.strip() and len(text.strip()) > 50:
-            print(f"✅ PDF text extraction: {len(text)} chars")
-            # Mesmo com texto embutido, tenta detectar QR codes
+        pypdf_text = text.strip()
+        if pypdf_text and len(pypdf_text) > 50:
+            print(f"✅ PyPDF2: {len(pypdf_text)} chars de {num_pages} página(s)")
+            
+            # QR codes (sempre tenta detectar)
             qr_codes = []
             if QR_CODE_ENABLED:
                 try:
@@ -683,14 +690,53 @@ def extract_text_from_pdf(file_path: str):
                         qr_codes.extend(page_qr)
                 except Exception as e:
                     print(f"⚠️ Erro ao buscar QR codes: {e}")
-            return text.strip(), qr_codes
+            
+            # Detectar se PyPDF2 conseguiu extrair produtos/tabelas
+            # Critério: deve ter códigos + descrições + quantidades (linha completa)
+            # Contagem de campos típicos em tabelas de produtos
+            import re
+            
+            # Contar campos numéricos (quantidades, preços, dimensões)
+            numeric_fields = len(re.findall(r'\d+[.,]\d+', pypdf_text))
+            
+            # Procurar por linhas que parecem produtos completos
+            # (código + espaços + texto + números)
+            product_lines = len(re.findall(r'\b[A-Z]{2,}[0-9]{3,}.*?\d+[.,]\d+', pypdf_text, re.MULTILINE))
+            
+            # PyPDF2 é confiável se tem muitos campos numéricos E linhas de produto
+            has_product_data = (numeric_fields >= 5 and product_lines >= 3)
+            
+            if has_product_data:
+                print(f"✅ PyPDF2 extraiu produtos ({product_lines} linhas, {numeric_fields} campos numéricos)")
+                return pypdf_text, qr_codes
+            
+            # PyPDF2 NÃO tem dados de produtos - SEMPRE força OCR
+            print(f"⚠️ PyPDF2 incompleto ({product_lines} linhas, {numeric_fields} campos) - forçando OCR...")
+            ocr_text = ocr_space_api(file_path, language='por')
+            
+            if ocr_text and len(ocr_text.strip()) > 100:
+                print(f"✅ OCR.space: {len(ocr_text)} chars (PyPDF2: {len(pypdf_text)})")
+                return ocr_text.strip(), qr_codes
+            else:
+                # OCR.space falhou/vazio, tenta engines locais
+                print("🔄 OCR.space insuficiente - tentando engines locais...")
+                ocr_local_text, ocr_qr = extract_text_from_pdf_with_ocr(file_path)
+                
+                if ocr_local_text and len(ocr_local_text.strip()) > 100:
+                    print(f"✅ OCR local: {len(ocr_local_text)} chars (PyPDF2: {len(pypdf_text)})")
+                    # Combina QR codes
+                    all_qr = qr_codes + ocr_qr
+                    return ocr_local_text.strip(), all_qr
+                else:
+                    # Última opção: retorna PyPDF2 mesmo sem produtos
+                    print(f"⚠️ Nenhum OCR melhorou - usando PyPDF2 ({len(pypdf_text)} chars)")
+                    return pypdf_text, qr_codes
 
-        # LEVEL 2: OCR.space API (cloud, grátis, preciso)
+        # LEVEL 2: OCR.space API (PDF sem texto embutido)
         print("📄 PDF sem texto embutido - tentando OCR.space API...")
         ocr_text = ocr_space_api(file_path, language='por')
         
         if ocr_text and len(ocr_text.strip()) > 50:
-            # QR codes (se disponível)
             qr_codes = []
             if QR_CODE_ENABLED:
                 try:
