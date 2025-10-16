@@ -653,167 +653,24 @@ def real_ocr_extract(file_path: str):
     return result
 
 
-def remove_repeated_headers(text: str) -> str:
-    """
-    Remove cabeçalhos repetidos e palavras como 'continua' entre páginas.
-    
-    Em documentos multipáginas, cada página pode ter:
-    - Palavra "continua" indicando continuação
-    - Headers repetidos (PEDIDO/ORDER, CÓDIGO/PART NUMBER, etc.)
-    
-    Esta função mantém apenas a primeira ocorrência dos headers e remove "continua".
-    """
-    lines = text.split('\n')
-    cleaned_lines = []
-    seen_headers = set()
-    
-    # Palavras/frases para remover completamente
-    skip_patterns = [
-        'continua', 'continuação', 'continuation',
-        '(continua)', '[continua]'
-    ]
-    
-    # Padrões de cabeçalhos para detectar duplicação
-    header_patterns = [
-        'PEDIDO/ORDER', 'CÓDIGO/PART NUMBER', 'DESCRIÇÃO/DESCRIPTION',
-        'LOTE/BATCH', 'N.SÉRIE/SERIAL', 'QUANT./QUANTITY'
-    ]
-    
-    for line in lines:
-        line_upper = line.upper().strip()
-        
-        # Pula linhas com "continua"
-        if any(pattern.upper() in line_upper for pattern in skip_patterns):
-            continue
-        
-        # Detecta se é uma linha de cabeçalho
-        is_header = any(pattern in line_upper for pattern in header_patterns)
-        
-        if is_header:
-            # Cria uma chave única para este header
-            header_key = ''.join(sorted([p for p in header_patterns if p in line_upper]))
-            
-            # Se já vimos este header antes, pula
-            if header_key in seen_headers:
-                continue
-            else:
-                seen_headers.add(header_key)
-        
-        cleaned_lines.append(line)
-    
-    return '\n'.join(cleaned_lines)
-
-
-def has_only_headers_no_products(text: str) -> bool:
-    """
-    Detecta se o texto extraído tem apenas cabeçalhos mas não tem dados de produtos ESTRUTURADOS.
-    
-    PyPDF2 pode extrair headers e dados separadamente (em linhas diferentes), mas os parsers
-    precisam de linhas estruturadas com código+descrição+quantidade juntos.
-    
-    Esta função detecta quando o texto tem headers mas os produtos não estão estruturados.
-    
-    Retorna True se:
-    - Tem palavras-chave de cabeçalho (PEDIDO, CÓDIGO, DESCRIÇÃO, etc.)
-    - MAS não tem linhas estruturadas com código+descrição+quantidade na mesma linha
-    """
-    import re
-    
-    text_upper = text.upper()
-    lines = text.split('\n')
-    
-    # Palavras-chave de cabeçalho
-    header_keywords = [
-        'PEDIDO/ORDER', 'CÓDIGO/PART NUMBER', 'DESCRIÇÃO/DESCRIPTION',
-        'LOTE/BATCH', 'QUANT./QUANTITY', 'PART NUMBER', 'DESCRIPTION'
-    ]
-    
-    # Verifica se tem cabeçalhos
-    has_headers = any(keyword in text_upper for keyword in header_keywords)
-    
-    if not has_headers:
-        return False
-    
-    # Procura por linhas ESTRUTURADAS com dados de produto
-    # Uma linha estruturada deve ter: SKU + descrição + quantidade REAL (não dimensões)
-    # Ex: "ABC123 PRODUTO TESTE 100 UN" ou "19607542/01 PLACA ESPUMA 25000 UN"
-    structured_line_count = 0
-    
-    for line in lines:
-        line_stripped = line.strip()
-        if len(line_stripped) < 20:  # Linha muito curta
-            continue
-        
-        # Procura por SKU/código de produto
-        # Aceita: ABC123, 19607542/01, E0748001901, etc.
-        sku_match = re.search(r'([A-Z]+\d+[A-Z0-9]*|\d{5,}/\d+|[A-Z]{2,}\d{3,})', line_stripped, re.IGNORECASE)
-        has_sku = bool(sku_match)
-        
-        # Procura por descrição (palavra com letras, mínimo 4 chars)
-        has_description = bool(re.search(r'[A-Za-z]{4,}', line_stripped))
-        
-        # Procura por quantidade REAL (número isolado com unidade obrigatória ou padrão específico)
-        # DEVE ter espaço antes do número e unidade depois (evita dimensões tipo 1980x0880)
-        # Ex: " 100 UN", " 25,000 KG", " 1.5 M", " 50 CX"
-        has_real_quantity = bool(re.search(r'\s+\d+[,.]?\d*\s+(UN|KG|M[L]?|L|PC|PCS|CX|UNID|UNIDADES|CAIXA)\b', line_stripped, re.IGNORECASE))
-        
-        # Linha estruturada = tem SKU + descrição + quantidade REAL com unidade
-        if has_sku and has_description and has_real_quantity:
-            structured_line_count += 1
-    
-    # Se tem headers mas nenhuma linha estruturada = só headers (forçar OCR)
-    if has_headers and structured_line_count == 0:
-        return True
-    
-    return False
-
-
 def extract_text_from_pdf(file_path: str):
     """
     Cascata de extração de PDF (4 níveis):
     1. Texto embutido (PyPDF2) - mais rápido
-    2. OCR.space API - cloud, preciso, grátis 25k/mês (FORÇADO se PyPDF2 extrair só headers)
+    2. OCR.space API - cloud, preciso, grátis 25k/mês
     3. PaddleOCR/EasyOCR/Tesseract - local, offline
     """
     try:
         # LEVEL 1: Tenta texto embutido primeiro (mais rápido)
         text = ""
-        num_pages = 0
         with open(file_path, "rb") as f:
             reader = PyPDF2.PdfReader(f)
-            num_pages = len(reader.pages)
             for page in reader.pages:
                 page_text = page.extract_text() or ""
                 text += page_text + "\n"
 
         if text.strip() and len(text.strip()) > 50:
-            # Verifica se é um documento multipáginas com apenas headers (sem dados)
-            only_headers = has_only_headers_no_products(text)
-            
-            if only_headers:
-                print(f"⚠️ PyPDF2 extraiu apenas cabeçalhos ({num_pages} páginas) - forçando OCR.space para ler produtos...")
-                # Força OCR.space mesmo com texto extraído
-                ocr_text = ocr_space_api(file_path, language='por')
-                
-                if ocr_text and len(ocr_text.strip()) > 50:
-                    # Limpa cabeçalhos repetidos e palavra "continua"
-                    ocr_text_cleaned = remove_repeated_headers(ocr_text)
-                    print(f"✅ OCR.space extraiu texto completo: {len(ocr_text_cleaned)} chars (limpo de headers repetidos)")
-                    qr_codes = []
-                    if QR_CODE_ENABLED:
-                        try:
-                            print("🔍 Procurando QR codes no PDF...")
-                            pages = convert_from_path(file_path, dpi=300)
-                            for page_num, page_img in enumerate(pages, start=1):
-                                page_qr = detect_and_read_qrcodes(page_img, page_number=page_num)
-                                qr_codes.extend(page_qr)
-                        except Exception as e:
-                            print(f"⚠️ Erro ao buscar QR codes: {e}")
-                    return ocr_text_cleaned.strip(), qr_codes
-                else:
-                    print("⚠️ OCR.space falhou - usando texto PyPDF2 mesmo com apenas headers")
-            
-            print(f"✅ PDF text extraction: {len(text)} chars ({num_pages} páginas)")
+            print(f"✅ PDF text extraction: {len(text)} chars")
             # Mesmo com texto embutido, tenta detectar QR codes
             qr_codes = []
             if QR_CODE_ENABLED:
@@ -833,9 +690,6 @@ def extract_text_from_pdf(file_path: str):
         ocr_text = ocr_space_api(file_path, language='por')
         
         if ocr_text and len(ocr_text.strip()) > 50:
-            # Limpa cabeçalhos repetidos e palavra "continua"
-            ocr_text_cleaned = remove_repeated_headers(ocr_text)
-            print(f"✅ OCR.space: {len(ocr_text_cleaned)} chars (limpo de headers repetidos)")
             # QR codes (se disponível)
             qr_codes = []
             if QR_CODE_ENABLED:
@@ -847,7 +701,7 @@ def extract_text_from_pdf(file_path: str):
                         qr_codes.extend(page_qr)
                 except Exception as e:
                     print(f"⚠️ Erro ao buscar QR codes: {e}")
-            return ocr_text_cleaned.strip(), qr_codes
+            return ocr_text.strip(), qr_codes
 
         # LEVEL 3: Engines locais (PaddleOCR → EasyOCR → Tesseract)
         print("📄 OCR.space falhou - usando engines locais (PaddleOCR/EasyOCR/Tesseract)...")
@@ -2268,9 +2122,7 @@ def universal_table_extract(file_path: str):
             print(f"⚠️ Camelot falhou: {e}")
     
     # Método 2: pdfplumber (melhor para tabelas sem bordas)
-    # IMPORTANTE: Sempre executar pdfplumber em TODAS as páginas, mesmo que Camelot já tenha encontrado produtos
-    # Isto garante que produtos em páginas subsequentes não sejam ignorados
-    if PDFPLUMBER_AVAILABLE and file_path.lower().endswith('.pdf'):
+    if PDFPLUMBER_AVAILABLE and file_path.lower().endswith('.pdf') and len(produtos) == 0:
         try:
             with pdfplumber.open(file_path) as pdf:
                 for page in pdf.pages:
