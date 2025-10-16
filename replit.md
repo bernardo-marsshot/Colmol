@@ -54,6 +54,36 @@ The project is built on Django 5.0.6 using Python 3.11, with SQLite for the data
 
 ## Recent Changes
 
+### October 16, 2025 - Correção: Detecção Inteligente de Headers Não Estruturados (Força OCR.space)
+- **Problema Identificado**: PyPDF2 extrai headers/cabeçalhos mas não consegue ler produtos visuais de PDFs Flexibol
+- **Comportamento Anterior**:
+  - PyPDF2 extraía cabeçalhos (PEDIDO/ORDER, CÓDIGO/PART NUMBER, etc.)
+  - PyPDF2 extraía códigos e quantidades MAS em linhas separadas (desorganizados)
+  - Sistema pensava que tinha texto suficiente e não usava OCR.space
+  - OCR.space nunca era ativado, produtos das páginas 2+ eram perdidos
+- **Correção Aplicada** (funções `has_only_headers_no_products` e `extract_text_from_pdf` em `rececao/services.py`):
+  - **Nova função `has_only_headers_no_products()`** (linhas ~710-771):
+    - Detecta quando PyPDF2 extrai headers mas sem linhas estruturadas
+    - Verifica se há linhas com SKU + descrição + quantidade REAL (com unidade) juntos
+    - Quantidade REAL: número + unidade obrigatória (UN, KG, CX, etc.)
+    - Evita falsos positivos de dimensões (ex: 1980x0880x0020)
+    - Não depende de palavra "continua" - detecção estrutural pura
+  - **Modificação em `extract_text_from_pdf()`** (linhas ~773-820):
+    - Se PyPDF2 retorna texto mas é só headers → força OCR.space
+    - OCR.space lê produtos visuais de TODAS as páginas
+    - Aplica `remove_repeated_headers()` para limpar headers duplicados
+  - **Função `remove_repeated_headers()`** (linhas ~682-707):
+    - Remove cabeçalhos repetidos entre páginas
+    - Remove palavra "continua" e variações
+    - Mantém apenas dados de produtos limpos
+- **Benefícios**:
+  - Documentos Flexibol multipáginas agora processados completamente
+  - Sistema força OCR.space quando PyPDF2 não consegue estruturar dados
+  - Detecção robusta sem depender de palavras-chave específicas
+  - Aceita SKUs variados (ABC123, 19607542/01, E0748001901, etc.)
+  - Elimina falsos positivos causados por dimensões de produtos
+  - Suporta unidades variadas (UN, KG, M, L, PC, PCS, CX, UNID, CAIXA)
+
 ### October 16, 2025 - Correção: Extração de Produtos de TODAS as Páginas PDF (Fornecedores Multipáginas)
 - **Problema Identificado**: Função `universal_table_extract` só executava pdfplumber quando Camelot não encontrava produtos
 - **Comportamento Anterior**:
