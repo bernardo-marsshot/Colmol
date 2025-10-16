@@ -139,3 +139,31 @@ The project is built on Django 5.0.6 using Python 3.11, with SQLite for the data
   - KPIs claros e focados (apenas matching de GR)
   - Não mistura tipos diferentes de problemas
 - **Architect Review**: Aprovado - KPIs isolados corretamente, filtros funcionam sem conflitos
+
+### October 16, 2025 - Feature: Diferenciação de Status 'Error' vs 'Exceptions'
+- **Problema Resolvido**: Gráfico tinha fatia "Erro" mas status 'error' não existia no código
+- **Implementação**:
+  - **services.py**: Nova lógica de status baseada no tipo de problema:
+    - Verifica se há `ExceptionTask` com `line_ref="OCR"` (erros críticos de processamento)
+    - Se sim → `MatchResult.status = "error"`
+    - Se não → lógica normal (`matched` se issues == 0, senão `exceptions`)
+  - **Preservação de Exceções de OCR**:
+    - Ao deletar exceções antigas: `inbound.exceptions.exclude(line_ref="OCR").delete()`
+    - Garante que exceções de OCR persistem entre reprocessamentos
+    - Apenas exceções de matching são recriadas
+- **Status Semânticos (agora claros)**:
+  - 🔴 **error**: Falha no OCR/parsing (ficheiro ilegível, OCR falhou, texto muito curto, >50% produtos inválidos, qualidade de imagem baixa)
+  - 🟡 **exceptions**: Problemas no matching (divergências, SKU não encontrado, quantidade excedida, PO não encontrada)
+  - 🟢 **matched**: Matching bem-sucedido, tudo OK
+  - ⚪ **pending**: Documento ainda não processado
+- **Ordem de Operações**:
+  1. Verificar se há erros de OCR
+  2. Deletar apenas exceções de matching antigas (preserva OCR)
+  3. Criar novas exceções de matching
+  4. Definir status baseado em tipo de problema
+- **Benefícios**:
+  - Diferenciação clara entre erros de processamento (OCR) e problemas de negócio (matching)
+  - Fatia vermelha "Erro" agora aparece corretamente no gráfico do dashboard
+  - Documentos ilegíveis/corrompidos são identificados visualmente
+  - Não mistura falhas técnicas com exceções de negócio
+- **Architect Review**: Aprovado - exceções de OCR preservadas corretamente, status diferenciado sem regressões
