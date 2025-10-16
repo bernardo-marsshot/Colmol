@@ -54,6 +54,25 @@ The project is built on Django 5.0.6 using Python 3.11, with SQLite for the data
 
 ## Recent Changes
 
+### October 16, 2025 - Integração PyMuPDF para Melhor Extração de Tabelas
+- **Nova Biblioteca**: Instalado PyMuPDF (fitz v1.26.5) para extração avançada de PDF
+- **Função Criada**: `extract_text_with_pymupdf()` em `services.py` (linhas 659-705)
+  - Percorre todas as páginas do PDF usando iteração explícita
+  - Preserva layout original usando flags: `TEXT_PRESERVE_WHITESPACE | TEXT_PRESERVE_LIGATURES | TEXT_PRESERVE_IMAGES`
+  - Identifica páginas individualmente com marcador "--- Página N ---"
+  - Integra detecção de QR codes quando disponível
+- **Cascata de Extração Atualizada** (função `extract_text_from_pdf` linha 708):
+  - **LEVEL 0**: PyMuPDF (novo) - preserva layout, ideal para tabelas
+  - **LEVEL 1**: PyPDF2 - fallback rápido para texto embutido
+  - **LEVEL 2**: OCR.space API - cloud OCR
+  - **LEVEL 3**: PaddleOCR/EasyOCR/Tesseract - engines locais
+- **Benefícios**:
+  - Leitura completa de todas as páginas do documento
+  - Layout preservado (crítico para documentos com tabelas)
+  - Espaços em branco mantidos para estrutura correta
+  - Fallback robusto se PyMuPDF falhar
+- **Validação**: Logs do servidor confirmam extração bem-sucedida de PDFs de 1-2 páginas (492-4696 chars)
+
 ### October 16, 2025 - Correção: Normalização Consistente de Números em Todos os Parsers
 - **Problema Identificado**: Função `normalize_number` aninhada em `parse_fatura_elastron` sobrescrevia a função global
 - **Função Aninhada Removida** (linhas 1109-1128):
