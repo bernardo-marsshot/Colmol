@@ -2659,6 +2659,7 @@ def map_supplier_codes(supplier, payload):
                 "qty": produto.get("quantidade") or 0,
                 "internal_sku": (mapping.internal_sku if mapping else None),
                 "confidence": (mapping.confidence if mapping else 0.0),
+                "po_number_extracted": produto.get("numero_encomenda", ""),  # Preservar numero_encomenda
             })
     # Formato antigo com 'lines' (no formato antigo, supplier_code era o SKU do produto)
     elif "lines" in payload:
@@ -2896,6 +2897,7 @@ def process_inbound(inbound: InboundDocument):
             description=ml.get("description", ""),
             unit=ml.get("unit", "UN"),
             qty_received=ml.get("qty", 0),
+            po_number_extracted=ml.get("po_number_extracted", ""),  # Armazenar numero_encomenda
         )
 
     # ===== VINCULAÇÃO DE PO (ANTES DE QUALQUER EXCEÇÃO/MATCHING) =====
@@ -2918,19 +2920,31 @@ def process_inbound(inbound: InboundDocument):
         print("📋 Nota de Encomenda: SKIP matching (PO criada, aguarda guias de remessa)")
         doc_items = payload.get("produtos", payload.get("lines", []))
         ok = len(doc_items)
-    elif inbound.doc_type == 'GR' and not inbound.po:
-        # GR sem PO: criar exceção ANTES do matching
-        issues = 1
-        po_number_extracted = payload.get('po_number') or payload.get('document_number') or 'N/A'
-        exceptions.append({
-            "line": "PO",
-            "issue": f"PO não identificada - número extraído: {po_number_extracted}"
-        })
-        print(f"⚠️ Guia de Remessa sem PO vinculada - exceção criada (PO extraído: {po_number_extracted})")
-    elif inbound.po:
+    elif inbound.doc_type == 'GR':
         from .models import POLine
         
         for r in inbound.lines.all():
+            # Buscar PO correta usando po_number_extracted da linha (se múltiplas POs)
+            target_po = inbound.po  # PO padrão vinculada ao documento
+            
+            if r.po_number_extracted:
+                # Tentar encontrar PO específica para este produto
+                specific_po = PurchaseOrder.objects.filter(number=r.po_number_extracted).first()
+                if specific_po:
+                    target_po = specific_po
+                    print(f"🔍 Produto {r.article_code} → PO específica {specific_po.number}")
+                else:
+                    print(f"⚠️ PO {r.po_number_extracted} não encontrada para produto {r.article_code}, usando PO padrão")
+            
+            # Se ainda não temos PO, criar exceção
+            if not target_po:
+                issues += 1
+                exceptions.append({
+                    "line": r.article_code,
+                    "issue": f"PO não encontrada (extraído: {r.po_number_extracted or 'N/A'})",
+                })
+                continue
+            
             mapping = CodeMapping.objects.filter(
                 supplier=inbound.supplier,
                 supplier_code=r.article_code
@@ -2948,13 +2962,13 @@ def process_inbound(inbound: InboundDocument):
                 print(f"🆕 CodeMapping criado automaticamente: {r.article_code} → {r.article_code} (qty: {qty_ordered})")
             
             internal_sku = mapping.internal_sku
-            po_line = POLine.objects.filter(po=inbound.po, internal_sku=internal_sku).first()
+            po_line = POLine.objects.filter(po=target_po, internal_sku=internal_sku).first()
             
             if not po_line:
                 issues += 1
                 exceptions.append({
                     "line": r.article_code,
-                    "issue": f"Produto {internal_sku} não encontrado na PO {inbound.po.number}",
+                    "issue": f"Produto {internal_sku} não encontrado na PO {target_po.number}",
                 })
                 continue
             
@@ -2967,13 +2981,13 @@ def process_inbound(inbound: InboundDocument):
                 issues += 1
                 exceptions.append({
                     "line": r.article_code,
-                    "issue": f"Quantidade excedida: recebida {qty_total_received} vs pedida {qty_ordered}",
+                    "issue": f"Quantidade excedida: recebida {qty_total_received} vs pedida {qty_ordered} (PO {target_po.number})",
                 })
                 continue
             
             po_line.qty_received = qty_total_received
             po_line.save()
-            print(f"✅ {internal_sku}: recebida {qty_new}, total {qty_total_received}/{qty_ordered}")
+            print(f"✅ {internal_sku} (PO {target_po.number}): recebida {qty_new}, total {qty_total_received}/{qty_ordered}")
             
             ok += 1
 
