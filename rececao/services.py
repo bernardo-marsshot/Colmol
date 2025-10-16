@@ -859,119 +859,172 @@ def detect_and_read_qrcodes(image, page_number=None):
 
 
 def extract_text_from_pdf_with_ocr(file_path: str):
-    """Converte todas as páginas para imagem e aplica PaddleOCR (ou Tesseract como fallback)."""
+    """Converte todas as páginas para imagem e aplica OCR com retry inteligente.
+    
+    Sistema de retry progressivo:
+    - Tenta extrair todas as páginas
+    - Se alguma falhar, guarda o que já foi extraído
+    - Tenta novamente apenas as páginas que falharam
+    - Repete até 3 tentativas por página ou até conseguir tudo
+    """
     import time
     import numpy as np
+    
     try:
-        # Tenta usar PaddleOCR primeiro
         paddle_ocr = get_paddle_ocr()
         ocr_engine = "PaddleOCR" if paddle_ocr else "Tesseract"
         
         print(f"📄 Converter PDF → imagens (OCR com {ocr_engine})…")
         
-        # Converter PDF → imagens primeiro
         start_time = time.time()
-        pages = convert_from_path(file_path, dpi=300)  # DPI 300 para melhor qualidade
+        pages = convert_from_path(file_path, dpi=300)
         conversion_time = time.time() - start_time
         
-        # Se conversão demorou muito (>20s), ficheiro pode ter problemas
         if conversion_time > 20:
             print(f"⚠️ Conversão PDF demorou {conversion_time:.1f}s - possível ficheiro problemático")
         
-        all_text = ""
-        all_qr_codes = []
+        # Rastreamento de páginas: {page_num: {"text": str, "qr_codes": list, "attempts": int, "success": bool}}
+        page_results = {}
+        for i in range(1, len(pages) + 1):
+            page_results[i] = {
+                "text": "",
+                "qr_codes": [],
+                "attempts": 0,
+                "success": False
+            }
         
-        for i, page in enumerate(pages, 1):
-            print(f"🔍 Página {i}/{len(pages)} - {ocr_engine}")
+        # Lista de páginas pendentes (ainda não extraídas com sucesso)
+        pending_pages = list(range(1, len(pages) + 1))
+        max_attempts = 3
+        
+        # Loop de retry: continua enquanto houver páginas pendentes e tentativas disponíveis
+        while pending_pages:
+            pages_to_retry = []
             
-            # Limite de tempo por página: 15 segundos
-            page_start = time.time()
-            
-            qr_codes = detect_and_read_qrcodes(page, page_number=i)
-            all_qr_codes.extend(qr_codes)
-            
-            # OCR da página - cascata de 3 níveis
-            page_text = ""
-            paddle_failed = False
-            easy_failed = False
-            ocr_engine_used = None
-            
-            try:
-                # Nível 1: PaddleOCR (rápido e preciso)
-                if paddle_ocr:
-                    try:
-                        img_array = np.array(page)
-                        result = paddle_ocr.ocr(img_array, cls=True)
-                        
-                        if result and result[0]:
-                            for line in result[0]:
-                                if line and len(line) >= 2:
-                                    text = line[1][0]
-                                    confidence = line[1][1]
-                                    if confidence > 0.5:
-                                        page_text += text + "\n"
-                        
-                        if page_text.strip():
-                            ocr_engine_used = "PaddleOCR"
-                        else:
-                            paddle_failed = True
-                            print(f"⚠️ PaddleOCR não extraiu texto da página {i}, tentando EasyOCR...")
-                    except Exception as paddle_error:
-                        paddle_failed = True
-                        print(f"⚠️ PaddleOCR falhou na página {i}: {paddle_error}, tentando EasyOCR...")
+            for page_num in pending_pages:
+                page = pages[page_num - 1]  # índice 0-based
+                page_data = page_results[page_num]
                 
-                # Nível 2: EasyOCR (se PaddleOCR falhou)
-                if (not paddle_ocr or paddle_failed) and not page_text.strip():
-                    easy_ocr = get_easy_ocr()
-                    if easy_ocr:
+                # Verificar se ainda tem tentativas disponíveis
+                if page_data["attempts"] >= max_attempts:
+                    print(f"❌ Página {page_num}: limite de tentativas ({max_attempts}) atingido")
+                    continue
+                
+                page_data["attempts"] += 1
+                attempt_num = page_data["attempts"]
+                print(f"🔍 Página {page_num}/{len(pages)} - tentativa {attempt_num}/{max_attempts}")
+                
+                page_start = time.time()
+                
+                # QR codes (apenas na primeira tentativa para evitar duplicados)
+                if attempt_num == 1:
+                    qr_codes = detect_and_read_qrcodes(page, page_number=page_num)
+                    page_data["qr_codes"].extend(qr_codes)
+                
+                # OCR da página - cascata de 3 níveis
+                page_text = ""
+                ocr_engine_used = None
+                
+                try:
+                    # Nível 1: PaddleOCR
+                    if paddle_ocr:
                         try:
-                            import numpy as np
                             img_array = np.array(page)
-                            result = easy_ocr.readtext(img_array)
+                            result = paddle_ocr.ocr(img_array, cls=True)
                             
-                            if result:
-                                for detection in result:
-                                    text = detection[1]
-                                    confidence = detection[2]
-                                    if confidence > 0.3:
-                                        page_text += text + " "
-                                page_text = page_text.strip() + "\n"
+                            if result and result[0]:
+                                for line in result[0]:
+                                    if line and len(line) >= 2:
+                                        text = line[1][0]
+                                        confidence = line[1][1]
+                                        if confidence > 0.5:
+                                            page_text += text + "\n"
                             
                             if page_text.strip():
-                                ocr_engine_used = "EasyOCR"
-                            else:
-                                easy_failed = True
-                                print(f"⚠️ EasyOCR não extraiu texto da página {i}, tentando Tesseract...")
-                        except Exception as easy_error:
-                            easy_failed = True
-                            print(f"⚠️ EasyOCR falhou na página {i}: {easy_error}, tentando Tesseract...")
-                
-                # Nível 3: Tesseract (fallback final)
-                if not page_text.strip():
-                    page_text = pytesseract.image_to_string(
-                        page, config="--psm 3 --oem 3 -l por", lang="por", timeout=60)
-                    if page_text.strip():
-                        ocr_engine_used = "Tesseract"
-                
-                if page_text.strip():
-                    all_text += f"\n--- Página {i} ---\n{page_text}\n"
-                    if ocr_engine_used:
-                        print(f"✅ Página {i} processada com {ocr_engine_used}")
+                                ocr_engine_used = "PaddleOCR"
+                        except Exception as paddle_error:
+                            print(f"⚠️ PaddleOCR falhou na página {page_num}: {paddle_error}")
                     
-            except RuntimeError as e:
-                if "timeout" in str(e).lower():
-                    print(f"⚠️ Timeout OCR na página {i} - imagem de má qualidade")
-                else:
-                    raise
-            except Exception as e:
-                print(f"⚠️ Erro OCR na página {i}: {e}")
+                    # Nível 2: EasyOCR
+                    if not page_text.strip():
+                        easy_ocr = get_easy_ocr()
+                        if easy_ocr:
+                            try:
+                                img_array = np.array(page)
+                                result = easy_ocr.readtext(img_array)
+                                
+                                if result:
+                                    for detection in result:
+                                        text = detection[1]
+                                        confidence = detection[2]
+                                        if confidence > 0.3:
+                                            page_text += text + " "
+                                    page_text = page_text.strip() + "\n"
+                                
+                                if page_text.strip():
+                                    ocr_engine_used = "EasyOCR"
+                            except Exception as easy_error:
+                                print(f"⚠️ EasyOCR falhou na página {page_num}: {easy_error}")
+                    
+                    # Nível 3: Tesseract
+                    if not page_text.strip():
+                        try:
+                            page_text = pytesseract.image_to_string(
+                                page, config="--psm 3 --oem 3 -l por", lang="por", timeout=60)
+                            if page_text.strip():
+                                ocr_engine_used = "Tesseract"
+                        except Exception as tess_error:
+                            print(f"⚠️ Tesseract falhou na página {page_num}: {tess_error}")
+                    
+                    # Guardar resultado
+                    if page_text.strip():
+                        page_data["text"] = page_text
+                        page_data["success"] = True
+                        print(f"✅ Página {page_num} extraída com {ocr_engine_used}")
+                    else:
+                        print(f"⚠️ Página {page_num} sem texto extraído - retry em próxima tentativa")
+                        pages_to_retry.append(page_num)
+                        
+                except RuntimeError as e:
+                    if "timeout" in str(e).lower():
+                        print(f"⚠️ Timeout OCR na página {page_num}")
+                        pages_to_retry.append(page_num)
+                    else:
+                        raise
+                except Exception as e:
+                    print(f"⚠️ Erro OCR na página {page_num}: {e}")
+                    pages_to_retry.append(page_num)
+                
+                page_time = time.time() - page_start
+                if page_time > 10:
+                    print(f"⚠️ Página {page_num} demorou {page_time:.1f}s")
             
-            page_time = time.time() - page_start
-            if page_time > 10:
-                print(f"⚠️ Página {i} demorou {page_time:.1f}s - qualidade baixa")
+            # Atualizar lista de páginas pendentes
+            pending_pages = pages_to_retry
+            
+            # Se ainda há páginas para retry, aguardar 1 segundo antes de tentar novamente
+            if pending_pages:
+                print(f"🔄 {len(pending_pages)} página(s) pendente(s) - aguardando retry...")
+                time.sleep(1)
         
-        print(f"✅ OCR completo: {len(pages)} páginas")
+        # Consolidar resultados de todas as páginas
+        all_text = ""
+        all_qr_codes = []
+        successful_pages = 0
+        
+        for page_num in sorted(page_results.keys()):
+            page_data = page_results[page_num]
+            if page_data["success"]:
+                all_text += f"\n--- Página {page_num} ---\n{page_data['text']}\n"
+                successful_pages += 1
+            all_qr_codes.extend(page_data["qr_codes"])
+        
+        print(f"✅ OCR completo: {successful_pages}/{len(pages)} páginas extraídas")
+        if successful_pages < len(pages):
+            print(f"⚠️ {len(pages) - successful_pages} página(s) não foram extraídas após {max_attempts} tentativas")
+        
         return all_text.strip(), all_qr_codes
+        
     except Exception as e:
         print(f"❌ OCR PDF erro: {e}")
         return "", []
