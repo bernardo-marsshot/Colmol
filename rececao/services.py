@@ -1760,78 +1760,96 @@ def parse_bon_commande(text: str):
     in_product_section = False
     product_header_found = False
     
-    for line in lines:
-        stripped = line.strip()
+    # Buffer para juntar linhas (PyMuPDF coloca cada campo numa linha separada)
+    i = 0
+    while i < len(lines):
+        stripped = lines[i].strip()
         if not stripped:
+            i += 1
             continue
         
         # Detectar início da seção de produtos (palavras-chave podem estar em linhas separadas)
         if re.search(r'Désignation|Quantité|Prix\s+unitaire', stripped, re.IGNORECASE):
             product_header_found = True
-        
-        # Se encontramos header e próxima linha não-vazia não é controle, começar extração
-        if product_header_found and not re.search(r'^(Désignation|Quantité|Prix|STOCK)', stripped, re.IGNORECASE):
-            in_product_section = True
-        
-        # Detectar fim da seção (TOTAL ou endereço)
-        if re.search(r'^TOTAL|^ADRESSE|^BON DE COMMANDE|^Livraison|^AIRE DES|^Tél|^SIREN', stripped, re.IGNORECASE):
-            in_product_section = False
+            i += 1
             continue
         
-        if in_product_section:
-            # Formato: MATELAS SAN REMO 140x190  2 202.00€ 404.00€
-            # Produto pode ter dimensões (140x190, 180x200, etc)
-            # Quantidade é número inteiro
-            # Preços em formato europeu (202.00€)
+        # Skip header lines
+        if re.search(r'^(Montant|STOCK\s+MAGASIN)$', stripped, re.IGNORECASE):
+            in_product_section = True
+            i += 1
+            continue
+        
+        # Detectar fim da seção
+        if re.search(r'^TOTAL|^ADRESSE|^BON DE COMMANDE|^Livraison|^AIRE DES|^Tél|^SIREN', stripped, re.IGNORECASE):
+            in_product_section = False
+            i += 1
+            continue
+        
+        if in_product_section and product_header_found:
+            # Formato OCR: cada campo numa linha separada
+            # Linha 1: MATELAS SAN REMO 140x190
+            # Linha 2: 2
+            # Linha 3: 202.00€
+            # Linha 4: 404.00€
             
-            # Padrão: [PRODUTO com possíveis dimensões] [QTY] [PREÇO€] [TOTAL€]
-            match = re.match(
-                r'^(.+?)\s+(\d+)\s+([\d,\.]+)\s*€\s+([\d,\.]+)\s*€',
-                stripped
-            )
-            
-            if match:
-                designacao = match.group(1).strip()
-                quantidade = int(match.group(2))
-                preco_str = match.group(3)
-                total_str = match.group(4)
+            # Verificar se esta é uma linha de produto (descrição)
+            if i + 3 < len(lines):
+                desc_line = lines[i].strip()
+                qty_line = lines[i+1].strip()
+                price_line = lines[i+2].strip()
+                total_line = lines[i+3].strip()
                 
-                try:
-                    preco_unitario = normalize_number(preco_str)
-                    total_linha = normalize_number(total_str)
+                # Verificar se próximas 3 linhas parecem quantidade + preços
+                if (re.match(r'^\d+$', qty_line) and
+                    re.match(r'^[\d,\.]+\s*€', price_line) and
+                    re.match(r'^[\d,\.]+\s*€', total_line)):
                     
-                    # Extrair dimensões da designação se existirem
-                    dims = ""
-                    dim_match = re.search(r'(\d{2,3})\s*[xX×]\s*(\d{2,3})', designacao)
-                    if dim_match:
-                        dims = f"{dim_match.group(1)}x{dim_match.group(2)}"
-                    
-                    # Extrair código/referência se existir (formato tipo SAN REMO, RIVIERA)
-                    codigo = ""
-                    cod_match = re.match(r'^([A-Z\s]+?)\s+\d', designacao)
-                    if cod_match:
-                        codigo = cod_match.group(1).strip()
-                    
-                    produtos.append({
-                        "artigo": codigo if codigo else designacao[:20],
-                        "descricao": designacao,
-                        "quantidade": float(quantidade),
-                        "unidade": "UN",
-                        "preco_unitario": preco_unitario,
-                        "total": total_linha,
-                        "dimensoes": dims,
-                        "cliente": cliente,
-                        "data_encomenda": data,
-                        "contremarque": contremarque,
-                        "referencia_ordem": "",
-                        "lote_producao": "",
-                        "volume": 0,
-                        "peso": 0.0,
-                        "iva": 20.0  # IVA França padrão
-                    })
-                except ValueError as e:
-                    print(f"⚠️ Erro ao converter valores numéricos em '{stripped[:50]}': {e}")
-                    continue
+                    try:
+                        quantidade = int(qty_line)
+                        preco_str = price_line.replace('€', '').strip()
+                        total_str = total_line.replace('€', '').strip()
+                        
+                        preco_unitario = normalize_number(preco_str)
+                        total_produto = normalize_number(total_str)
+                        
+                        # Extrair dimensões
+                        dims = ""
+                        dim_match = re.search(r'(\d{2,3})\s*[xX×]\s*(\d{2,3})', desc_line)
+                        if dim_match:
+                            dims = f"{dim_match.group(1)}x{dim_match.group(2)}"
+                        
+                        # Extrair código (ex: SAN REMO, RIVIERA)
+                        codigo = ""
+                        cod_match = re.match(r'^MATELAS\s+([A-Z\s]+?)\s+\d', desc_line, re.IGNORECASE)
+                        if cod_match:
+                            codigo = cod_match.group(1).strip()
+                        
+                        produtos.append({
+                            "artigo": codigo if codigo else desc_line[:20],
+                            "descricao": desc_line,
+                            "quantidade": float(quantidade),
+                            "unidade": "UN",
+                            "preco_unitario": preco_unitario,
+                            "total": total_produto,
+                            "dimensoes": dims,
+                            "cliente": cliente,
+                            "data_encomenda": data,
+                            "contremarque": contremarque,
+                            "referencia_ordem": "",
+                            "lote_producao": "",
+                            "volume": 0,
+                            "peso": 0.0,
+                            "iva": 20.0
+                        })
+                        
+                        print(f"✅ Produto Bon de Commande: {desc_line} - {quantidade} UN")
+                        i += 4  # Pular as 4 linhas processadas
+                        continue
+                    except (ValueError, IndexError) as e:
+                        pass
+        
+        i += 1
     
     return produtos
 
@@ -1929,8 +1947,8 @@ def parse_pedido_espanhol(text: str):
                     i += 1
                     continue
                 
-                # 5. Linha 3 (código) não pode ter palavras (evita "GUARNIZO", "PORTUGAL", etc como código)
-                if any(word in line3.upper() for word in ['GUARNIZO', 'PORTUGAL', 'ESPAÑA', 'FRANCE', 'ADMINISTRA']):
+                # 5. Linha 3 (código) não pode ter palavras (evita "GUARNIZO", "PORTUGAL", "POLIGONO", etc como código)
+                if any(word in line3.upper() for word in ['GUARNIZO', 'PORTUGAL', 'ESPAÑA', 'FRANCE', 'ADMINISTRA', 'POLIGONO', 'INDUTRIAL', 'MORERO']):
                     i += 1
                     continue
                 
