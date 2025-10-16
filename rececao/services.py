@@ -216,7 +216,8 @@ Return valid JSON:
       "descricao": "description",
       "quantidade": 10.5,
       "preco_unitario": 25.99,
-      "total": 272.40
+      "total": 272.40,
+      "numero_encomenda": "PO number for this specific product (if document has multiple POs)"
     }
   ]
 }
@@ -277,7 +278,8 @@ Rules:
 - Extract EVERY product line
 - INTEGER ≤3 after unit = volume (Elastron only) → ignore
 - DECIMAL after unit = dimension → don't use as quantity
-- First number before unit = quantity (always)"""
+- First number before unit = quantity (always)
+- IMPORTANT: If document has multiple PO numbers (Encomenda nr, Pedido nr, etc), extract the PO number for EACH product"""
 
         user_prompt = f"""Extract ALL products from this document (PT/ES/FR):
 
@@ -393,7 +395,8 @@ ALWAYS return valid JSON with this exact structure:
       "descricao": "product description",
       "quantidade": 10.5,
       "preco_unitario": 25.99,
-      "total": 272.40
+      "total": 272.40,
+      "numero_encomenda": "PO number for this specific product (if document has multiple POs)"
     }
   ],
   "total_geral": 272.40
@@ -428,12 +431,25 @@ French document:
 MATELAS SAN REMO 140X200 | Qté: 2 | PU: 245,00€ | Total: 490,00€
 → {"codigo": "SANREMO140", "descricao": "MATELAS SAN REMO 140X200", "quantidade": 2, "preco_unitario": 245.00, "total": 490.00}
 
+Document with MULTIPLE Purchase Orders (extract PO number per product):
+Encomenda nr 11-161050
+PRODUTO-A | 10 UN
+Encomenda nr 11-161594  
+PRODUTO-B | 5 UN
+PRODUTO-C | 8 UN
+→ [
+  {"codigo": "PRODUTO-A", "quantidade": 10, "numero_encomenda": "11-161050"},
+  {"codigo": "PRODUTO-B", "quantidade": 5, "numero_encomenda": "11-161594"},
+  {"codigo": "PRODUTO-C", "quantidade": 8, "numero_encomenda": "11-161594"}
+]
+
 Rules:
 - Extract EVERY product, even if some fields are missing
 - Products can be in tables, lists, or multi-line format
 - Ignore addresses, headers, footers - ONLY extract products
 - Convert all quantities/prices to numbers (replace comma with dot)
 - Use null for missing fields
+- IMPORTANT: If document has multiple PO numbers (Encomenda nr, Pedido nr, etc), extract the PO number for EACH product
 - Return ONLY the JSON, no markdown, no explanations"""
 
         # Preparar preview do texto OCR (sem backslash em f-string)
@@ -2664,72 +2680,94 @@ def map_supplier_codes(supplier, payload):
 def create_po_from_nota_encomenda(inbound: InboundDocument, payload: dict):
     """
     Cria automaticamente PurchaseOrder + POLines a partir de uma Nota de Encomenda (Fatura).
+    Se o documento tem múltiplas encomendas, cria uma PO separada para cada.
     Extrai: número encomenda, fornecedor, produtos, quantidades, dimensões.
     """
     from .models import PurchaseOrder, POLine
-    
-    # Extrair número da encomenda do documento
-    po_number = payload.get("document_number") or payload.get("po_number") or f"PO-{inbound.number}"
-    
-    # Verificar se PO já existe (evitar duplicados)
-    existing_po = PurchaseOrder.objects.filter(number=po_number).first()
-    if existing_po:
-        print(f"⚠️ PO {po_number} já existe, vinculando documento à PO existente")
-        inbound.po = existing_po
-        inbound.save()
-        return existing_po
-    
-    # Criar nova Purchase Order
-    po = PurchaseOrder.objects.create(
-        number=po_number,
-        supplier=inbound.supplier
-    )
-    print(f"✅ Criada PO {po_number} para fornecedor {inbound.supplier.name}")
+    from collections import defaultdict
     
     # Extrair produtos do payload (suporta formatos: produtos ou lines)
     produtos = payload.get("produtos", [])
     if not produtos:
         produtos = payload.get("lines", [])
     
-    # Criar POLines para cada produto (agregar quantidades se produto repetir)
-    lines_created = 0
+    # Agrupar produtos por numero_encomenda
+    produtos_por_po = defaultdict(list)
+    
     for produto in produtos:
-        # Extrair dados do produto (garantir que não são None)
-        article_code = produto.get("artigo") or produto.get("codigo") or produto.get("supplier_code") or ""
-        description = produto.get("descricao") or produto.get("description") or ""
-        unit = produto.get("unidade") or produto.get("unit") or "UN"
-        qty_ordered = Decimal(str(produto.get("quantidade") or produto.get("qty") or 0))
+        # Extrair numero_encomenda do produto (se existir)
+        po_number = produto.get("numero_encomenda", "").strip()
         
-        if not article_code or qty_ordered <= 0:
-            continue
+        # Se não tem numero_encomenda no produto, usar fallback do documento
+        if not po_number:
+            po_number = payload.get("document_number") or payload.get("po_number") or f"PO-{inbound.number}"
         
-        # Usar get_or_create para evitar duplicados - se SKU já existe, agregar quantidade
-        po_line, created = POLine.objects.get_or_create(
-            po=po,
-            internal_sku=article_code,
-            defaults={
-                'description': description,
-                'unit': unit,
-                'qty_ordered': qty_ordered,
-                'tolerance': 0
-            }
-        )
-        
-        if not created:
-            # Linha já existia - somar quantidades (ambos são Decimal agora)
-            po_line.qty_ordered += qty_ordered
-            po_line.save()
-            print(f"📊 Agregado {qty_ordered} {unit} ao produto {article_code} (total: {po_line.qty_ordered})")
-        
-        lines_created += 1
+        produtos_por_po[po_number].append(produto)
     
-    print(f"✅ Criadas {lines_created} linhas na PO {po_number}")
+    # Criar uma PO para cada grupo de produtos
+    pos_criadas = []
+    primeira_po = None
     
-    # Vincular documento à PO criada
-    inbound.po = po
-    inbound.save()
+    for po_number, produtos_grupo in produtos_por_po.items():
+        # Verificar se PO já existe (evitar duplicados)
+        existing_po = PurchaseOrder.objects.filter(number=po_number).first()
+        if existing_po:
+            print(f"⚠️ PO {po_number} já existe, vinculando produtos à PO existente")
+            po = existing_po
+        else:
+            # Criar nova Purchase Order
+            po = PurchaseOrder.objects.create(
+                number=po_number,
+                supplier=inbound.supplier
+            )
+            print(f"✅ Criada PO {po_number} para fornecedor {inbound.supplier.name}")
+        
+        # Criar POLines para cada produto deste grupo
+        lines_created = 0
+        for produto in produtos_grupo:
+            # Extrair dados do produto (garantir que não são None)
+            article_code = produto.get("artigo") or produto.get("codigo") or produto.get("supplier_code") or ""
+            description = produto.get("descricao") or produto.get("description") or ""
+            unit = produto.get("unidade") or produto.get("unit") or "UN"
+            qty_ordered = Decimal(str(produto.get("quantidade") or produto.get("qty") or 0))
+            
+            if not article_code or qty_ordered <= 0:
+                continue
+            
+            # Usar get_or_create para evitar duplicados - se SKU já existe, agregar quantidade
+            po_line, created = POLine.objects.get_or_create(
+                po=po,
+                internal_sku=article_code,
+                defaults={
+                    'description': description,
+                    'unit': unit,
+                    'qty_ordered': qty_ordered,
+                    'tolerance': 0
+                }
+            )
+            
+            if not created:
+                # Linha já existia - somar quantidades (ambos são Decimal agora)
+                po_line.qty_ordered += qty_ordered
+                po_line.save()
+                print(f"📊 Agregado {qty_ordered} {unit} ao produto {article_code} na PO {po_number} (total: {po_line.qty_ordered})")
+            
+            lines_created += 1
+        
+        print(f"✅ Criadas {lines_created} linhas na PO {po_number}")
+        pos_criadas.append(po)
+        
+        if not primeira_po:
+            primeira_po = po
     
-    return po
+    # Vincular documento à primeira PO criada (ou última se todas já existiam)
+    if pos_criadas:
+        inbound.po = primeira_po
+        inbound.save()
+        print(f"📎 Documento vinculado à PO {primeira_po.number}")
+    
+    # Retornar primeira PO (mantém compatibilidade com código existente)
+    return primeira_po if primeira_po else None
 
 
 @transaction.atomic
@@ -2760,7 +2798,8 @@ def process_inbound(inbound: InboundDocument):
                     "descricao": p.get('descricao', ''),
                     "quantidade": float(p.get('quantidade') or 0),
                     "preco_unitario": float(p.get('preco_unitario') or 0),
-                    "total": float(p.get('total') or 0)
+                    "total": float(p.get('total') or 0),
+                    "numero_encomenda": p.get('numero_encomenda', '')
                 }
                 for p in ollama_data.get('produtos', [])
             ],
