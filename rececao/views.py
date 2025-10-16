@@ -8,7 +8,7 @@ from .services import process_inbound, export_document_to_excel
 def dashboard(request):
     # Dashboard mostra Faturas e Guias (FT e GR) mas EXCLUI Notas de Encomenda
     # Notas de Encomenda (que criam POs) têm a sua própria página em /po/
-    all_docs_queryset = InboundDocument.objects.filter(purchase_order__isnull=True)
+    all_docs_queryset = InboundDocument.objects.filter(po__isnull=True)
     gr_queryset = all_docs_queryset.filter(doc_type='GR')
     
     # Total de documentos: todos (FT + GR)
