@@ -659,18 +659,57 @@ def extract_text_from_pdf(file_path: str):
     1. Texto embutido (PyPDF2) - mais rápido
     2. OCR.space API - cloud, preciso, grátis 25k/mês
     3. PaddleOCR/EasyOCR/Tesseract - local, offline
+    
+    Detecção inteligente: se PyPDF2 extraiu poucos produtos mas documento tem múltiplas seções/páginas, força OCR.
     """
     try:
         # LEVEL 1: Tenta texto embutido primeiro (mais rápido)
         text = ""
+        num_pages = 0
         with open(file_path, "rb") as f:
             reader = PyPDF2.PdfReader(f)
+            num_pages = len(reader.pages)
             for page in reader.pages:
                 page_text = page.extract_text() or ""
                 text += page_text + "\n"
 
         if text.strip() and len(text.strip()) > 50:
-            print(f"✅ PDF text extraction: {len(text)} chars")
+            print(f"✅ PDF text extraction: {len(text)} chars ({num_pages} páginas)")
+            
+            # DETECÇÃO DE INCOMPLETUDE: verificar se PyPDF2 pode estar a perder produtos
+            import re
+            
+            # Contar códigos de produto extraídos
+            product_codes = re.findall(r'\b([A-Z]{3}\d{6,}[A-Z]?\d*[,\.]?\d?)\b', text)
+            valid_codes = [c for c in product_codes if not c.startswith('200') and not c.startswith('195') and not c.startswith('500')]
+            unique_products = len(set(valid_codes))
+            
+            # Contar seções "Continua" (indicam múltiplas tabelas)
+            continua_sections = len(re.findall(r'Continua[çã]?[oã]?', text, re.IGNORECASE))
+            
+            # REGRA: Se tem múltiplas páginas/seções mas poucos produtos, PyPDF2 pode estar falhando
+            products_per_page = unique_products / num_pages if num_pages > 0 else 0
+            
+            # Forçar OCR se:
+            # - Tem 2+ páginas E menos de 8 produtos por página, OU
+            # - Tem 2+ seções "Continua" E menos de 15 produtos total
+            force_ocr = False
+            if num_pages >= 2 and products_per_page < 8:
+                print(f"⚠️ PyPDF2 extraiu apenas {unique_products} produtos em {num_pages} páginas (~{products_per_page:.1f} por página)")
+                print(f"⚠️ Possível perda de dados - forçando OCR completo para garantir extração total...")
+                force_ocr = True
+            elif continua_sections >= 2 and unique_products < 15:
+                print(f"⚠️ PyPDF2 extraiu {unique_products} produtos mas há {continua_sections} seções 'Continua'")
+                print(f"⚠️ Documento com múltiplas tabelas - forçando OCR completo...")
+                force_ocr = True
+            
+            if force_ocr:
+                print("🔄 Tentando extração completa com OCR...")
+                return extract_text_from_pdf_with_ocr(file_path)
+            
+            # Texto parece completo - continuar com PyPDF2
+            print(f"✅ {unique_products} produtos detectados - texto parece completo")
+            
             # Mesmo com texto embutido, tenta detectar QR codes
             qr_codes = []
             if QR_CODE_ENABLED:
