@@ -47,6 +47,21 @@ The project is built on Django 5.0.6 using Python 3.11, with SQLite for the data
 
 ## Recent Changes
 
+### October 16, 2025 - Correção: Agregação de Quantidades em POs Duplicadas
+- **Bug Fix**: Produtos duplicados em múltiplas encomendas agora agregam quantidades automaticamente
+- **Problema Resolvido**: 
+  - Notas de Encomenda com múltiplas encomendas continham produtos repetidos
+  - Sistema falhava com `UNIQUE constraint failed: rececao_poline.po_id, rececao_poline.internal_sku`
+- **Solução Implementada**:
+  - Substituído `POLine.objects.create()` por `get_or_create()`
+  - Quando produto já existe na PO → soma quantidades automaticamente
+  - Log mostra agregação: "📊 Agregado X unidades ao produto Y (total: Z)"
+- **Benefícios**:
+  - Documentos complexos processados sem erros
+  - Quantidades corretas (soma de todas ocorrências)
+  - Descrição e unidade preservadas da primeira ocorrência
+- **Architect Review**: Correção aprovada - quantidades agregadas corretamente, sem regressões
+
 ### October 16, 2025 - Correção: Vinculação de PO Antes de Exceções
 - **Bug Fix**: Vinculação de PO agora acontece ANTES de qualquer exceção ou matching
 - **Ordem de Processamento Corrigida**:
