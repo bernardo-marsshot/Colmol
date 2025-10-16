@@ -45,6 +45,24 @@ Key architectural decisions and features include:
 
 ## Recent Changes
 
+### October 15, 2025 - Auto-Criação de CodeMapping para Produtos Desconhecidos
+- **Feature**: Produtos desconhecidos em notas de encomenda agora são adicionados automaticamente à base de dados
+- **Problema Resolvido**: Anteriormente, quando uma nota de encomenda continha produtos sem CodeMapping, o sistema gerava exceção "Código não mapeado para SKU interno"
+- **Solução Implementada**: 
+  - Quando `process_inbound` não encontra CodeMapping para um article_code, cria automaticamente
+  - CodeMapping criado com:
+    - `supplier`: fornecedor do documento
+    - `supplier_code`: código do artigo
+    - `internal_sku`: mesmo código do artigo (pode ser ajustado manualmente depois)
+    - `qty_ordered`: quantidade recebida do documento (ou 0 se não disponível)
+    - `confidence`: 0.5 (indica criação automática com baixa confiança)
+  - Logging: imprime mensagem `🆕 CodeMapping criado automaticamente...`
+- **Benefícios**:
+  - Elimina exceções ao processar notas de encomenda com produtos novos
+  - Permite processamento automático sem intervenção manual
+  - CodeMapping com confidence=0.5 permite identificar mappings auto-criados para revisão posterior
+- **Architect Review**: Aprovado - lógica defensiva e robusta, sem dependências de PO
+
 ### October 15, 2025 - Normalização de Números: Milhares vs Decimais (Baseado em Número de Dígitos)
 - **Feature**: Sistema universal de normalização de números baseado no número de dígitos após vírgula
 - **Função normalize_number**: Detecta formato correto baseado na quantidade de dígitos
