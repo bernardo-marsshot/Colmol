@@ -23,7 +23,7 @@ The project is built on Django 5.0.6 using Python 3.11, with SQLite for the data
 - **Advanced Illegible File Detection**: Multi-layer validation system detects and reports illegible documents, creating exception tasks.
 - **Excel Export Enhancements**: Intelligent dimension extraction and "Mini Códigos FPOL" mapping for standardized Excel exports.
 - **Robustness**: Comprehensive None-safety across product processing functions and automatic creation of `CodeMapping` for unknown products.
-- **Number Normalization**: Universal system for normalizing numbers based on digit count after the comma.
+- **Number Normalization**: Universal system for normalizing numbers based on digit count after the comma (3 digits = thousands separator, 1-2 digits = decimal).
 - **LLM Fallback System**: Automatic fallback to a secondary Groq API key and then to Ollama if primary Groq calls fail.
 - **Flexible Product Validation**: Allows product acceptance based on valid description (>=10 chars) and quantity (>0) even without an explicit product code.
 - **Multi-PO Handling**: Documents containing multiple purchase orders now result in separate POs being created for each.
@@ -51,3 +51,39 @@ The project is built on Django 5.0.6 using Python 3.11, with SQLite for the data
     -   **pdfplumber**: Advanced PDF parsing.
     -   **rapidfuzz**: Fuzzy string matching.
 -   **Database**: SQLite (db.sqlite3).
+
+## Recent Changes
+
+### October 16, 2025 - Correção: Normalização Consistente de Números em Todos os Parsers
+- **Problema Identificado**: Função `normalize_number` aninhada em `parse_fatura_elastron` sobrescrevia a função global
+- **Função Aninhada Removida** (linhas 1109-1128):
+  - Implementação antiga **não** seguia regra de 3 dígitos
+  - Tratava vírgula sempre como decimal (formato PT: 1.234,56)
+  - Causava inconsistência entre parsers diferentes
+- **Correção Aplicada**:
+  - Removida função aninhada duplicada
+  - Agora todos os parsers usam a função global `normalize_number` (linha 39)
+  - Implementação correta da regra universal de 3 dígitos
+- **Regra de Normalização Confirmada**:
+  - **3 dígitos após vírgula** = separador de milhares (remover vírgula)
+    - Exemplos: `190,000 → 190000.0`, `200,090 → 200090.0`, `1,880 → 1880.0`
+  - **1-2 dígitos após vírgula** = decimal normal (substituir vírgula por ponto)
+    - Exemplos: `190,5 → 190.5`, `2,5 → 2.5`, `34,00 → 34.0`
+- **Testes de Validação** (todos ✅):
+  ```
+  190,000 → 190000.0  (3 dígitos = separador de milhares)
+  200,090 → 200090.0  (3 dígitos = separador de milhares)
+  1,880 → 1880.0      (3 dígitos = separador de milhares)
+  125,000 → 125000.0  (3 dígitos = separador de milhares)
+  0,150 → 150.0       (3 dígitos = separador de milhares)
+  
+  190,5 → 190.5       (1-2 dígitos = decimal normal)
+  2,5 → 2.5           (1-2 dígitos = decimal normal)
+  34,00 → 34.0        (1-2 dígitos = decimal normal)
+  1,88 → 1.88         (1-2 dígitos = decimal normal)
+  ```
+- **Benefícios**:
+  - Normalização consistente em TODOS os parsers (Elastron, Colmol, Genérico, LLM)
+  - Regra de 3 dígitos aplicada uniformemente em todo o sistema
+  - Sem duplicação de lógica de normalização
+  - Documentação clara na função global com exemplos
