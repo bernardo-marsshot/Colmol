@@ -1,0 +1,146 @@
+ 
+ 
+L7i6-Processado por programa certificado n.º401/AT
+EUROSPUMA-SOC.IND.ESPUMAS SINT. S.A. Capital social 14.500.000,00 EUR NIF PT500102430 Registo comercial C.R.C. ESPINHO
+Guetim - Apartado 95 Website WWW.EUROSPUMA.COM E-mail geral@eurospuma.pt/comercial@eurospuma.pt
+4501-909 ESPINHO Telefone 227 335 000
+(Chamada para a rede fixa nacional)Fax 227 335 030 1 /2
+Data 2025-09-10
+Cliente 2111 012913
+NIF IVA PT500248800
+Condição pagamento 90 DIAS RESUMO
+Via expedição TRANSP. (THC)
+Vendedor JOSÉ DOMINGOS
+Código AT 17878756579Exmo(s). Sr(s).
+COLMOL-COLCHÕES, S.A.
+ZONA IND.DAS CAVADAS - APARTADO 115
+VILA DE CUCUJÃES
+3721-908 -VILA DE CUCUJÃES
+ 
+SÓ NOS RESPONSABILIZAMOS DA VENDA DE PRODUTOS COM CERTIFICAÇÃO OEKO-TEX® QUANDO SOLICITADO POR ESCRITO. 
+Nº DE REGISTO DE PRODUTOR DE PRODUTOS (EMBALAGENS): PT01103479
+34 VOLUME(S)
+Código
+ Descrição
+ Quantidade
+ Medida 1
+ Medida 2
+ Medida 3
+ Qtd. preço
+Encomenda nr 11-161050
+Vossa requisição 4038
+CBAGD00067 CX EUROSPUMA 3044 VE 125,000 UN 1,880 0,150 0,080 84,600 KG
+CX E190D30 - PACOTES DE 25 CX.
+Encomenda nr 11-161594
+Vossa requisição 4197
+43106026 PM-B 200 TRANCHADO 640,000 MT 320,000 0,260 33,280 KG
+FIBRA 100% POLIESTER
+AF26
+42952210 PM-A 290 COL 300,000 MT 30,000 2,100 182,700 KG
+FIBRA 100% POLIESTER
+A300
+Encomenda nr 11-161659
+Vossa requisição 4221
+CBACF00466 CX EUROSPUMA 2350 LA 75,000 UN 1,410 0,150 0,070 25,539 KG
+E160LA
+CBACF00467 CX EUROSPUMA 2350 LA 75,000 UN 1,200 0,150 0,070 21,735 KG
+E140LA
+43106028 PM-B 200 TRANCHADO 560,000 MT 280,000 0,280 31,360 KG
+FIBRA 100% POLIESTER
+AF28
+Encomenda nr 11-161682
+Vossa requisição 4247
+43106032 PM-B 200 TRANCHADO 280,000 MT 280,000 0,320 17,920 KG
+FIBRA 100% POLIESTER
+AF32
+43106030 PM-B 200 TRANCHADO 280,000 MT 280,000 0,300 16,800 KG
+FIBRA 100% POLIESTER
+----------------------------------------
+✅ 1 QR code(s) detectado(s)
+📄 Tipo de documento detectado: GUIA_COLMOL
+✅ Extraídos 3 produtos da Guia Colmol
+✅ Dados salvos em /home/runner/workspace/extracao.json
+🔑 Tentando Groq com chave primária (GROQ_API_KEY)...
+⚠️ Groq HTTP 429 (GROQ_API_KEY)
+🔄 Rate limit na chave primária - tentando chave secundária (GROQ_API_KEY_2)...
+✅ Groq LLM (GROQ_API_KEY_2): 11 produtos extraídos
+✅ Usando dados do Ollama LLM (11 produtos)
+📋 Processando Nota de Encomenda: 36
+✅ Criada PO 11-161050, 11-161594, 11-161659, 11-161682, 11-161749 para fornecedor Santos e Fernandes Armazém de Utilidades Porlar, Lda.
+Internal Server Error: /upload/
+Traceback (most recent call last):
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/django/db/backends/utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/django/db/backends/sqlite3/base.py", line 329, in execute
+    return super().execute(query, params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+sqlite3.IntegrityError: UNIQUE constraint failed: rececao_poline.po_id, rececao_poline.internal_sku
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/django/core/handlers/exception.py", line 55, in inner
+    response = get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/django/core/handlers/base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/rececao/views.py", line 110, in upload_inbound
+    process_inbound(inbound)
+  File "/nix/store/7d088dip86hlzri9sk0h78b63yfmx0a0-python3-3.11.13/lib/python3.11/contextlib.py", line 81, in inner
+    return func(*args, **kwds)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/rececao/services.py", line 2779, in process_inbound
+    po = create_po_from_nota_encomenda(inbound, payload)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/nix/store/7d088dip86hlzri9sk0h78b63yfmx0a0-python3-3.11.13/lib/python3.11/contextlib.py", line 81, in inner
+    return func(*args, **kwds)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/rececao/services.py", line 2706, in create_po_from_nota_encomenda
+    POLine.objects.create(
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/django/db/models/manager.py", line 87, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/django/db/models/query.py", line 679, in create
+    obj.save(force_insert=True, using=self.db)
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/django/db/models/base.py", line 822, in save
+    self.save_base(
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/django/db/models/base.py", line 909, in save_base
+    updated = self._save_table(
+              ^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/django/db/models/base.py", line 1071, in _save_table
+    results = self._do_insert(
+              ^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/django/db/models/base.py", line 1112, in _do_insert
+    return manager._insert(
+           ^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/django/db/models/manager.py", line 87, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/django/db/models/query.py", line 1847, in _insert
+    return query.get_compiler(using=using).execute_sql(returning_fields)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/django/db/models/sql/compiler.py", line 1823, in execute_sql
+    cursor.execute(sql, params)
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/django/db/backends/utils.py", line 122, in execute
+    return super().execute(sql, params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/django/db/backends/utils.py", line 79, in execute
+    return self._execute_with_wrappers(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/django/db/backends/utils.py", line 92, in _execute_with_wrappers
+    return executor(sql, params, many, context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/django/db/backends/utils.py", line 100, in _execute
+    with self.db.wrap_database_errors:
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/django/db/utils.py", line 91, in __exit__
+    raise dj_exc_value.with_traceback(traceback) from exc_value
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/django/db/backends/utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/django/db/backends/sqlite3/base.py", line 329, in execute
+    return super().execute(query, params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+django.db.utils.IntegrityError: UNIQUE constraint failed: rececao_poline.po_id, rececao_poline.internal_sku
+[16/Oct/2025 00:55:50] "POST /upload/ HTTP/1.1" 500 271399
