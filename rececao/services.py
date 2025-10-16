@@ -22,15 +22,6 @@ from django.db import transaction
 from .models import (InboundDocument, ReceiptLine, CodeMapping, MatchResult,
                      ExceptionTask, POLine, PurchaseOrder)
 
-# PyMuPDF for better PDF text extraction
-try:
-    import fitz  # PyMuPDF
-    PYMUPDF_AVAILABLE = True
-    print("✅ PyMuPDF disponível para extração avançada de PDF")
-except ImportError:
-    PYMUPDF_AVAILABLE = False
-    print("⚠️ PyMuPDF não disponível")
-
 # --- QR code detection (usando OpenCV) ---
 try:
     import cv2
@@ -620,14 +611,8 @@ def real_ocr_extract(file_path: str):
 
     print(f"🔍 Processando com Tesseract: {os.path.basename(file_path)}")
     
-    # Flag para controlar se usamos PyMuPDF
-    used_pymupdf = False
-    
     if ext == ".pdf":
         text_content, qr_codes = extract_text_from_pdf(file_path)
-        # Verificar se PyMuPDF foi usado (texto contém marcadores de página)
-        if "--- Página" in text_content:
-            used_pymupdf = True
     elif ext in [".jpg", ".jpeg", ".png", ".tiff", ".bmp"]:
         text_content, qr_codes = extract_text_from_image(file_path)
 
@@ -664,105 +649,19 @@ def real_ocr_extract(file_path: str):
         return error_result
 
     result = parse_portuguese_document(text_content, qr_codes, texto_pdfplumber_curto, file_path=file_path)
-    
-    # FALLBACK INTELIGENTE: Se PyMuPDF foi usado mas nenhum produto foi extraído,
-    # fazer fallback para pdfplumber que tem melhor compatibilidade com parsers existentes
-    produtos_extraidos = len(result.get('produtos', []))
-    if used_pymupdf and produtos_extraidos == 0 and ext == ".pdf":
-        # Verificar se o texto contém códigos de produtos (indica que há dados para extrair)
-        import re
-        tem_codigos = bool(re.search(r'\b[A-Z]{3}\d{12}\b', text_content))
-        
-        if tem_codigos:
-            print("🔄 PyMuPDF extraiu texto mas parser retornou 0 produtos - fallback para pdfplumber...")
-            # Forçar uso de pdfplumber/Tesseract
-            try:
-                import pdfplumber
-                text_pdfplumber = ""
-                with pdfplumber.open(file_path) as pdf:
-                    for page in pdf.pages:
-                        page_text = page.extract_text() or ""
-                        text_pdfplumber += page_text + "\n"
-                
-                if text_pdfplumber.strip():
-                    print(f"✅ pdfplumber fallback: {len(text_pdfplumber)} chars")
-                    result = parse_portuguese_document(text_pdfplumber, qr_codes, False, file_path=file_path)
-                    produtos_extraidos = len(result.get('produtos', []))
-                    print(f"✅ Fallback result: {produtos_extraidos} produtos extraídos")
-            except Exception as e:
-                print(f"⚠️ Fallback pdfplumber falhou: {e}")
-    
     save_extraction_to_json(result)
     return result
 
 
-def extract_with_pymupdf(file_path: str):
-    """
-    Extrai texto de PDF usando PyMuPDF (fitz) preservando layout e estrutura.
-    Melhor que PyPDF2 para tabelas multi-página e preservação de layout.
-    
-    Returns:
-        tuple: (texto_extraido, qr_codes) ou None se falhar
-    """
-    if not PYMUPDF_AVAILABLE:
-        return None
-    
-    try:
-        doc = fitz.open(file_path)
-        text_parts = []
-        
-        print(f"📄 PyMuPDF: Processando {len(doc)} página(s)...")
-        
-        for page_num, page in enumerate(doc, start=1):
-            # Extrai texto mantendo layout original (melhor para tabelas)
-            page_text = page.get_text("text")
-            
-            if page_text.strip():
-                text_parts.append(f"--- Página {page_num} ---\n{page_text}\n")
-        
-        doc.close()
-        
-        full_text = "\n".join(text_parts)
-        
-        if full_text.strip() and len(full_text.strip()) > 50:
-            print(f"✅ PyMuPDF extraction: {len(full_text)} chars de {len(text_parts)} página(s)")
-            
-            # Detectar QR codes
-            qr_codes = []
-            if QR_CODE_ENABLED:
-                try:
-                    print("🔍 Procurando QR codes no PDF...")
-                    pages = convert_from_path(file_path, dpi=300)
-                    for page_num, page_img in enumerate(pages, start=1):
-                        page_qr = detect_and_read_qrcodes(page_img, page_number=page_num)
-                        qr_codes.extend(page_qr)
-                except Exception as e:
-                    print(f"⚠️ Erro ao buscar QR codes: {e}")
-            
-            return full_text.strip(), qr_codes
-        
-        return None
-        
-    except Exception as e:
-        print(f"⚠️ PyMuPDF falhou: {e}")
-        return None
-
-
 def extract_text_from_pdf(file_path: str):
     """
-    Cascata de extração de PDF (5 níveis):
-    1. PyMuPDF (fitz) - melhor layout e multi-página
-    2. PyPDF2 texto embutido - mais rápido como fallback
-    3. OCR.space API - cloud, preciso, grátis 25k/mês
-    4. PaddleOCR/EasyOCR/Tesseract - local, offline
+    Cascata de extração de PDF (4 níveis):
+    1. Texto embutido (PyPDF2) - mais rápido
+    2. OCR.space API - cloud, preciso, grátis 25k/mês
+    3. PaddleOCR/EasyOCR/Tesseract - local, offline
     """
     try:
-        # LEVEL 1: PyMuPDF (melhor para layout e multi-página)
-        pymupdf_result = extract_with_pymupdf(file_path)
-        if pymupdf_result:
-            return pymupdf_result
-        
-        # LEVEL 2: Tenta texto embutido com PyPDF2 (fallback)
+        # LEVEL 1: Tenta texto embutido primeiro (mais rápido)
         text = ""
         with open(file_path, "rb") as f:
             reader = PyPDF2.PdfReader(f)
@@ -771,7 +670,7 @@ def extract_text_from_pdf(file_path: str):
                 text += page_text + "\n"
 
         if text.strip() and len(text.strip()) > 50:
-            print(f"✅ PyPDF2 text extraction: {len(text)} chars")
+            print(f"✅ PDF text extraction: {len(text)} chars")
             # Mesmo com texto embutido, tenta detectar QR codes
             qr_codes = []
             if QR_CODE_ENABLED:
@@ -786,7 +685,7 @@ def extract_text_from_pdf(file_path: str):
                     print(f"⚠️ Erro ao buscar QR codes: {e}")
             return text.strip(), qr_codes
 
-        # LEVEL 3: OCR.space API (cloud, grátis, preciso)
+        # LEVEL 2: OCR.space API (cloud, grátis, preciso)
         print("📄 PDF sem texto embutido - tentando OCR.space API...")
         ocr_text = ocr_space_api(file_path, language='por')
         
@@ -804,7 +703,7 @@ def extract_text_from_pdf(file_path: str):
                     print(f"⚠️ Erro ao buscar QR codes: {e}")
             return ocr_text.strip(), qr_codes
 
-        # LEVEL 4: Engines locais (PaddleOCR → EasyOCR → Tesseract)
+        # LEVEL 3: Engines locais (PaddleOCR → EasyOCR → Tesseract)
         print("📄 OCR.space falhou - usando engines locais (PaddleOCR/EasyOCR/Tesseract)...")
         return extract_text_from_pdf_with_ocr(file_path)
 
@@ -1381,8 +1280,7 @@ def parse_guia_colmol(text: str):
         
         if re.match(r'^[A-Z0-9]{10,}', line_stripped):
             parts = line_stripped.split()
-            # Tolerância: Aceitar linhas com pelo menos 3 partes (código + descrição + algo)
-            if len(parts) >= 3:
+            if len(parts) >= 8:
                 try:
                     codigo = parts[0]
                     
@@ -1411,21 +1309,7 @@ def parse_guia_colmol(text: str):
                     while j < len(parts) and not re.match(r'^\d+[.,]\d+$', parts[j]):
                         j += 1
                     
-                    # FALLBACK: Se não encontrar quantidade válida, tentar extrair de qualquer número na linha
-                    quantidade = 0.0
-                    if j < len(parts):
-                        quantidade = normalize_number(parts[j])
-                    else:
-                        # Buscar qualquer número na linha (fallback para dados corrompidos)
-                        for part in parts[1:]:  # Skip código (parts[0])
-                            try:
-                                num = normalize_number(part)
-                                if num > 0:
-                                    quantidade = num
-                                    break
-                            except:
-                                continue
-                    
+                    quantidade = normalize_number(parts[j]) if j < len(parts) else 0.0
                     unidade = parts[j+1] if j+1 < len(parts) else "UN"
                     med1 = normalize_number(parts[j+2]) if j+2 < len(parts) else 0.0
                     med2 = normalize_number(parts[j+3]) if j+3 < len(parts) else 0.0
@@ -1433,23 +1317,21 @@ def parse_guia_colmol(text: str):
                     peso = normalize_number(parts[j+5]) if j+5 < len(parts) else 0.0
                     iva = normalize_number(parts[j+6]) if j+6 < len(parts) else 23.0
                     
-                    # Só adicionar se tiver código E (descrição OU quantidade válida)
-                    if codigo and (descricao or quantidade > 0):
-                        produtos.append({
-                            "referencia_ordem": f"{current_encomenda} / Req {current_requisicao}",
-                            "artigo": codigo,
-                            "descricao": descricao,
-                            "lote_producao": "",
-                            "quantidade": quantidade,
-                            "unidade": unidade,
-                            "volume": 0,
-                            "dimensoes": f"{med1}x{med2}x{med3}",
-                            "peso": peso,
-                            "iva": iva,
-                            "total": 0.0
-                        })
+                    produtos.append({
+                        "referencia_ordem": f"{current_encomenda} / Req {current_requisicao}",
+                        "artigo": codigo,
+                        "descricao": descricao,
+                        "lote_producao": "",
+                        "quantidade": quantidade,
+                        "unidade": unidade,
+                        "volume": 0,
+                        "dimensoes": f"{med1}x{med2}x{med3}",
+                        "peso": peso,
+                        "iva": iva,
+                        "total": 0.0
+                    })
                 except (ValueError, IndexError) as e:
-                    print(f"⚠️ Erro ao parsear linha Colmol '{line_stripped[:80]}': {e}")
+                    print(f"⚠️ Erro ao parsear linha Colmol: {e}")
                     continue
     
     return produtos
@@ -1584,10 +1466,8 @@ def parse_guia_generica(text: str):
 
 def parse_ordem_compra(text: str):
     """
-    Parser específico para Ordens de Compra portuguesas.
-    Suporta dois formatos:
-    1. Linhas separadas: Referência + Descrição / Quantidade + Unidade
-    2. Linha única: REFERÊNCIA DESCRIÇÃO QUANTIDADE UNIDADE DATA
+    Parser específico para Ordens de Compra com linhas separadas.
+    Formato: Referência + Descrição numa linha, Quantidade + Unidade + Data noutra linha.
     """
     produtos = []
     lines = text.split("\n")
@@ -1601,66 +1481,32 @@ def parse_ordem_compra(text: str):
         if not stripped:
             continue
         
-        # Formato 1: Linha completa tudo junto
-        # Exemplo: 26.100145COLCHAO 1,95X1,40=27"SPA CHERRY VISCO"COLMOL1.000 UN2025-10-17
-        # Padrão: CÓDIGO (números.números) + DESCRIÇÃO (texto) + QUANTIDADE (número.número) + UNIDADE + DATA
-        combined_match = re.match(
-            r'^(\d+\.\d+)(.+?)([\d,\.]+)\s+([A-Z]{2,4})(?:\s*(\d{4}-\d{2}-\d{2}))?',
-            stripped,
-            re.IGNORECASE
-        )
-        
-        if combined_match:
-            codigo = combined_match.group(1)
-            descricao = combined_match.group(2).strip()
-            quantidade_str = combined_match.group(3)
-            unidade = combined_match.group(4).upper()
-            data_entrega = combined_match.group(5) if combined_match.group(5) else ""
-            
-            # Validar unidade
-            unidades_validas = {'UN', 'UNI', 'UNID', 'PC', 'PCS', 'KG', 'G', 'M', 'M2', 'M3', 'L', 'ML', 'CX', 'PAR', 'PAC', 'SET', 'RL', 'FD'}
-            if unidade in unidades_validas:
-                try:
-                    quantidade = normalize_number(quantidade_str)
-                    
-                    # Extrair dimensões
-                    dims = ""
-                    dim_match = re.search(r'(\d),(\d{2})[xX×](\d),(\d{2})', descricao)
-                    if dim_match:
-                        dims = f"{dim_match.group(1)}.{dim_match.group(2)}x{dim_match.group(3)}.{dim_match.group(4)}"
-                    
-                    produtos.append({
-                        "artigo": codigo,
-                        "descricao": descricao,
-                        "quantidade": quantidade,
-                        "unidade": unidade,
-                        "data_entrega": data_entrega,
-                        "dimensoes": dims,
-                        "referencia_ordem": "",
-                        "lote_producao": "",
-                        "volume": 0,
-                        "peso": 0.0,
-                        "iva": 23.0,
-                        "total": 0.0
-                    })
-                    continue
-                except (ValueError, IndexError):
-                    pass
-        
-        # Formato 2a: Detectar linha de quantidade + unidade PRIMEIRO (mais específico)
+        # Detectar linha de quantidade + unidade PRIMEIRO (mais específico)
         # Formato: 1.000 UN 2025-10-17 [texto opcional]
+        # Aceita: uppercase/lowercase units, data opcional, texto trailing opcional
+        # Exemplo: "1.000 UN 2025-10-17", "1.000 un", "3.5 KG 2025-10-17 RECEBIDO"
         qty_match = re.match(r'^([\d,\.]+)\s+([A-Za-z]{2,4})(?:\s+(\d{4}-\d{2}-\d{2}))?', stripped)
         if qty_match:
             quantidade_str = qty_match.group(1)
             unidade = qty_match.group(2).upper()
             data_entrega = qty_match.group(3) if qty_match.group(3) else ""
             
+            # Validar unidade: lista de unidades conhecidas OU tem data (evita false positives)
             unidades_validas = {'UN', 'UNI', 'UNID', 'PC', 'PCS', 'KG', 'G', 'M', 'M2', 'M3', 'L', 'ML', 'CX', 'PAR', 'PAC', 'SET', 'RL', 'FD'}
             is_valid_unit = unidade in unidades_validas or data_entrega
             
             if is_valid_unit:
                 try:
-                    quantidade = normalize_number(quantidade_str)
+                    # Converter quantidade (formato PT: 1.000 = 1000)
+                    if '.' in quantidade_str and ',' not in quantidade_str:
+                        # Formato 1.000 (mil)
+                        quantidade = float(quantidade_str.replace('.', ''))
+                    elif ',' in quantidade_str:
+                        # Formato 1,5 (um e meio)
+                        quantidade = float(quantidade_str.replace(',', '.'))
+                    else:
+                        quantidade = float(quantidade_str)
+                        
                     quantidades.append({
                         'quantidade': quantidade,
                         'unidade': unidade,
@@ -1670,8 +1516,9 @@ def parse_ordem_compra(text: str):
                 except ValueError:
                     pass
         
-        # Formato 2b: Detectar linha de referência + descrição (menos específico)
+        # Detectar linha de referência + descrição (menos específico)
         # Formato: 26.100145 COLCHAO 1,95X1,40=27"SPA CHERRY VISCO"COLMOL
+        # Só faz match se NÃO for linha de quantidade (já verificado acima)
         ref_match = re.match(r'^(\d+\.\d+)\s+(.+)$', stripped)
         if ref_match:
             referencias.append({
@@ -1680,25 +1527,24 @@ def parse_ordem_compra(text: str):
             })
             continue
     
-    # Se já extraiu produtos no formato 1, retornar
-    if produtos:
-        return produtos
-    
-    # Formato 2: Combinar referências com quantidades (ordem sequencial 1:1)
+    # Validar emparelhamento de referências e quantidades
     if len(referencias) != len(quantidades):
         print(f"⚠️ Contagem inconsistente: {len(referencias)} referências vs {len(quantidades)} quantidades")
         print(f"   Referências: {[r['codigo'] for r in referencias]}")
         qtys_str = ["{} {}".format(q['quantidade'], q['unidade']) for q in quantidades]
         print(f"   Quantidades: {qtys_str}")
+        # Usar o mínimo para evitar IndexError
         min_count = min(len(referencias), len(quantidades))
         print(f"   Processando apenas {min_count} produtos emparelhados")
     
+    # Combinar referências com quantidades (ordem sequencial 1:1)
     paired_count = min(len(referencias), len(quantidades))
     for i in range(paired_count):
         ref = referencias[i]
         if i < len(quantidades):
             qty_info = quantidades[i]
             
+            # Extrair dimensões da descrição se existirem
             dims = ""
             dim_match = re.search(r'(\d),(\d{2})[xX×](\d),(\d{2})', ref['descricao'])
             if dim_match:
@@ -1758,98 +1604,76 @@ def parse_bon_commande(text: str):
         contremarque = cm_match.group(1).strip()
     
     in_product_section = False
-    product_header_found = False
     
-    # Buffer para juntar linhas (PyMuPDF coloca cada campo numa linha separada)
-    i = 0
-    while i < len(lines):
-        stripped = lines[i].strip()
+    for line in lines:
+        stripped = line.strip()
         if not stripped:
-            i += 1
             continue
         
-        # Detectar início da seção de produtos (palavras-chave podem estar em linhas separadas)
-        if re.search(r'Désignation|Quantité|Prix\s+unitaire', stripped, re.IGNORECASE):
-            product_header_found = True
-            i += 1
-            continue
-        
-        # Skip header lines
-        if re.search(r'^(Montant|STOCK\s+MAGASIN)$', stripped, re.IGNORECASE):
+        # Detectar início da seção de produtos
+        if re.search(r'Désignation.*Quantité.*Prix', stripped, re.IGNORECASE):
             in_product_section = True
-            i += 1
             continue
         
-        # Detectar fim da seção
-        if re.search(r'^TOTAL|^ADRESSE|^BON DE COMMANDE|^Livraison|^AIRE DES|^Tél|^SIREN', stripped, re.IGNORECASE):
+        # Detectar fim da seção (TOTAL ou endereço)
+        if re.search(r'^TOTAL|^ADRESSE|^BON DE COMMANDE', stripped, re.IGNORECASE):
             in_product_section = False
-            i += 1
             continue
         
-        if in_product_section and product_header_found:
-            # Formato OCR: cada campo numa linha separada
-            # Linha 1: MATELAS SAN REMO 140x190
-            # Linha 2: 2
-            # Linha 3: 202.00€
-            # Linha 4: 404.00€
+        if in_product_section:
+            # Formato: MATELAS SAN REMO 140x190  2 202.00€ 404.00€
+            # Produto pode ter dimensões (140x190, 180x200, etc)
+            # Quantidade é número inteiro
+            # Preços em formato europeu (202.00€)
             
-            # Verificar se esta é uma linha de produto (descrição)
-            if i + 3 < len(lines):
-                desc_line = lines[i].strip()
-                qty_line = lines[i+1].strip()
-                price_line = lines[i+2].strip()
-                total_line = lines[i+3].strip()
+            # Padrão: [PRODUTO com possíveis dimensões] [QTY] [PREÇO€] [TOTAL€]
+            match = re.match(
+                r'^(.+?)\s+(\d+)\s+([\d,\.]+)\s*€\s+([\d,\.]+)\s*€',
+                stripped
+            )
+            
+            if match:
+                designacao = match.group(1).strip()
+                quantidade = int(match.group(2))
+                preco_str = match.group(3)
+                total_str = match.group(4)
                 
-                # Verificar se próximas 3 linhas parecem quantidade + preços
-                if (re.match(r'^\d+$', qty_line) and
-                    re.match(r'^[\d,\.]+\s*€', price_line) and
-                    re.match(r'^[\d,\.]+\s*€', total_line)):
+                try:
+                    preco_unitario = normalize_number(preco_str)
+                    total_linha = normalize_number(total_str)
                     
-                    try:
-                        quantidade = int(qty_line)
-                        preco_str = price_line.replace('€', '').strip()
-                        total_str = total_line.replace('€', '').strip()
-                        
-                        preco_unitario = normalize_number(preco_str)
-                        total_produto = normalize_number(total_str)
-                        
-                        # Extrair dimensões
-                        dims = ""
-                        dim_match = re.search(r'(\d{2,3})\s*[xX×]\s*(\d{2,3})', desc_line)
-                        if dim_match:
-                            dims = f"{dim_match.group(1)}x{dim_match.group(2)}"
-                        
-                        # Extrair código (ex: SAN REMO, RIVIERA)
-                        codigo = ""
-                        cod_match = re.match(r'^MATELAS\s+([A-Z\s]+?)\s+\d', desc_line, re.IGNORECASE)
-                        if cod_match:
-                            codigo = cod_match.group(1).strip()
-                        
-                        produtos.append({
-                            "artigo": codigo if codigo else desc_line[:20],
-                            "descricao": desc_line,
-                            "quantidade": float(quantidade),
-                            "unidade": "UN",
-                            "preco_unitario": preco_unitario,
-                            "total": total_produto,
-                            "dimensoes": dims,
-                            "cliente": cliente,
-                            "data_encomenda": data,
-                            "contremarque": contremarque,
-                            "referencia_ordem": "",
-                            "lote_producao": "",
-                            "volume": 0,
-                            "peso": 0.0,
-                            "iva": 20.0
-                        })
-                        
-                        print(f"✅ Produto Bon de Commande: {desc_line} - {quantidade} UN")
-                        i += 4  # Pular as 4 linhas processadas
-                        continue
-                    except (ValueError, IndexError) as e:
-                        pass
-        
-        i += 1
+                    # Extrair dimensões da designação se existirem
+                    dims = ""
+                    dim_match = re.search(r'(\d{2,3})\s*[xX×]\s*(\d{2,3})', designacao)
+                    if dim_match:
+                        dims = f"{dim_match.group(1)}x{dim_match.group(2)}"
+                    
+                    # Extrair código/referência se existir (formato tipo SAN REMO, RIVIERA)
+                    codigo = ""
+                    cod_match = re.match(r'^([A-Z\s]+?)\s+\d', designacao)
+                    if cod_match:
+                        codigo = cod_match.group(1).strip()
+                    
+                    produtos.append({
+                        "artigo": codigo if codigo else designacao[:20],
+                        "descricao": designacao,
+                        "quantidade": float(quantidade),
+                        "unidade": "UN",
+                        "preco_unitario": preco_unitario,
+                        "total": total_linha,
+                        "dimensoes": dims,
+                        "cliente": cliente,
+                        "data_encomenda": data,
+                        "contremarque": contremarque,
+                        "referencia_ordem": "",
+                        "lote_producao": "",
+                        "volume": 0,
+                        "peso": 0.0,
+                        "iva": 20.0  # IVA França padrão
+                    })
+                except ValueError as e:
+                    print(f"⚠️ Erro ao converter valores numéricos em '{stripped[:50]}': {e}")
+                    continue
     
     return produtos
 
@@ -1941,14 +1765,8 @@ def parse_pedido_espanhol(text: str):
                     pass
                 
                 # 4. Descrição não pode conter palavras de endereço
-                address_words = ['POLIGONO', 'NAVE', 'CALLE', 'RUA', 'AVENIDA', 'ZONA', 'INDUSTRIAL', 'MORERO', 'GUARNIZO']
-                desc_upper = line2.upper()
-                if any(word in desc_upper for word in address_words):
-                    i += 1
-                    continue
-                
-                # 5. Linha 3 (código) não pode ter palavras (evita "GUARNIZO", "PORTUGAL", "POLIGONO", etc como código)
-                if any(word in line3.upper() for word in ['GUARNIZO', 'PORTUGAL', 'ESPAÑA', 'FRANCE', 'ADMINISTRA', 'POLIGONO', 'INDUTRIAL', 'MORERO']):
+                address_words = ['POLIGONO', 'NAVE', 'CALLE', 'RUA', 'AVENIDA', 'ZONA', 'INDUSTRIAL']
+                if any(word in line2.upper() for word in address_words):
                     i += 1
                     continue
                 
@@ -2038,11 +1856,8 @@ def parse_pedido_espanhol(text: str):
                 except:
                     pass
                 # 4. Descrição não pode ter palavras de endereço
-                address_words = ['POLIGONO', 'NAVE', 'CALLE', 'RUA', 'AVENIDA', 'ZONA', 'INDUSTRIAL', 'MORERO', 'GUARNIZO']
+                address_words = ['POLIGONO', 'NAVE', 'CALLE', 'RUA', 'AVENIDA', 'ZONA', 'INDUSTRIAL']
                 if any(word in descripcion.upper() for word in address_words):
-                    is_valid = False
-                # 5. Código não pode ter palavras de endereço
-                if any(word in codigo.upper() for word in ['POLIGONO', 'INDUTRIAL', 'MORERO', 'GUARNIZO', 'PORTUGAL', 'ESPAÑA', 'ADMINISTRA']):
                     is_valid = False
                 
                 if is_valid:
@@ -2107,12 +1922,8 @@ def parse_pedido_espanhol(text: str):
                 except:
                     pass
                 # 4. Descrição não pode ter palavras de endereço
-                address_words = ['POLIGONO', 'NAVE', 'CALLE', 'RUA', 'AVENIDA', 'ZONA', 'INDUSTRIAL', 'MORERO', 'GUARNIZO']
+                address_words = ['POLIGONO', 'NAVE', 'CALLE', 'RUA', 'AVENIDA', 'ZONA', 'INDUSTRIAL']
                 if any(word in descripcion.upper() for word in address_words):
-                    i += 1
-                    continue
-                # 5. Código não pode ter palavras de endereço
-                if any(word in codigo.upper() for word in ['POLIGONO', 'INDUTRIAL', 'MORERO', 'GUARNIZO', 'PORTUGAL', 'ESPAÑA', 'ADMINISTRA']):
                     i += 1
                     continue
                 
@@ -2160,27 +1971,6 @@ def parse_pedido_espanhol(text: str):
                 codigo = match2.group(1)
                 descripcion = match2.group(2).strip()
                 cantidad_str = match2.group(3).replace(',', '.')
-                
-                # VALIDAÇÕES (mesmas dos outros formatos)
-                is_valid = True
-                if re.match(r'^\d+$', codigo):
-                    is_valid = False
-                if codigo.startswith('PT'):
-                    is_valid = False
-                try:
-                    if float(cantidad_str) > 100:
-                        is_valid = False
-                except:
-                    pass
-                address_words = ['POLIGONO', 'NAVE', 'CALLE', 'RUA', 'AVENIDA', 'ZONA', 'INDUSTRIAL', 'MORERO', 'GUARNIZO']
-                if any(word in descripcion.upper() for word in address_words):
-                    is_valid = False
-                if any(word in codigo.upper() for word in ['POLIGONO', 'INDUTRIAL', 'MORERO', 'GUARNIZO', 'PORTUGAL', 'ESPAÑA', 'ADMINISTRA']):
-                    is_valid = False
-                
-                if not is_valid:
-                    i += 1
-                    continue
                 
                 try:
                     cantidad = float(cantidad_str)
@@ -2390,40 +2180,10 @@ def universal_table_extract(file_path: str):
         except Exception as e:
             print(f"⚠️ pdfplumber falhou: {e}")
     
-    # Filtrar produtos inválidos (endereços, códigos postais, etc)
-    produtos_validos = []
-    palavras_invalidas = {
-        'tertres', 'moissons', 'maxiliterie', 'colmol', 'adresse', 'livraison',
-        'zone', 'commercial', 'rue', 'rua', 'avenida', 'street', 'avenue',
-        'cidade', 'city', 'codigo', 'postal', 'telefone', 'phone', 'tel',
-        'fax', 'email', 'e-mail', 'cliente', 'customer', 'fornecedor', 'supplier'
-    }
+    if produtos:
+        print(f"✅ Extração universal de tabelas: {len(produtos)} produtos")
     
-    for p in produtos:
-        artigo = str(p.get('artigo', '')).lower()
-        descricao = str(p.get('descricao', '')).lower()
-        quantidade = p.get('quantidade', 0)
-        
-        # Filtro 1: Evitar códigos postais como quantidades (>= 5 dígitos)
-        if quantidade > 9999:
-            continue
-        
-        # Filtro 2: Evitar palavras de endereço no artigo ou descrição
-        texto_completo = f"{artigo} {descricao}"
-        if any(palavra in texto_completo for palavra in palavras_invalidas):
-            continue
-        
-        # Filtro 3: Artigo muito curto ou genérico
-        if artigo and len(artigo) < 2:
-            continue
-        
-        # Produto válido
-        produtos_validos.append(p)
-    
-    if produtos_validos:
-        print(f"✅ Extração universal de tabelas: {len(produtos_validos)} produtos válidos (filtrados {len(produtos) - len(produtos_validos)})")
-    
-    return produtos_validos
+    return produtos
 
 
 def parse_generic_document(text: str, file_path: str = None):
@@ -2993,54 +2753,46 @@ def create_po_from_nota_encomenda(inbound: InboundDocument, payload: dict):
 
 @transaction.atomic
 def process_inbound(inbound: InboundDocument):
-    # Estratégia: OCR primeiro, LLM só como fallback se OCR falhar
-    # 1. Primeiro: OCR rápido para obter texto e produtos
+    # Estratégia híbrida: OCR rápido + Ollama pós-processamento
+    # 1. Primeiro: OCR rápido para obter texto (sempre disponível)
     ocr_payload = real_ocr_extract(inbound.file.path)
     ocr_text = ocr_payload.get('texto_completo', '')
-    ocr_produtos = len(ocr_payload.get('produtos', [])) + len(ocr_payload.get('lines', []))
     
-    # 2. Verificar se OCR extraiu produtos com sucesso
-    if ocr_produtos > 0:
-        # OCR funcionou - usar dados OCR
-        print(f"✅ Usando dados do OCR cascade ({ocr_produtos} produtos extraídos)")
-        payload = ocr_payload
-    else:
-        # OCR falhou (0 produtos) - tentar LLM como fallback
-        print("⚠️ OCR retornou 0 produtos - tentando LLM como fallback...")
-        ollama_data = ollama_extract_document(inbound.file.path, ocr_text=ocr_text)
+    # 2. Depois: Tentar Ollama com texto OCR como contexto (melhora precisão)
+    ollama_data = ollama_extract_document(inbound.file.path, ocr_text=ocr_text)
+    
+    if ollama_data and ollama_data.get('produtos'):
+        # Ollama extraiu dados com sucesso - usar dados LLM
+        print(f"✅ Usando dados do Ollama LLM ({len(ollama_data.get('produtos', []))} produtos)")
         
-        if ollama_data and ollama_data.get('produtos'):
-            # Ollama extraiu dados - usar como fallback
-            print(f"✅ LLM fallback: {len(ollama_data.get('produtos', []))} produtos extraídos")
-            
-            # Converter formato Ollama para formato esperado
-            payload = {
-                "fornecedor": ollama_data.get('fornecedor', ''),
-                "nif": ollama_data.get('nif', ''),
-                "numero_documento": ollama_data.get('numero_documento', ''),
-                "data_documento": ollama_data.get('data_documento', ''),
-                "po_number": ollama_data.get('numero_encomenda', ''),
-                "iban": ollama_data.get('iban', ''),
-                "produtos": [
-                    {
-                        "artigo": p.get('codigo', ''),
-                        "descricao": p.get('descricao', ''),
-                        "quantidade": float(p.get('quantidade') or 0),
-                        "preco_unitario": float(p.get('preco_unitario') or 0),
-                        "total": float(p.get('total') or 0),
-                        "numero_encomenda": p.get('numero_encomenda', '')
-                    }
-                    for p in ollama_data.get('produtos', [])
-                ],
-                "total": ollama_data.get('total_geral', 0),
-                "texto_completo": ocr_text or "Dados extraídos via Ollama LLM",
-                "tipo_documento": ollama_data.get('tipo_documento', 'UNKNOWN_LLM'),
-                "extraction_method": "ollama_llm"
-            }
-        else:
-            # LLM também falhou - usar dados OCR mesmo vazios
-            print("❌ LLM também falhou - usando payload OCR")
-            payload = ocr_payload
+        # Converter formato Ollama para formato esperado
+        payload = {
+            "fornecedor": ollama_data.get('fornecedor', ''),
+            "nif": ollama_data.get('nif', ''),
+            "numero_documento": ollama_data.get('numero_documento', ''),
+            "data_documento": ollama_data.get('data_documento', ''),
+            "po_number": ollama_data.get('numero_encomenda', ''),
+            "iban": ollama_data.get('iban', ''),
+            "produtos": [
+                {
+                    "artigo": p.get('codigo', ''),
+                    "descricao": p.get('descricao', ''),
+                    "quantidade": float(p.get('quantidade') or 0),
+                    "preco_unitario": float(p.get('preco_unitario') or 0),
+                    "total": float(p.get('total') or 0),
+                    "numero_encomenda": p.get('numero_encomenda', '')
+                }
+                for p in ollama_data.get('produtos', [])
+            ],
+            "total": ollama_data.get('total_geral', 0),
+            "texto_completo": ocr_text or "Dados extraídos via Ollama LLM",
+            "tipo_documento": ollama_data.get('tipo_documento', 'UNKNOWN_LLM'),
+            "extraction_method": "ollama_llm"
+        }
+    else:
+        # Fallback: Usar dados OCR diretamente
+        print("🔄 Ollama não disponível/falhou - usando dados OCR cascade")
+        payload = ocr_payload
 
     if payload.get("error"):
         ExceptionTask.objects.create(

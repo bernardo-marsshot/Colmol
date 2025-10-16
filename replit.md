@@ -15,33 +15,75 @@ The project is built on Django 5.0.6 using Python 3.11, with SQLite for the data
 
 **Technical Implementations & Feature Specifications:**
 - **Multi-format Document Processing**: Auto-detection and parsing for various document types (e.g., Elastron invoices, Colmol delivery notes, generic documents, specific Spanish/French PO formats).
-- **OCR Integration**: A 5-level cascade OCR system (PyMuPDF → PyPDF2 → OCR.space → PaddleOCR/EasyOCR → Tesseract) with intelligent fallback ensures maximum success rates, supporting multi-page processing, local offline processing, and QR code detection. OCR data is prioritized over LLM data if products are extracted.
-- **LLM Integration**: Groq LLM (Llama-3.3-70B) is used for universal document extraction and structuring, processing OCR-extracted text into structured JSON, acting as a fallback when OCR extracts zero products.
-- **Format-Specific and Generic Parsers**: Dedicated parsing logic for known supplier formats and a flexible generic parser for unknown formats, including robust product validation and number normalization.
-- **Purchase Order Matching & Validation**: SKU mapping, quantity validation, exception management, and a decremental matching system. Includes bidirectional document flow, multi-PO handling, and line-item matching for delivery receipts with multiple POs.
+- **OCR Integration**: A 4-level cascade OCR system (OCR.space → PaddleOCR → EasyOCR → Tesseract) ensures maximum success rates, supporting local, offline processing and QR code detection.
+- **LLM Integration**: Groq LLM (Llama-3.3-70B) is used for universal document extraction and structuring, processing OCR-extracted text into structured JSON.
+- **Format-Specific and Generic Parsers**: Dedicated parsing logic for known supplier formats and a flexible generic parser for unknown formats.
+- **Purchase Order Matching & Validation**: SKU mapping, quantity validation, exception management, and a decremental matching system.
+- **Bidirectional Document Flow**: Automatic PO creation from "Notas de Encomenda" and linking with "Guias de Remessa".
 - **Advanced Illegible File Detection**: Multi-layer validation system detects and reports illegible documents, creating exception tasks.
 - **Excel Export Enhancements**: Intelligent dimension extraction and "Mini Códigos FPOL" mapping for standardized Excel exports.
-- **Robustness**: Comprehensive None-safety across product processing functions, automatic creation of `CodeMapping` for unknown products, and flexible product validation allowing acceptance based on description and quantity.
-- **Differentiated Status**: Clear distinction between 'Error' (critical processing failures) and 'Exceptions' (business logic problems).
+- **Robustness**: Comprehensive None-safety across product processing functions and automatic creation of `CodeMapping` for unknown products.
+- **Number Normalization**: Universal system for normalizing numbers based on digit count after the comma (3 digits = thousands separator, 1-2 digits = decimal).
+- **LLM Fallback System**: Automatic fallback to a secondary Groq API key and then to Ollama if primary Groq calls fail.
+- **Flexible Product Validation**: Allows product acceptance based on valid description (>=10 chars) and quantity (>0) even without an explicit product code.
+- **Multi-PO Handling**: Documents containing multiple purchase orders now result in separate POs being created for each.
+- **Quantity Aggregation**: Duplicate products within multiple orders in a single document automatically aggregate quantities.
+- **PO Linking Priority**: Purchase Order linking now occurs before any exceptions or matching processes.
+- **Line-Item Matching for GR with Multiple POs**: Delivery Receipts can perform matching using a specific PO extracted for each product line item.
+- **Dashboard Enhancements**: Dashboard now displays all documents (FT + GR) with clear visual differentiation and separate KPIs for GR matching.
+- **Differentiated Status**: Clear distinction between 'Error' (critical processing failures like OCR issues) and 'Exceptions' (business logic problems like matching discrepancies).
 
 **System Design Choices:**
 - Configured for autoscale deployment.
 - Emphasizes robust error handling and fallback mechanisms for OCR and LLM integrations.
-- Universal number normalization based on digit count after the comma (3 digits = thousands separator, 1-2 digits = decimal).
 
 ## External Dependencies
 -   **OCR Engines**:
-    -   **PyMuPDF (fitz)**: Level 1 - Fast multi-page PDF extraction.
-    -   **PyPDF2**: Level 2 - Embedded text extraction fallback.
-    -   **OCR.space API**: Level 3 - Cloud OCR.
-    -   **PaddleOCR**: Level 4 - Primary local engine.
-    -   **EasyOCR**: Level 4 - Secondary local fallback.
-    -   **Tesseract OCR**: Level 4 - Final local fallback (with Portuguese).
+    -   **OCR.space API**: Cloud OCR.
+    -   **PaddleOCR**: Primary local engine.
+    -   **EasyOCR**: Secondary local fallback.
+    -   **Tesseract OCR**: Final local fallback (with Portuguese).
 -   **Large Language Model**:
-    -   **Groq API**: Utilizes Llama-3.3-70B.
+    -   **Groq API**: Utilizes Llama-3.3-70B for universal document text structuring.
     -   **Ollama**: Final LLM fallback.
 -   **Universal Extraction Tools**:
     -   **Camelot-py**: PDF table extraction.
     -   **pdfplumber**: Advanced PDF parsing.
     -   **rapidfuzz**: Fuzzy string matching.
 -   **Database**: SQLite (db.sqlite3).
+
+## Recent Changes
+
+### October 16, 2025 - Correção: Normalização Consistente de Números em Todos os Parsers
+- **Problema Identificado**: Função `normalize_number` aninhada em `parse_fatura_elastron` sobrescrevia a função global
+- **Função Aninhada Removida** (linhas 1109-1128):
+  - Implementação antiga **não** seguia regra de 3 dígitos
+  - Tratava vírgula sempre como decimal (formato PT: 1.234,56)
+  - Causava inconsistência entre parsers diferentes
+- **Correção Aplicada**:
+  - Removida função aninhada duplicada
+  - Agora todos os parsers usam a função global `normalize_number` (linha 39)
+  - Implementação correta da regra universal de 3 dígitos
+- **Regra de Normalização Confirmada**:
+  - **3 dígitos após vírgula** = separador de milhares (remover vírgula)
+    - Exemplos: `190,000 → 190000.0`, `200,090 → 200090.0`, `1,880 → 1880.0`
+  - **1-2 dígitos após vírgula** = decimal normal (substituir vírgula por ponto)
+    - Exemplos: `190,5 → 190.5`, `2,5 → 2.5`, `34,00 → 34.0`
+- **Testes de Validação** (todos ✅):
+  ```
+  190,000 → 190000.0  (3 dígitos = separador de milhares)
+  200,090 → 200090.0  (3 dígitos = separador de milhares)
+  1,880 → 1880.0      (3 dígitos = separador de milhares)
+  125,000 → 125000.0  (3 dígitos = separador de milhares)
+  0,150 → 150.0       (3 dígitos = separador de milhares)
+  
+  190,5 → 190.5       (1-2 dígitos = decimal normal)
+  2,5 → 2.5           (1-2 dígitos = decimal normal)
+  34,00 → 34.0        (1-2 dígitos = decimal normal)
+  1,88 → 1.88         (1-2 dígitos = decimal normal)
+  ```
+- **Benefícios**:
+  - Normalização consistente em TODOS os parsers (Elastron, Colmol, Genérico, LLM)
+  - Regra de 3 dígitos aplicada uniformemente em todo o sistema
+  - Sem duplicação de lógica de normalização
+  - Documentação clara na função global com exemplos
