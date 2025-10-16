@@ -2649,13 +2649,18 @@ def map_supplier_codes(supplier, payload):
             # Artigo/SKU do produto (garantir que não é None)
             article_code = produto.get("artigo") or ""
             
+            # Se supplier_code está vazio, usar article_code como fallback
+            # Isto acontece quando o parser não extrai referencia_ordem
+            if not supplier_code and article_code:
+                supplier_code = article_code
+            
             # IMPORTANTE: Lookup usando article_code, não supplier_code!
             # supplier_code (ex:"1ECWH") é igual para todas as linhas deste fornecedor
             # article_code (ex:"E0748001901") é único por produto
             mapping = CodeMapping.objects.filter(
                 supplier=supplier, supplier_code=article_code).first() if article_code else None
             mapped.append({
-                "supplier_code": supplier_code or "",
+                "supplier_code": supplier_code or "UNKNOWN",
                 "article_code": article_code or "UNKNOWN",
                 "description": produto.get("descricao") or "",
                 "unit": produto.get("unidade") or "UN",
