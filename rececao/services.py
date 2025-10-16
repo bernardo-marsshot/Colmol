@@ -2122,7 +2122,9 @@ def universal_table_extract(file_path: str):
             print(f"⚠️ Camelot falhou: {e}")
     
     # Método 2: pdfplumber (melhor para tabelas sem bordas)
-    if PDFPLUMBER_AVAILABLE and file_path.lower().endswith('.pdf') and len(produtos) == 0:
+    # IMPORTANTE: Sempre executar pdfplumber em TODAS as páginas, mesmo que Camelot já tenha encontrado produtos
+    # Isto garante que produtos em páginas subsequentes não sejam ignorados
+    if PDFPLUMBER_AVAILABLE and file_path.lower().endswith('.pdf'):
         try:
             with pdfplumber.open(file_path) as pdf:
                 for page in pdf.pages:
