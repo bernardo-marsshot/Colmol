@@ -80,7 +80,13 @@
 
   <div class="documents-list" style="max-height: 600px; overflow-y: auto; padding-right: 10px;">
   {% for d in latest %}
-  <div class="document-item mb-3" data-status="{% if d.match_result %}{% if d.match_result.status == 'matched' %}matched{% elif d.match_result.status == 'exceptions' %}exceptions{% elif d.match_result.status == 'error' %}error{% else %}pending{% endif %}{% else %}pending{% endif %}">
+  {% if d.doc_type == 'FT' %}
+    {# Nota de Encomenda: status proprio que nao conflita com filtros de GR #}
+    <div class="document-item mb-3" data-status="{% if d.po %}ft_success{% else %}ft_error{% endif %}">
+  {% else %}
+    {# Guia de Remessa: status baseado em match_result #}
+    <div class="document-item mb-3" data-status="{% if d.match_result %}{% if d.match_result.status == 'matched' %}matched{% elif d.match_result.status == 'exceptions' %}exceptions{% elif d.match_result.status == 'error' %}error{% else %}pending{% endif %}{% else %}pending{% endif %}">
+  {% endif %}
     <div class="row align-items-center">
       <div class="col-md-2">
         <small class="text-muted">{{ d.received_at|date:"d/m H:i" }}</small>
@@ -90,42 +96,52 @@
       </div>
       <div class="col-md-3">
         <a href="{% url 'inbound_detail' d.pk %}" class="btn-bizneo-document">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"
-            aria-hidden="true">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" stroke-width="2"
-              stroke-linecap="round" stroke-linejoin="round" />
-            <polyline points="14,2 14,8 20,8" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-              stroke-linejoin="round" />
-            <line x1="16" y1="13" x2="8" y2="13" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-              stroke-linejoin="round" />
-            <line x1="16" y1="17" x2="8" y2="17" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-              stroke-linejoin="round" />
-          </svg>
+          {% if d.doc_type == 'FT' %}
+          <span style="font-size: 1.1em;">📝</span>
+          {% else %}
+          <span style="font-size: 1.1em;">📦</span>
+          {% endif %}
           {{ d.get_doc_type_display }} {{ d.number }}
         </a>
       </div>
       <div class="col-md-2">
         {% if d.po %}
         <a href="/po/" class="text-decoration-none" title="Ver encomenda {{ d.po.number }}">
-          <small>📋 {{ d.po.number }}</small>
+          <small>
+            {% if d.doc_type == 'FT' %}
+            ✨ {{ d.po.number }}
+            {% else %}
+            📋 {{ d.po.number }}
+            {% endif %}
+          </small>
         </a>
         {% else %}
         <small class="text-muted">-</small>
         {% endif %}
       </div>
       <div class="col-md-3 d-flex align-items-center gap-2">
-        {% if d.match_result %}
-        {% if d.match_result.status == 'matched' %}
-        <span class="badge bg-success">✓</span>
-        {% elif d.match_result.status == 'exceptions' %}
-        <span class="badge bg-warning">!</span>
-        {% elif d.match_result.status == 'error' %}
-        <span class="badge bg-danger">✗</span>
+        {% if d.doc_type == 'FT' %}
+          {# Nota de Encomenda: status baseado em PO criada #}
+          {% if d.po %}
+          <span class="badge bg-success">✓</span>
+          {% else %}
+          <span class="badge bg-danger">✗</span>
+          {% endif %}
         {% else %}
-        <span class="badge bg-secondary">-</span>
-        {% endif %}
-        {% else %}
-        <span class="badge bg-secondary">-</span>
+          {# Guia de Remessa: status baseado em matching #}
+          {% if d.match_result %}
+          {% if d.match_result.status == 'matched' %}
+          <span class="badge bg-success">✓</span>
+          {% elif d.match_result.status == 'exceptions' %}
+          <span class="badge bg-warning">!</span>
+          {% elif d.match_result.status == 'error' %}
+          <span class="badge bg-danger">✗</span>
+          {% else %}
+          <span class="badge bg-secondary">-</span>
+          {% endif %}
+          {% else %}
+          <span class="badge bg-secondary">-</span>
+          {% endif %}
         {% endif %}
         
         <!-- Compact progress bar next to badge -->

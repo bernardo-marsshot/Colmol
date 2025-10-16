@@ -6,24 +6,29 @@ from .forms import InboundUploadForm
 from .services import process_inbound, export_document_to_excel
 
 def dashboard(request):
-    # Dashboard mostra apenas Guias de Remessa (GR), nao Notas de Encomenda (FT)
-    guias_queryset = InboundDocument.objects.filter(doc_type='GR')
+    # Dashboard mostra TODOS os documentos (FT e GR) mas KPIs focam em GR
+    all_docs_queryset = InboundDocument.objects.all()
+    gr_queryset = all_docs_queryset.filter(doc_type='GR')
     
-    # Contagens por estado (apenas Guias)
-    total_docs = guias_queryset.count()
-    matched    = guias_queryset.filter(match_result__status='matched').count()
-    exceptions = guias_queryset.filter(match_result__status='exceptions').count()
-    errors     = guias_queryset.filter(match_result__status='error').count()
+    # Total de documentos: todos (FT + GR)
+    total_docs = all_docs_queryset.count()
+    
+    # KPIs de processamento: apenas GR (matching)
+    # FT nao faz matching, entao nao conta para estes KPIs
+    matched    = gr_queryset.filter(match_result__status='matched').count()
+    exceptions = gr_queryset.filter(match_result__status='exceptions').count()
+    errors     = gr_queryset.filter(match_result__status='error').count()
 
-    # Pendente = tudo o que não tem resultado ainda (ou qualquer outro estado não coberto acima)
-    pending = total_docs - matched - exceptions - errors
+    # Pendente = GR sem resultado ainda
+    gr_total = gr_queryset.count()
+    pending = gr_total - matched - exceptions - errors
     if pending < 0:
-        pending = 0  # salvaguarda, caso existam estados “extra” ou inconsistências
+        pending = 0
 
     suppliers = Supplier.objects.count()
 
     latest_docs = (
-        guias_queryset
+        all_docs_queryset
         .select_related('supplier', 'po', 'match_result')
         .order_by('-received_at')
     )
@@ -49,8 +54,8 @@ def dashboard(request):
         doc.reading_percentage = round(reading_percentage, 1)
         latest.append(doc)
     
-    # Get latest document statistics for line reading chart (apenas Guias)
-    latest_doc = guias_queryset.select_related('supplier', 'po', 'match_result').order_by('-received_at').first()
+    # Get latest document statistics for line reading chart
+    latest_doc = all_docs_queryset.select_related('supplier', 'po', 'match_result').order_by('-received_at').first()
     latest_doc_stats = {
         'has_doc': False,
         'total_lines': 0,
