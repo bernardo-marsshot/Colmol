@@ -2161,6 +2161,27 @@ def parse_pedido_espanhol(text: str):
                 descripcion = match2.group(2).strip()
                 cantidad_str = match2.group(3).replace(',', '.')
                 
+                # VALIDAÇÕES (mesmas dos outros formatos)
+                is_valid = True
+                if re.match(r'^\d+$', codigo):
+                    is_valid = False
+                if codigo.startswith('PT'):
+                    is_valid = False
+                try:
+                    if float(cantidad_str) > 100:
+                        is_valid = False
+                except:
+                    pass
+                address_words = ['POLIGONO', 'NAVE', 'CALLE', 'RUA', 'AVENIDA', 'ZONA', 'INDUSTRIAL', 'MORERO', 'GUARNIZO']
+                if any(word in descripcion.upper() for word in address_words):
+                    is_valid = False
+                if any(word in codigo.upper() for word in ['POLIGONO', 'INDUTRIAL', 'MORERO', 'GUARNIZO', 'PORTUGAL', 'ESPAÑA', 'ADMINISTRA']):
+                    is_valid = False
+                
+                if not is_valid:
+                    i += 1
+                    continue
+                
                 try:
                     cantidad = float(cantidad_str)
                     
