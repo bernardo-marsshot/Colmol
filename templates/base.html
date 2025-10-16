@@ -12,239 +12,242 @@
     html,
     body {
       height: 100%;
-    html, body {
-      height: 100%;
-      background: #ffffff;
-      color: #000000;
-    }
 
-    body {
-      display: flex;
-      flex-direction: column;
-    }
-
-    body {
-      display: flex;
-      flex-direction: column;
-    }
-
-    .card {
-      background: #ffffff;
-      border: 1px solid #e55a00;
-      box-shadow: 0 2px 4px rgba(229, 90, 0, 0.1);
-    }
-
-    a {
-      color: #b34700;
-    }
-
-    a:hover {
-      color: #8b3800;
-    }
-
-    .navbar {
-      background: #cc4400;
-      position: relative;
-      z-index: 1000;
-    }
-
-    .navbar-brand,
-    .nav-link {
-      color: #ffffff !important;
-    }
-
-    .nav-link:hover {
-      color: #ffffff !important;
-    }
-
-    footer {
-      color: #666666;
-    }
-
-    .btn-primary {
-      background-color: #cc4400;
-      border-color: #cc4400;
-      color: #ffffff;
-    }
-
-    .btn-primary:hover {
-      background-color: #993300;
-      border-color: #993300;
-    }
-
-    /* Botões estilo Bizneo modernos */
-    .btn-bizneo-primary {
-      background: linear-gradient(135deg, #FF6B35 0%, #e55a00 100%);
-      border: none;
-      border-radius: 8px;
-      padding: 12px 20px;
-      color: white;
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      text-decoration: none;
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      box-shadow: 0 4px 12px rgba(255, 107, 53, 0.25);
-      position: relative;
-      overflow: hidden;
-    }
-
-    .btn-bizneo-primary:hover {
-      background: linear-gradient(135deg, #e55a00 0%, #cc4400 100%);
-      transform: translateY(-1px);
-      box-shadow: 0 6px 20px rgba(255, 107, 53, 0.35);
-      color: white;
-      text-decoration: none;
-    }
-
-    .btn-bizneo-primary:active {
-      transform: translateY(0);
-      box-shadow: 0 2px 8px rgba(255, 107, 53, 0.3);
-    }
-
-    .btn-bizneo-success {
-      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-      border: none;
-      border-radius: 8px;
-      padding: 12px 20px;
-      color: white;
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      text-decoration: none;
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
-    }
-
-    .btn-bizneo-success:hover {
-      background: linear-gradient(135deg, #059669 0%, #047857 100%);
-      transform: translateY(-1px);
-      box-shadow: 0 6px 20px rgba(16, 185, 129, 0.35);
-      color: white;
-      text-decoration: none;
-    }
-
-    .btn-bizneo-success:active {
-      transform: translateY(0);
-      box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
-    }
-
-    /* Ícones SVG nos botões */
-    .btn-bizneo-primary svg,
-    .btn-bizneo-success svg {
-      flex-shrink: 0;
-    }
-
-    .btn-bizneo-secondary {
-      background: transparent;
-      border: 2px solid #e5e7eb;
-      border-radius: 8px;
-      padding: 10px 18px;
-      color: #374151;
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      text-decoration: none;
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .btn-bizneo-secondary:hover {
-      border-color: #FF6B35;
-      color: #FF6B35;
-      background: #fff5f1;
-      text-decoration: none;
-      transform: translateY(-1px);
-    }
-
-    .btn-bizneo-secondary:active {
-      transform: translateY(0);
-    }
-
-    .btn-bizneo-document {
-      background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
-      border: 1px solid #e5e7eb;
-      border-radius: 8px;
-      padding: 10px 16px;
-      color: #374151;
-      font-size: 14px;
-      font-weight: 500;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      text-decoration: none;
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      width: 100%;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    }
-
-    .btn-bizneo-document:hover {
-      background: linear-gradient(135deg, #FF6B35 0%, #e55a00 100%);
-      border-color: #FF6B35;
-      color: white;
-      text-decoration: none;
-      transform: translateY(-1px);
-      box-shadow: 0 4px 12px rgba(255, 107, 53, 0.25);
-    }
-
-    .btn-bizneo-document:active {
-      transform: translateY(0);
-    }
-
-    /* Responsividade dos botões */
-    @media (max-width: 768px) {
-      .btn-bizneo-primary,
-      .btn-bizneo-success,
-      .btn-bizneo-secondary {
-        width: 100%;
-        justify-content: center;
-        margin-bottom: 8px;
+      html,
+      body {
+        height: 100%;
+        background: #ffffff;
+        color: #000000;
       }
-    }
 
-    .border-secondary {
-      border-color: #e55a00 !important;
-    }
+      body {
+        display: flex;
+        flex-direction: column;
+      }
 
-    .table {
-      background-color: #ffffff;
-      color: #000000;
-    }
+      body {
+        display: flex;
+        flex-direction: column;
+      }
 
-    .table th {
-      background-color: #f8f9fa;
-      color: #000000;
-      border-bottom: 2px solid #e55a00;
-    }
+      .card {
+        background: #ffffff;
+        border: 1px solid #e55a00;
+        box-shadow: 0 2px 4px rgba(229, 90, 0, 0.1);
+      }
 
-    .table td {
-      border-top: 1px solid #dee2e6;
-    }
+      a {
+        color: #b34700;
+      }
 
-    main {
-      flex: 1;
-    }
+      a:hover {
+        color: #8b3800;
+      }
 
-    footer {
-      margin-top: auto;
-    }
+      .navbar {
+        background: #cc4400;
+        position: relative;
+        z-index: 1000;
+      }
 
-    main {
-      flex: 1;
-    }
+      .navbar-brand,
+      .nav-link {
+        color: #ffffff !important;
+      }
 
-    footer {
-      margin-top: auto;
-    }
+      .nav-link:hover {
+        color: #ffffff !important;
+      }
+
+      footer {
+        color: #666666;
+      }
+
+      .btn-primary {
+        background-color: #cc4400;
+        border-color: #cc4400;
+        color: #ffffff;
+      }
+
+      .btn-primary:hover {
+        background-color: #993300;
+        border-color: #993300;
+      }
+
+      /* Botões estilo Bizneo modernos */
+      .btn-bizneo-primary {
+        background: linear-gradient(135deg, #FF6B35 0%, #e55a00 100%);
+        border: none;
+        border-radius: 8px;
+        padding: 12px 20px;
+        color: white;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        box-shadow: 0 4px 12px rgba(255, 107, 53, 0.25);
+        position: relative;
+        overflow: hidden;
+      }
+
+      .btn-bizneo-primary:hover {
+        background: linear-gradient(135deg, #e55a00 0%, #cc4400 100%);
+        transform: translateY(-1px);
+        box-shadow: 0 6px 20px rgba(255, 107, 53, 0.35);
+        color: white;
+        text-decoration: none;
+      }
+
+      .btn-bizneo-primary:active {
+        transform: translateY(0);
+        box-shadow: 0 2px 8px rgba(255, 107, 53, 0.3);
+      }
+
+      .btn-bizneo-success {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        border: none;
+        border-radius: 8px;
+        padding: 12px 20px;
+        color: white;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
+      }
+
+      .btn-bizneo-success:hover {
+        background: linear-gradient(135deg, #059669 0%, #047857 100%);
+        transform: translateY(-1px);
+        box-shadow: 0 6px 20px rgba(16, 185, 129, 0.35);
+        color: white;
+        text-decoration: none;
+      }
+
+      .btn-bizneo-success:active {
+        transform: translateY(0);
+        box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+      }
+
+      /* Ícones SVG nos botões */
+      .btn-bizneo-primary svg,
+      .btn-bizneo-success svg {
+        flex-shrink: 0;
+      }
+
+      .btn-bizneo-secondary {
+        background: transparent;
+        border: 2px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 10px 18px;
+        color: #374151;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .btn-bizneo-secondary:hover {
+        border-color: #FF6B35;
+        color: #FF6B35;
+        background: #fff5f1;
+        text-decoration: none;
+        transform: translateY(-1px);
+      }
+
+      .btn-bizneo-secondary:active {
+        transform: translateY(0);
+      }
+
+      .btn-bizneo-document {
+        background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 10px 16px;
+        color: #374151;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      }
+
+      .btn-bizneo-document:hover {
+        background: linear-gradient(135deg, #FF6B35 0%, #e55a00 100%);
+        border-color: #FF6B35;
+        color: white;
+        text-decoration: none;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(255, 107, 53, 0.25);
+      }
+
+      .btn-bizneo-document:active {
+        transform: translateY(0);
+      }
+
+      /* Responsividade dos botões */
+      @media (max-width: 768px) {
+
+        .btn-bizneo-primary,
+        .btn-bizneo-success,
+        .btn-bizneo-secondary {
+          width: 100%;
+          justify-content: center;
+          margin-bottom: 8px;
+        }
+      }
+
+      .border-secondary {
+        border-color: #e55a00 !important;
+      }
+
+      .table {
+        background-color: #ffffff;
+        color: #000000;
+      }
+
+      .table th {
+        background-color: #f8f9fa;
+        color: #000000;
+        border-bottom: 2px solid #e55a00;
+      }
+
+      .table td {
+        border-top: 1px solid #dee2e6;
+      }
+
+      main {
+        flex: 1;
+      }
+
+      footer {
+        margin-top: auto;
+      }
+
+      main {
+        flex: 1;
+      }
+
+      footer {
+        margin-top: auto;
+      }
   </style>
 </head>
 
@@ -261,7 +264,7 @@
           <li class="nav-item"><a class="nav-link" href="/">Painel</a></li>
           <li class="nav-item"><a class="nav-link" href="/upload/">Carregar Documento</a></li>
           <li class="nav-item"><a class="nav-link" href="/po/">Encomendas (POs)</a></li>
-          <li class="nav-item"><a class="nav-link" href="/admin/">Administração</a></li>
+          <li class="nav-item"><a class="nav-link" href="/admin/" target="_blank">Administração</a></li>
         </ul>
       </div>
     </div>
