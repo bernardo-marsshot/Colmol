@@ -2,29 +2,68 @@
   "numero_requisicao": "",
   "document_number": "",
   "po_number": "",
-  "supplier_name": "",
-  "delivery_date": "07.10.25",
+  "supplier_name": "N.I.F.\nPag.\nAtendido por",
+  "delivery_date": "09/10/2025",
   "qr_codes": [],
   "produtos": [
     {
-      "artigo": "TERTRES",
-      "descricao": "– ST PARRES AUX",
-      "quantidade": 10410.0,
-      "preco_unitario": 0.0
+      "artigo": "POLIGONO",
+      "descricao": "INDUTRIAL MORERO, NAVE 1",
+      "quantidade": 10.0,
+      "unidade": "UN",
+      "preco_unitario": 0.0,
+      "total": 0.0,
+      "dimensoes": "",
+      "pedido_numero": "",
+      "fecha": "",
+      "proveedor": "N.I.F.\nPag.\nAtendido por",
+      "referencia_ordem": "",
+      "lote_producao": "",
+      "volume": 0,
+      "peso": 0.0,
+      "iva": 21.0
     },
     {
-      "artigo": "TERTRES",
-      "descricao": "– SAINT PARRES AUX",
-      "quantidade": 10410.0,
-      "preco_unitario": 0.0
+      "artigo": "LUSTOPVS135190",
+      "descricao": "COLCHON TOP VISCO 2019 135X190",
+      "quantidade": 4.0,
+      "unidade": "UN",
+      "preco_unitario": 0.0,
+      "total": 0.0,
+      "dimensoes": "135x190",
+      "pedido_numero": "",
+      "fecha": "",
+      "proveedor": "N.I.F.\nPag.\nAtendido por",
+      "referencia_ordem": "",
+      "lote_producao": "",
+      "volume": 0,
+      "peso": 0.0,
+      "iva": 21.0
+    },
+    {
+      "artigo": "LUSTOPVS150190",
+      "descricao": "COLCHON TOP VISCO 2019 150X190",
+      "quantidade": 4.0,
+      "unidade": "UN",
+      "preco_unitario": 0.0,
+      "total": 0.0,
+      "dimensoes": "150x190",
+      "pedido_numero": "",
+      "fecha": "",
+      "proveedor": "N.I.F.\nPag.\nAtendido por",
+      "referencia_ordem": "",
+      "lote_producao": "",
+      "volume": 0,
+      "peso": 0.0,
+      "iva": 21.0
     }
   ],
   "lines": [],
   "totals": {
-    "total_lines": 2,
-    "total_quantity": 20820.0
+    "total_lines": 3,
+    "total_quantity": 18.0
   },
-  "tipo_documento": "BON_COMMANDE",
-  "texto_completo": "--- Página 1 ---\n \n \n \n \n \nDésignation \nQuantité \nPrix unitaire \nMontant \nSTOCK MAGASIN \n \n \n \nMATELAS SAN REMO 140x190 \n2 \n202.00€ \n404.00€ \nMATELAS SAN REMO 180x200 \n2 \n295.00€ \n590.00€ \nMATELAS RIVIERA 180 x 200 \n1 \n489.00€ \n489.00€ \nMATELAS RIVIERA 160 x 200  \n1 \n441.00€ \n441.00€ \nTOTAL \n 1924.00€ \nBON DE COMMANDE : contremarque \nDATE : 07.10.25 \n \nCONTREMARQUE :   STOCK \n \nLivraison demandée pour le : \n \nDÈS QUE POSSIBLE  \nAIRE DES MOISSONS \n10410 – ST PARRES AUX TERTRES \nTél : 03.25.42.45.94/96 \nSarl M3C au capital de 7622.45 € \nSIREN : 423 103 076 \nN° CCE FR 76 423 103 076 \nEntreprise indépendante franchisée \n \nCOLMOL \nADRESSE DE LIVRAISON  \nMAXILITERIE \nZONE COMMERCIALE AIRE DES MOISSONS \n10410 – SAINT PARRES AUX TERTRES",
+  "tipo_documento": "PEDIDO_ESPANHOL",
+  "texto_completo": "--- Página 1 ---\nFecha\nPedido nº\nProveedor\nN.I.F.\nPag.\nAtendido por\n1\nPT500248800\n0000292\nPC5/0005051\n09/10/2025\nADMINISTRA\nPEDIDO\nCOSGUI D.M. S.L.\nB39031059\nPOLIGONO INDUTRIAL MORERO, NAVE 1 10\n39611\nGUARNIZO\n942252861\nNIF.\nfacturacion@cosgui.com\nCOLMOL COLCHOES SA\nZONA INDUSTRIAL DAS CAVADAS APART 119 RUA DO PRO\n3721-\nVILA DE CUCUJAES\n4,00\nCOLCHON TOP VISCO 2019 135X190\nLUSTOPVS135190\n4,00\nCOLCHON TOP VISCO 2019 150X190\nLUSTOPVS150190\nDescripción\nCantidad\nCódigo\nSu Referencia\nNotas :",
   "baixa_qualidade_texto": false
 }

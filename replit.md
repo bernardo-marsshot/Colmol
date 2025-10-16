@@ -56,6 +56,27 @@ The project is built on Django 5.0.6 using Python 3.11, with SQLite for the data
 
 ## Recent Changes
 
+### October 16, 2025 - CORREÇÃO FINAL: Validações em Todos os Formatos Espanhóis
+- **Problema Corrigido**: "POLIGONO" ainda era extraído como produto (Qtd: 10) no Pedido Espanhol
+- **Causa Root**: Parser tinha 3 formatos de extração (buffer multi-linha, formato 1, formato 1B) mas validações só existiam em alguns
+- **Correção Aplicada**:
+  - **Formato 1B**: Adicionada validação #5 que rejeita códigos com palavras: POLIGONO, INDUTRIAL, MORERO, GUARNIZO, PORTUGAL, ESPAÑA, ADMINISTRA
+  - **Formato 1**: Adicionada validação #5 (mesma lista) que antes não existia
+  - **Buffer Multi-linha**: Validação #5 já existia, reforçada lista de palavras
+  - **Todas as validações agora aplicadas uniformemente nos 3 formatos**
+- **Validações Completas (5 níveis)**:
+  1. Código não pode ser número puro (evita NIFs como "500248800")
+  2. Código não pode começar com "PT" (evita NIFs como "PT500248800")
+  3. Quantidade < 100 (evita telefones/códigos postais como "942252861")
+  4. Descrição não pode conter palavras de endereço (POLIGONO, NAVE, CALLE, MORERO, GUARNIZO, ZONA, INDUSTRIAL)
+  5. **Código não pode conter palavras de endereço** (POLIGONO, INDUTRIAL, MORERO, GUARNIZO, PORTUGAL, ESPAÑA, ADMINISTRA)
+- **Resultado**: Pedido Espanhol agora extrai **APENAS 2 produtos válidos**:
+  - LUSTOPVS135190 - COLCHON TOP VISCO 2019 135X190 (Qtd: 4)
+  - LUSTOPVS150190 - COLCHON TOP VISCO 2019 150X190 (Qtd: 4)
+  - ✅ "POLIGONO" é rejeitado corretamente
+  - ✅ "GUARNIZO" é rejeitado corretamente
+  - ✅ Endereços não são extraídos como produtos
+
 ### October 16, 2025 - CORREÇÃO: Quantidades Corretas em Notas de Encomenda
 - **Problemas Corrigidos**:
   1. **Ordem de Compra**: Parser não extraía quantidades no formato "1.000 UN 2025-10-17" quando OCR retornava texto sem separação adequada
@@ -70,9 +91,10 @@ The project is built on Django 5.0.6 using Python 3.11, with SQLite for the data
     - Detecta headers de produto mesmo quando "Désignation", "Quantité", "Prix" estão em linhas separadas
     - Detecta fim de seção de produtos para não extrair endereços (AIRE DES, Tél, SIREN, etc)
   - **Parser Pedido Espanhol Reforçado**:
-    - Validações adicionais no buffer multi-linha para evitar endereços como produtos
-    - Filtra palavras: POLIGONO, NAVE, MORERO, GUARNIZO, ADMINISTRA
-    - Valida que códigos não contenham nomes de cidades/países
+    - Validações aplicadas em **TODOS** os 3 formatos de extração (buffer multi-linha, formato 1, formato 1B)
+    - Filtra palavras no CÓDIGO: POLIGONO, INDUTRIAL, MORERO, GUARNIZO, PORTUGAL, ESPAÑA, ADMINISTRA
+    - Filtra palavras na DESCRIÇÃO: POLIGONO, NAVE, CALLE, MORERO, GUARNIZO, ZONA, INDUSTRIAL
+    - Valida quantidade < 100 (evita telefones/códigos postais)
   - **Filtros de Validação no Parser Genérico**:
     - Rejeita quantidades > 9999 (evita códigos postais como 10410)
     - Filtra palavras de endereço (tertres, moissons, rue, rua, adresse, colmol, maxiliterie, etc)

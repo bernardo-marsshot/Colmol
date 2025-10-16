@@ -2038,8 +2038,11 @@ def parse_pedido_espanhol(text: str):
                 except:
                     pass
                 # 4. Descrição não pode ter palavras de endereço
-                address_words = ['POLIGONO', 'NAVE', 'CALLE', 'RUA', 'AVENIDA', 'ZONA', 'INDUSTRIAL']
+                address_words = ['POLIGONO', 'NAVE', 'CALLE', 'RUA', 'AVENIDA', 'ZONA', 'INDUSTRIAL', 'MORERO', 'GUARNIZO']
                 if any(word in descripcion.upper() for word in address_words):
+                    is_valid = False
+                # 5. Código não pode ter palavras de endereço
+                if any(word in codigo.upper() for word in ['POLIGONO', 'INDUTRIAL', 'MORERO', 'GUARNIZO', 'PORTUGAL', 'ESPAÑA', 'ADMINISTRA']):
                     is_valid = False
                 
                 if is_valid:
@@ -2104,8 +2107,12 @@ def parse_pedido_espanhol(text: str):
                 except:
                     pass
                 # 4. Descrição não pode ter palavras de endereço
-                address_words = ['POLIGONO', 'NAVE', 'CALLE', 'RUA', 'AVENIDA', 'ZONA', 'INDUSTRIAL']
+                address_words = ['POLIGONO', 'NAVE', 'CALLE', 'RUA', 'AVENIDA', 'ZONA', 'INDUSTRIAL', 'MORERO', 'GUARNIZO']
                 if any(word in descripcion.upper() for word in address_words):
+                    i += 1
+                    continue
+                # 5. Código não pode ter palavras de endereço
+                if any(word in codigo.upper() for word in ['POLIGONO', 'INDUTRIAL', 'MORERO', 'GUARNIZO', 'PORTUGAL', 'ESPAÑA', 'ADMINISTRA']):
                     i += 1
                     continue
                 
