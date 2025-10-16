@@ -47,6 +47,17 @@ The project is built on Django 5.0.6 using Python 3.11, with SQLite for the data
 
 ## Recent Changes
 
+### October 16, 2025 - Feature: Múltiplas POs por Documento
+- **Nova Funcionalidade**: Documentos com múltiplas encomendas agora criam uma PO separada para cada
+- **Implementação**:
+  - LLM (Groq/Ollama) extrai `numero_encomenda` por produto
+  - Sistema agrupa produtos por `numero_encomenda`
+  - Cria PO dedicada para cada grupo com produtos corretos
+  - Fallback: se produto sem `numero_encomenda`, usa número do documento
+- **Exemplo**: Documento com Encomenda 11-161050 (2 produtos) e Encomenda 11-161594 (3 produtos) → cria 2 POs separadas
+- **Compatibilidade**: Documentos com encomenda única continuam funcionando normalmente
+- **Architect Review**: Agrupamento e criação de POs aprovados, sem regressões
+
 ### October 16, 2025 - Correção: Agregação de Quantidades em POs Duplicadas
 - **Bug Fix**: Produtos duplicados em múltiplas encomendas agora agregam quantidades automaticamente
 - **Problema Resolvido**: 
