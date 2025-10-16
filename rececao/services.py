@@ -1758,19 +1758,23 @@ def parse_bon_commande(text: str):
         contremarque = cm_match.group(1).strip()
     
     in_product_section = False
+    product_header_found = False
     
     for line in lines:
         stripped = line.strip()
         if not stripped:
             continue
         
-        # Detectar início da seção de produtos
-        if re.search(r'Désignation.*Quantité.*Prix', stripped, re.IGNORECASE):
+        # Detectar início da seção de produtos (palavras-chave podem estar em linhas separadas)
+        if re.search(r'Désignation|Quantité|Prix\s+unitaire', stripped, re.IGNORECASE):
+            product_header_found = True
+        
+        # Se encontramos header e próxima linha não-vazia não é controle, começar extração
+        if product_header_found and not re.search(r'^(Désignation|Quantité|Prix|STOCK)', stripped, re.IGNORECASE):
             in_product_section = True
-            continue
         
         # Detectar fim da seção (TOTAL ou endereço)
-        if re.search(r'^TOTAL|^ADRESSE|^BON DE COMMANDE', stripped, re.IGNORECASE):
+        if re.search(r'^TOTAL|^ADRESSE|^BON DE COMMANDE|^Livraison|^AIRE DES|^Tél|^SIREN', stripped, re.IGNORECASE):
             in_product_section = False
             continue
         
@@ -1919,8 +1923,14 @@ def parse_pedido_espanhol(text: str):
                     pass
                 
                 # 4. Descrição não pode conter palavras de endereço
-                address_words = ['POLIGONO', 'NAVE', 'CALLE', 'RUA', 'AVENIDA', 'ZONA', 'INDUSTRIAL']
-                if any(word in line2.upper() for word in address_words):
+                address_words = ['POLIGONO', 'NAVE', 'CALLE', 'RUA', 'AVENIDA', 'ZONA', 'INDUSTRIAL', 'MORERO', 'GUARNIZO']
+                desc_upper = line2.upper()
+                if any(word in desc_upper for word in address_words):
+                    i += 1
+                    continue
+                
+                # 5. Linha 3 (código) não pode ter palavras (evita "GUARNIZO", "PORTUGAL", etc como código)
+                if any(word in line3.upper() for word in ['GUARNIZO', 'PORTUGAL', 'ESPAÑA', 'FRANCE', 'ADMINISTRA']):
                     i += 1
                     continue
                 

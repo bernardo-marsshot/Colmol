@@ -66,11 +66,17 @@ The project is built on Django 5.0.6 using Python 3.11, with SQLite for the data
     - Linhas separadas: Referência + Descrição / Quantidade + Unidade
     - Linha única (OCR mal separado): `CÓDIGO DESCRIÇÃO QUANTIDADE UNIDADE DATA`
     - Usa `normalize_number()` para converter "1.000" → 1000, "1,5" → 1.5
+  - **Parser Bon de Commande Corrigido**:
+    - Detecta headers de produto mesmo quando "Désignation", "Quantité", "Prix" estão em linhas separadas
+    - Detecta fim de seção de produtos para não extrair endereços (AIRE DES, Tél, SIREN, etc)
+  - **Parser Pedido Espanhol Reforçado**:
+    - Validações adicionais no buffer multi-linha para evitar endereços como produtos
+    - Filtra palavras: POLIGONO, NAVE, MORERO, GUARNIZO, ADMINISTRA
+    - Valida que códigos não contenham nomes de cidades/países
   - **Filtros de Validação no Parser Genérico**:
     - Rejeita quantidades > 9999 (evita códigos postais como 10410)
-    - Filtra palavras de endereço (tertres, moissons, rue, rua, adresse, etc)
+    - Filtra palavras de endereço (tertres, moissons, rue, rua, adresse, colmol, maxiliterie, etc)
     - Rejeita artigos muito curtos ou genéricos
-  - **Parser Bon de Commande**: Já existia e funciona corretamente, agora não é sobrescrito por dados inválidos do genérico
 - **Resultado**: Quantidades agora são extraídas corretamente de documentos portugueses, franceses e espanhóis
 
 ### October 16, 2025 - CORREÇÃO CRÍTICA: OCR Prioridade sobre LLM
