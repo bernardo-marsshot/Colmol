@@ -1258,81 +1258,106 @@ def parse_fatura_elastron(text: str):
     return produtos
 
 
-def parse_guia_colmol(text: str):
-    """Parser específico para Guias de Remessa Colmol."""
+def parse_guia_colmol(text: str, file_path=None):
+    """
+    Parser específico para Guias de Remessa Colmol/Flexipol.
+    O OCR extrai colunas da tabela em blocos separados:
+    - Bloco 1: Códigos de produto
+    - Bloco 2: Descrições (PLACA + dimensões)
+    - Bloco 3: Lotes
+    - Bloco 4: Quantidades
+    - Bloco 5: Unidades
+    """
     produtos = []
     lines = text.split("\n")
     
-    current_encomenda = ""
-    current_requisicao = ""
+    # Encontrar blocos de dados
+    codigos = []
+    descricoes = []
+    lotes = []
+    quantidades = []
+    unidades = []
     
-    for i, line in enumerate(lines):
-        line_stripped = line.strip()
+    i = 0
+    while i < len(lines):
+        line = lines[i].strip()
         
-        if "ENCOMENDA Nº" in line_stripped:
-            encomenda_match = re.search(r'ENCOMENDA Nº\.?\s*(\d+-\d+)', line_stripped)
-            requisicao_match = re.search(r'REQUISICAO Nº\.?\s*(\d+)', line_stripped)
-            if encomenda_match:
-                current_encomenda = encomenda_match.group(1)
-            if requisicao_match:
-                current_requisicao = requisicao_match.group(1)
+        # Detectar bloco de códigos (começam com letras e têm 15 caracteres)
+        if re.match(r'^[A-Z]{3}[A-Z0-9]{12}$', line):
+            # Coletar todos os códigos consecutivos
+            while i < len(lines) and re.match(r'^[A-Z]{3}[A-Z0-9]{12}$', lines[i].strip()):
+                codigos.append(lines[i].strip())
+                i += 1
             continue
         
-        if re.match(r'^[A-Z0-9]{10,}', line_stripped):
-            parts = line_stripped.split()
-            if len(parts) >= 8:
-                try:
-                    codigo = parts[0]
-                    
-                    descricao_parts = []
-                    j = 1
-                    # Parar na descrição quando encontrar: número decimal, unidade (UN/MT/ML), ou padrão CX.
-                    while j < len(parts):
-                        part = parts[j]
-                        # Número decimal (quantidade)
-                        if re.match(r'^\d+[.,]\d+$', part):
-                            break
-                        # Unidades conhecidas (às vezes vem antes da quantidade)
-                        if part.upper() in ['UN', 'MT', 'ML', 'M²', 'M2']:
-                            break
-                        # Padrão de dimensões (CX.1150x...)
-                        if re.match(r'^CX\.\d', part, re.IGNORECASE):
-                            descricao_parts.append(part)
-                            j += 1
-                            break
-                        descricao_parts.append(part)
-                        j += 1
-                    
-                    descricao = ' '.join(descricao_parts)
-                    
-                    # Agora procurar quantidade (pode ter espaços antes)
-                    while j < len(parts) and not re.match(r'^\d+[.,]\d+$', parts[j]):
-                        j += 1
-                    
-                    quantidade = normalize_number(parts[j]) if j < len(parts) else 0.0
-                    unidade = parts[j+1] if j+1 < len(parts) else "UN"
-                    med1 = normalize_number(parts[j+2]) if j+2 < len(parts) else 0.0
-                    med2 = normalize_number(parts[j+3]) if j+3 < len(parts) else 0.0
-                    med3 = normalize_number(parts[j+4]) if j+4 < len(parts) else 0.0
-                    peso = normalize_number(parts[j+5]) if j+5 < len(parts) else 0.0
-                    iva = normalize_number(parts[j+6]) if j+6 < len(parts) else 23.0
-                    
-                    produtos.append({
-                        "referencia_ordem": f"{current_encomenda} / Req {current_requisicao}",
-                        "artigo": codigo,
-                        "descricao": descricao,
-                        "lote_producao": "",
-                        "quantidade": quantidade,
-                        "unidade": unidade,
-                        "volume": 0,
-                        "dimensoes": f"{med1}x{med2}x{med3}",
-                        "peso": peso,
-                        "iva": iva,
-                        "total": 0.0
-                    })
-                except (ValueError, IndexError) as e:
-                    print(f"⚠️ Erro ao parsear linha Colmol: {e}")
-                    continue
+        # Detectar bloco de descrições (contém PLACA ou ROLO)
+        if 'PLACA' in line or 'ROLO' in line:
+            # Coletar todas as descrições consecutivas
+            while i < len(lines) and ('PLACA' in lines[i] or 'ROLO' in lines[i] or 'x' in lines[i].lower()):
+                descricoes.append(lines[i].strip())
+                i += 1
+                if i < len(lines) and lines[i].strip() and not ('PLACA' in lines[i] or 'ROLO' in lines[i] or 'x' in lines[i].lower()):
+                    break
+            continue
+        
+        # Detectar bloco de lotes (padrão: número espaço letras, ex: "23 D AZ", "HR 35 D BG")
+        if re.match(r'^(\d+|[A-Z]{2,})\s+[A-Z]', line):
+            # Coletar todos os lotes consecutivos
+            while i < len(lines) and re.match(r'^(\d+|[A-Z]{2,})\s+[A-Z]', lines[i].strip()):
+                lotes.append(lines[i].strip())
+                i += 1
+            continue
+        
+        # Detectar bloco de quantidades (números com vírgula)
+        if re.match(r'^\d+,\d+$', line):
+            # Coletar todas as quantidades consecutivas
+            while i < len(lines) and re.match(r'^\d+,\d+$', lines[i].strip()):
+                quantidades.append(lines[i].strip())
+                i += 1
+            continue
+        
+        # Detectar bloco de unidades (UN, ML, MT, etc.)
+        if line in ['UN', 'ML', 'MT', 'M2', 'M²', 'KG']:
+            # Coletar todas as unidades consecutivas
+            while i < len(lines) and lines[i].strip() in ['UN', 'ML', 'MT', 'M2', 'M²', 'KG']:
+                unidades.append(lines[i].strip())
+                i += 1
+            continue
+        
+        i += 1
+    
+    # Associar os dados (cada lista deve ter o mesmo tamanho)
+    min_len = min(len(codigos), len(descricoes), len(lotes), len(quantidades))
+    
+    print(f"📊 Blocos encontrados: {len(codigos)} códigos, {len(descricoes)} descrições, {len(lotes)} lotes, {len(quantidades)} quantidades")
+    
+    for i in range(min_len):
+        codigo = codigos[i]
+        descricao = descricoes[i]
+        lote = lotes[i]
+        quantidade_str = quantidades[i]
+        unidade = unidades[i] if i < len(unidades) else 'UN'
+        
+        try:
+            quantidade = normalize_number(quantidade_str)
+        except:
+            quantidade = 0.0
+        
+        if quantidade > 0:
+            produtos.append({
+                "referencia_ordem": "",
+                "artigo": codigo,
+                "descricao": descricao,
+                "lote_producao": lote,
+                "quantidade": quantidade,
+                "unidade": unidade,
+                "volume": 0,
+                "dimensoes": "",
+                "peso": 0.0,
+                "iva": 23.0,
+                "total": 0.0
+            })
+            print(f"✅ Produto {i+1}: {codigo} | {descricao} | Lote: {lote} | Qtd: {quantidade} {unidade}")
     
     return produtos
 
@@ -2380,7 +2405,7 @@ def parse_portuguese_document(text: str, qr_codes=None, texto_pdfplumber_curto=F
                 result["produtos"] = produtos
                 print(f"✅ Extraídos {len(produtos)} produtos com parser genérico")
     elif doc_type == "GUIA_COLMOL":
-        produtos = parse_guia_colmol(text)
+        produtos = parse_guia_colmol(text, file_path=file_path)
         if produtos:
             result["produtos"] = produtos
             result["supplier_name"] = "Colmol - Colchões S.A"
