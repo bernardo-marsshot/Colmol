@@ -54,6 +54,54 @@ The project is built on Django 5.0.6 using Python 3.11, with SQLite for the data
 
 ## Recent Changes
 
+### October 16, 2025 - Sistema Inteligente de Detecção e Fallback OCR para Documentos Complexos
+- **Problema Identificado**: PDFs complexos com tabelas multi-página não extraíam todos os produtos
+  - PyPDF2 extraía apenas cabeçalhos de tabelas, não o conteúdo das linhas
+  - Documentos com múltiplas seções "Continua" tinham extração incompleta
+  - Parsers retornavam 0 produtos apesar de códigos estarem presentes no texto
+  
+- **Solução Implementada - Detecção de Incompletude Pós-Parsing (linhas 656-684)**:
+  - **Caso 1 - Falha Completa**: Parser retorna 0 produtos MAS há >5 códigos únicos no texto
+    - Detecta que PyPDF2 extraiu apenas cabeçalhos, não tabelas
+  - **Caso 2 - Extração Parcial**: Parser retorna < 60% das ocorrências TOTAIS de códigos (incluindo duplicados) E há >10 ocorrências
+    - Conta TODAS as ocorrências (não só únicos) - representa linhas potenciais com lotes/duplicados
+    - Detecta extração parcial significativa (ex: 30 linhas parseadas de 72 ocorrências)
+  - **Ação**: Força OCR completo automaticamente com Tesseract
+  - **Resultado**: Re-parseia texto OCR e extrai produtos corretamente
+  
+- **Evita Falsos Positivos**:
+  - Caso 1: Só ativa com >5 códigos únicos (evita documentos mínimos)
+  - Caso 2: Só ativa com >10 ocorrências totais E < 60% parseado (tolera variações, detecta perdas significativas)
+  - Documentos pequenos legítimos (1-10 produtos) usam PyPDF2 normalmente
+  - Threshold 60% permite margem mas ainda detecta incompletude real
+  
+- **Otimização do OCR (linhas 954-1006)**:
+  - Simplificado para usar **Tesseract direto** (leve, evita problemas de memória)
+  - Removida cascata complexa PaddleOCR → EasyOCR (causava OOM kills)
+  - Timeout por página: 120s
+  - Processamento sequencial com feedback de progresso
+  
+- **Bug Fixes**:
+  - Corrigido parâmetro `cls=True` incompatível no PaddleOCR
+  
+- **Resultados de Teste**:
+  - ✅ PDF complexo (3 páginas, 4 seções "Continua"): **24 produtos, 479.000 unidades** extraídos
+  - ✅ Detecção crítica ativou após parser retornar 0 produtos (PyPDF2 extraiu apenas cabeçalhos)
+  - ✅ OCR Tesseract processou 3 páginas (~3.5min) e extraiu tabelas corretamente
+  - ✅ Sistema totalmente automático - zero intervenção manual necessária
+  - ✅ **Sem falsos positivos**: Documentos pequenos legítimos usam PyPDF2 normalmente
+  
+- **Fluxo Completo do Sistema**:
+  ```
+  1. PyPDF2 extrai texto (rápido, sempre primeiro)
+  2. Parser processa texto extraído
+  3. SE parser retorna 0 produtos MAS há códigos no texto:
+     → Sistema detecta que PyPDF2 extraiu apenas cabeçalhos
+     → Força OCR Tesseract completo
+     → Re-parseia texto OCR
+  4. Extração bem-sucedida
+  ```
+
 ### October 16, 2025 - Correção: Normalização Consistente de Números em Todos os Parsers
 - **Problema Identificado**: Função `normalize_number` aninhada em `parse_fatura_elastron` sobrescrevia a função global
 - **Função Aninhada Removida** (linhas 1109-1128):
