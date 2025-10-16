@@ -1105,28 +1105,6 @@ def extract_guia_remessa_products(text: str):
         prod_match = product_pattern.match(stripped)
         if prod_match:
             try:
-                # Função auxiliar para normalizar números PT/EN
-                def normalize_number(value: str) -> float:
-                    """
-                    Converte número para float, suportando formatos PT e EN.
-                    PT: 1.234,56 (ponto=milhares, vírgula=decimal)
-                    EN: 1,234.56 ou 1234.56 (ponto=decimal)
-                    """
-                    value = value.strip()
-
-                    # Se tem vírgula, assume formato PT (vírgula é decimal)
-                    if "," in value:
-                        # Remove pontos (separadores de milhares)
-                        value = value.replace(".", "")
-                        # Substitui vírgula por ponto
-                        value = value.replace(",", ".")
-                    # Se tem ponto mas não tem vírgula, assume formato EN (ponto é decimal)
-                    # Remove apenas vírgulas que seriam separadores de milhares
-                    else:
-                        value = value.replace(",", "")
-
-                    return float(value)
-
                 artigo = prod_match.group(1).strip()
                 total = normalize_number(prod_match.group(2))
                 volume = normalize_number(prod_match.group(3))
