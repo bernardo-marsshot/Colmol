@@ -15,6 +15,14 @@ class PurchaseOrder(models.Model):
 
     def __str__(self):
         return self.number
+    
+    @property
+    def is_complete(self):
+        """PO está completa quando TODAS as linhas têm qty_remaining = 0"""
+        lines = self.lines.all()
+        if not lines.exists():
+            return False
+        return all(line.is_complete for line in lines)
 
 class POLine(models.Model):
     po = models.ForeignKey(PurchaseOrder, on_delete=models.CASCADE, related_name='lines')
@@ -22,6 +30,7 @@ class POLine(models.Model):
     description = models.CharField(max_length=255, blank=True)
     unit = models.CharField(max_length=20, default='UN')
     qty_ordered = models.DecimalField(max_digits=12, decimal_places=2)
+    qty_received = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     tolerance = models.DecimalField(max_digits=6, decimal_places=2, default=0)  # tolerância admitida
 
     class Meta:
@@ -29,6 +38,16 @@ class POLine(models.Model):
 
     def __str__(self):
         return f"{self.po.number} · {self.internal_sku}"
+    
+    @property
+    def qty_remaining(self):
+        """Quantidade em falta = pedida - recebida"""
+        return self.qty_ordered - self.qty_received
+    
+    @property
+    def is_complete(self):
+        """Linha está completa quando qty_remaining <= 0"""
+        return self.qty_remaining <= 0
 
 class CodeMapping(models.Model):
     supplier = models.ForeignKey(Supplier, on_delete=models.CASCADE, related_name='code_mappings')
