@@ -44,3 +44,22 @@ The project is built on Django 5.0.6 using Python 3.11, with SQLite for the data
     -   **pdfplumber**: Advanced PDF parsing and table detection.
     -   **rapidfuzz**: Fuzzy string matching for multi-language field detection.
 -   **Database**: SQLite (db.sqlite3).
+
+## Recent Changes
+
+### October 16, 2025 - Correção: Vinculação de PO Antes de Exceções
+- **Bug Fix**: Vinculação de PO agora acontece ANTES de qualquer exceção ou matching
+- **Ordem de Processamento Corrigida**:
+  1. Criar linhas de receção
+  2. **Vincular PO** (usando `po_number` ou `document_number` do payload)
+  3. **Se GR sem PO** → adicionar exceção "PO não identificada" ao array (antes do matching)
+  4. Matching (apenas se tiver PO)
+  5. Recriar exceções (preserva exceção de PO)
+- **Problema Resolvido**: 
+  - Anteriormente, exceção "PO não identificada" era criada após matching
+  - Agora é criada ANTES, mostrando número extraído para debug
+- **Benefícios**:
+  - Exceções aparecem na ordem correta
+  - Número da PO extraído é mostrado mesmo quando não encontrada
+  - Evita tentativas de matching sem PO vinculada
+- **Architect Review**: Bug de exceção deletada corrigido - exceção é preservada corretamente

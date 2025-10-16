@@ -2849,15 +2849,18 @@ def process_inbound(inbound: InboundDocument):
             qty_received=ml.get("qty", 0),
         )
 
-    # ligar à PO (se existir e ainda não estiver vinculada)
+    # ===== VINCULAÇÃO DE PO (ANTES DE QUALQUER EXCEÇÃO/MATCHING) =====
     # NOTA: Se doc_type == 'FT', já criou e vinculou PO acima, não desvincular!
     if not inbound.po:
-        po = PurchaseOrder.objects.filter(number=payload.get("po_number")).first()
-        if po:
-            inbound.po = po
-            inbound.save()
+        po_number = payload.get("po_number") or payload.get("document_number")
+        if po_number:
+            po = PurchaseOrder.objects.filter(number=po_number).first()
+            if po:
+                inbound.po = po
+                inbound.save()
+                print(f"🔗 PO vinculada: {po.number}")
 
-    # Matching
+    # ===== MATCHING =====
     ok = 0
     issues = 0
     exceptions = []
@@ -2866,6 +2869,15 @@ def process_inbound(inbound: InboundDocument):
         print("📋 Nota de Encomenda: SKIP matching (PO criada, aguarda guias de remessa)")
         doc_items = payload.get("produtos", payload.get("lines", []))
         ok = len(doc_items)
+    elif inbound.doc_type == 'GR' and not inbound.po:
+        # GR sem PO: criar exceção ANTES do matching
+        issues = 1
+        po_number_extracted = payload.get('po_number') or payload.get('document_number') or 'N/A'
+        exceptions.append({
+            "line": "PO",
+            "issue": f"PO não identificada - número extraído: {po_number_extracted}"
+        })
+        print(f"⚠️ Guia de Remessa sem PO vinculada - exceção criada (PO extraído: {po_number_extracted})")
     elif inbound.po:
         from .models import POLine
         
@@ -2915,13 +2927,6 @@ def process_inbound(inbound: InboundDocument):
             print(f"✅ {internal_sku}: recebida {qty_new}, total {qty_total_received}/{qty_ordered}")
             
             ok += 1
-    else:
-        for r in inbound.lines.all():
-            issues += 1
-            exceptions.append({
-                "line": r.supplier_code,
-                "issue": "PO não identificada"
-            })
 
     res, _ = MatchResult.objects.get_or_create(inbound=inbound)
 
