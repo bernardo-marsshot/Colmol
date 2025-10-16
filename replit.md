@@ -52,14 +52,17 @@ The project is built on Django 5.0.6 using Python 3.11, with SQLite for the data
 - **Problema Resolvido**: 
   - Notas de Encomenda com múltiplas encomendas continham produtos repetidos
   - Sistema falhava com `UNIQUE constraint failed: rececao_poline.po_id, rececao_poline.internal_sku`
+  - Erro de tipo: `unsupported operand type(s) for +=: 'decimal.Decimal' and 'float'`
 - **Solução Implementada**:
   - Substituído `POLine.objects.create()` por `get_or_create()`
   - Quando produto já existe na PO → soma quantidades automaticamente
+  - Conversão `Decimal(str(...))` para compatibilidade com DecimalField
   - Log mostra agregação: "📊 Agregado X unidades ao produto Y (total: Z)"
 - **Benefícios**:
   - Documentos complexos processados sem erros
   - Quantidades corretas (soma de todas ocorrências)
   - Descrição e unidade preservadas da primeira ocorrência
+  - Precisão numérica mantida com Decimal
 - **Architect Review**: Correção aprovada - quantidades agregadas corretamente, sem regressões
 
 ### October 16, 2025 - Correção: Vinculação de PO Antes de Exceções
