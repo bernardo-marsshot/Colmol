@@ -2870,12 +2870,19 @@ def process_inbound(inbound: InboundDocument):
         produtos_invalidos = 0
         for produto in produtos_extraidos:
             codigo = produto.get('artigo') or ''
+            descricao = produto.get('descricao') or ''
             quantidade = produto.get('quantidade', 0)
             
-            # Produto inválido se:
-            # - Código muito curto (<5 chars), vazio, ou None
-            # - Quantidade = 0 ou inválida
-            if not codigo or len(str(codigo)) < 5 or quantidade <= 0:
+            # Produto é VÁLIDO se:
+            # - Tem código válido (≥5 chars) E quantidade > 0, OU
+            # - Não tem código MAS tem descrição válida (≥10 chars) E quantidade > 0
+            tem_codigo_valido = codigo and len(str(codigo)) >= 5
+            tem_descricao_valida = descricao and len(str(descricao)) >= 10
+            tem_quantidade_valida = quantidade > 0
+            
+            produto_valido = (tem_codigo_valido or tem_descricao_valida) and tem_quantidade_valida
+            
+            if not produto_valido:
                 produtos_invalidos += 1
         
         # Se >50% dos produtos são inválidos, ficheiro está desformatado
@@ -2884,7 +2891,7 @@ def process_inbound(inbound: InboundDocument):
             ExceptionTask.objects.create(
                 inbound=inbound,
                 line_ref="OCR",
-                issue=f"Ficheiro desformatado - {produtos_invalidos}/{len(produtos_extraidos)} produtos com dados inválidos (códigos curtos ou quantidades zero)"
+                issue=f"Ficheiro desformatado - {produtos_invalidos}/{len(produtos_extraidos)} produtos com dados inválidos (sem código E sem descrição, ou quantidades zero)"
             )
 
     # criar linhas de receção
