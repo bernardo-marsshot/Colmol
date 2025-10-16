@@ -1381,7 +1381,8 @@ def parse_guia_colmol(text: str):
         
         if re.match(r'^[A-Z0-9]{10,}', line_stripped):
             parts = line_stripped.split()
-            if len(parts) >= 8:
+            # Tolerância: Aceitar linhas com pelo menos 3 partes (código + descrição + algo)
+            if len(parts) >= 3:
                 try:
                     codigo = parts[0]
                     
@@ -1410,7 +1411,21 @@ def parse_guia_colmol(text: str):
                     while j < len(parts) and not re.match(r'^\d+[.,]\d+$', parts[j]):
                         j += 1
                     
-                    quantidade = normalize_number(parts[j]) if j < len(parts) else 0.0
+                    # FALLBACK: Se não encontrar quantidade válida, tentar extrair de qualquer número na linha
+                    quantidade = 0.0
+                    if j < len(parts):
+                        quantidade = normalize_number(parts[j])
+                    else:
+                        # Buscar qualquer número na linha (fallback para dados corrompidos)
+                        for part in parts[1:]:  # Skip código (parts[0])
+                            try:
+                                num = normalize_number(part)
+                                if num > 0:
+                                    quantidade = num
+                                    break
+                            except:
+                                continue
+                    
                     unidade = parts[j+1] if j+1 < len(parts) else "UN"
                     med1 = normalize_number(parts[j+2]) if j+2 < len(parts) else 0.0
                     med2 = normalize_number(parts[j+3]) if j+3 < len(parts) else 0.0
@@ -1418,21 +1433,23 @@ def parse_guia_colmol(text: str):
                     peso = normalize_number(parts[j+5]) if j+5 < len(parts) else 0.0
                     iva = normalize_number(parts[j+6]) if j+6 < len(parts) else 23.0
                     
-                    produtos.append({
-                        "referencia_ordem": f"{current_encomenda} / Req {current_requisicao}",
-                        "artigo": codigo,
-                        "descricao": descricao,
-                        "lote_producao": "",
-                        "quantidade": quantidade,
-                        "unidade": unidade,
-                        "volume": 0,
-                        "dimensoes": f"{med1}x{med2}x{med3}",
-                        "peso": peso,
-                        "iva": iva,
-                        "total": 0.0
-                    })
+                    # Só adicionar se tiver código E (descrição OU quantidade válida)
+                    if codigo and (descricao or quantidade > 0):
+                        produtos.append({
+                            "referencia_ordem": f"{current_encomenda} / Req {current_requisicao}",
+                            "artigo": codigo,
+                            "descricao": descricao,
+                            "lote_producao": "",
+                            "quantidade": quantidade,
+                            "unidade": unidade,
+                            "volume": 0,
+                            "dimensoes": f"{med1}x{med2}x{med3}",
+                            "peso": peso,
+                            "iva": iva,
+                            "total": 0.0
+                        })
                 except (ValueError, IndexError) as e:
-                    print(f"⚠️ Erro ao parsear linha Colmol: {e}")
+                    print(f"⚠️ Erro ao parsear linha Colmol '{line_stripped[:80]}': {e}")
                     continue
     
     return produtos
