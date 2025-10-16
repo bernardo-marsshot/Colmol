@@ -167,3 +167,30 @@ The project is built on Django 5.0.6 using Python 3.11, with SQLite for the data
   - Documentos ilegíveis/corrompidos são identificados visualmente
   - Não mistura falhas técnicas com exceções de negócio
 - **Architect Review**: Aprovado - exceções de OCR preservadas corretamente, status diferenciado sem regressões
+
+### October 16, 2025 - Feature: Sistema de Retry Progressivo para PDFs Multi-Página
+- **Problema Resolvido**: PDFs com múltiplas páginas devem ser processados de forma resiliente
+- **Implementação em `extract_text_from_pdf_with_ocr`**:
+  - **Rastreamento por Página**: Cada página tem estado independente (`text`, `qr_codes`, `attempts`, `success`)
+  - **Loop de Retry Inteligente**:
+    - Tenta extrair todas as páginas
+    - Se alguma falhar → guarda o que já foi extraído
+    - Tenta novamente APENAS as páginas que falharam
+    - Repete até 3 tentativas por página
+  - **Preservação de Progresso**:
+    - Páginas bem-sucedidas não são reprocessadas
+    - QR codes salvos apenas na primeira tentativa (evita duplicados)
+    - Texto consolidado de todas as páginas que conseguiram ser extraídas
+  - **Limite de Tentativas**: Máximo 3 tentativas por página para evitar loops infinitos
+  - **Aguardo entre Retries**: 1 segundo entre rounds de retry para dar "tempo de respiração"
+- **Exemplo de Fluxo**:
+  - **Tentativa 1**: Página 1 ✅, Página 2 ❌, Página 3 ✅
+  - **Tentativa 2** (apenas Página 2): Página 2 ✅
+  - **Resultado**: 3/3 páginas extraídas, texto consolidado completo
+- **Cascata de OCR Mantida**: PaddleOCR → EasyOCR → Tesseract (cada tentativa usa os 3 engines)
+- **Benefícios**:
+  - PDFs com páginas problemáticas não bloqueiam extração das outras
+  - Sistema resiliente: continua tentando até conseguir ou esgotar tentativas
+  - Resultados parciais sempre retornados (melhor que falha total)
+  - Logs detalhados: `✅ OCR completo: X/Y páginas extraídas`
+- **Architect Review**: Aprovado - retry progressivo funciona, progresso preservado, sem loops infinitos
