@@ -1,37 +1,46 @@
 {
-  "numero_requisicao": "UISI",
-  "document_number": "DE",
-  "po_number": "DE",
-  "supplier_name": "",
-  "delivery_date": "25-09-10",
-  "qr_codes": [
+  "numero_requisicao": "",
+  "document_number": "",
+  "po_number": "",
+  "supplier_name": "Contribuinte\tData\tPágina",
+  "delivery_date": "25-10-08",
+  "qr_codes": [],
+  "produtos": [
     {
-      "data": {
-        "nif_emitente": "500102430",
-        "nif_adquirente": "500248800",
-        "pais_adquirente": "PT",
-        "tipo_documento": "GR",
-        "estado_documento": "F",
-        "data_documento": "20250910",
-        "identificacao_documento": "GR 11/82873",
-        "atcud": "JF47HG32-82873",
-        "espaco_fiscal": "0",
-        "total_impostos": "0.00",
-        "total_documento": "0.00",
-        "hash": "L7i6",
-        "certificado": "401"
-      },
-      "raw_data": "A:500102430*B:500248800*C:PT*D:GR*E:F*F:20250910*G:GR 11/82873*H:JF47HG32-82873*I1:0*N:0.00*O:0.00*Q:L7i6*R:401",
-      "page": 1
+      "artigo": "26.100145",
+      "descricao": "COLCHAO 1,95X1,40=27\"SPA CHERRY VISCO\"COLMOL",
+      "quantidade": 1.0,
+      "unidade": "UN",
+      "data_entrega": "2025-10-17",
+      "dimensoes": "1.95x1.40",
+      "referencia_ordem": "",
+      "lote_producao": "",
+      "volume": 0,
+      "peso": 0.0,
+      "iva": 23.0,
+      "total": 0.0
+    },
+    {
+      "artigo": "26.100100",
+      "descricao": "COLCHAO 1,83X1,33=24Cm ORTOPEDICO\"KOLUNA \"COLMOL",
+      "quantidade": 3.0,
+      "unidade": "UN",
+      "data_entrega": "2025-10-17",
+      "dimensoes": "1.83x1.33",
+      "referencia_ordem": "",
+      "lote_producao": "",
+      "volume": 0,
+      "peso": 0.0,
+      "iva": 23.0,
+      "total": 0.0
     }
   ],
-  "produtos": [],
   "lines": [],
   "totals": {
-    "total_lines": 0,
-    "total_quantity": 0
+    "total_lines": 2,
+    "total_quantity": 4.0
   },
-  "tipo_documento": "GUIA_COLMOL",
-  "texto_completo": "--- Página 1 ---\nATCUD:JF47HG32-82873\nGuia de Remessa GR 11/82873\nQUADRUPLICADO\n \n \nL7i6-Processado por programa certificado n.º401/AT\nEUROSPUMA-SOC.IND.ESPUMAS SINT. S.A.\nCapital social 14.500.000,00 EUR\nNIF PT 500102430\nRegisto comercial C.R.C. ESPINHO\nGuetim - Apartado 95\nWebsite\nWWW.EUROSPUMA.COM\nE-mail\ngeral@eurospuma.pt/comercial@eurospuma.pt\n4501-909 ESPINHO\nTelefone\n227 335 000\n(Chamada para a rede fixa nacional)\nFax\n227 335 030\n1\n/\n2\nData\n2025-09-10\nCliente\n2111 012913\nNIF\nIVA PT 500248800\nCondição pagamento\n90 DIAS RESUMO\nVia expedição\nTRANSP. (THC)\nVendedor\nJOSÉ DOMINGOS\nCódigo AT\n17878756579\nExmo(s). Sr(s).\nCOLMOL-COLCHÕES, S.A.\nZONA IND.DAS CAVADAS - APARTADO 115\nVILA DE CUCUJÃES\n3721-908 - VILA DE CUCUJÃES\n \nSÓ NOS RESPONSABILIZAMOS DA VENDA DE PRODUTOS COM CERTIFICAÇÃO OEKO-TEX® QUANDO SOLICITADO POR ESCRITO.\nNº DE REGISTO DE PRODUTOR DE PRODUTOS (EMBALAGENS): PT01103479\n34 VOLUME(S)\nCódigo\nDescrição\nQuantidade\nMedida 1 Medida 2 Medida 3\nQtd. preço\nEncomenda nr 11 - 161050\nVossa requisição 4038\nCBAGD00067\nCX EUROSPUMA 3044 VE\n125,000 UN\n1,880\n0,150\n0,080\n84,600 KG\nCX E190D30 - PACOTES DE 25 CX.\nEncomenda nr 11 - 161594\nVossa requisição 4197\n43106026\nPM-B 200 TRANCHADO\n640,000 MT\n320,000\n0,260\n33,280 KG\nFIBRA 100% POLIESTER\nAF26\n42952210\nPM-A 290 COL\n300,000 MT\n30,000\n2,100\n182,700 KG\nFIBRA 100% POLIESTER\nA300\nEncomenda nr 11 - 161659\nVossa requisição 4221\nCBACF00466\nCX EUROSPUMA 2350 LA\n75,000 UN\n1,410\n0,150\n0,070\n25,539 KG\nE160LA\nCBACF00467\nCX EUROSPUMA 2350 LA\n75,000 UN\n1,200\n0,150\n0,070\n21,735 KG\nE140LA\n43106028\nPM-B 200 TRANCHADO\n560,000 MT\n280,000\n0,280\n31,360 KG\nFIBRA 100% POLIESTER\nAF28\nEncomenda nr 11 - 161682\nVossa requisição 4247\n43106032\nPM-B 200 TRANCHADO\n280,000 MT\n280,000\n0,320\n17,920 KG\nFIBRA 100% POLIESTER\nAF32\n43106030\nPM-B 200 TRANCHADO\n280,000 MT\n280,000\n0,300\n16,800 KG\nFIBRA 100% POLIESTER\nAF30\n43106022\nPM-B 200 TRANCHADO\n360,000 MT\n360,000\n0,220\n15,840 KG\nFIBRA 100% POLIESTER\nAF22\n43105018\nPM-B 150 TRANCHADO\n500,000 MT\n500,000\n0,180\n13,500 KG\nFIBRA 100% POLIESTER\nAF18\nEncomenda nr 11 - 161749\nVossa requisição 4288\n\n\n--- Página 2 ---\nGuia de Remessa GR 11/82873\nATCUD:JF47HG32-82873\nQUADRUPLICADO\n \n \nL7i6-Processado por programa certificado n.º401/AT\nEUROSPUMA-SOC.IND.ESPUMAS SINT. S.A.\nCapital social 14.500.000,00 EUR\nNIF PT 500102430\nRegisto comercial C.R.C. ESPINHO\nGuetim - Apartado 95\nWebsite\nWWW.EUROSPUMA.COM\nE-mail\ngeral@eurospuma.pt/comercial@eurospuma.pt\n4501-909 ESPINHO\nTelefone\n227 335 000\n(Chamada para a rede fixa nacional)\nFax\n227 335 030\n2\n/\n2\nCódigo\nDescrição\nQuantidade\nMedida 1 Medida 2 Medida 3\nQtd. preço\n42952210\nPM-A 290 COL\n150,000 MT\n30,000\n2,100\n91,350 KG\nFIBRA 100% POLIESTER\nA300\nLOCAL DE CARGA\nLOCAL DE DESCARGA\nMatrícula C-70840\nReboque\nPartida\n2025-09-10\nHora\n10:05\nChegada  \nHora  \nRecebido por  \nR.LAGOS - GUETIM\nESPINHO\n4500-423 ESPINHO\nCOLMOL-COLCHÕES, S.A.\nZONA IND.DAS CAVADAS - APARTADO 115\nVILA DE CUCUJÃES\n3721-908 VILA DE CUCUJÃES\nPT PORTUGAL\n** Este documento não serve como Fatura **\nCópia de documento não válida para os fins previstos no Regime Tributário Complementar dos Bens em Circulação",
+  "tipo_documento": "ORDEM_COMPRA",
+  "texto_completo": "S & F\t\r\nSantos e Fernandes\t\r\nArmazém de Utilidades Porlar, Lda.\tCOLMOL - COLCHOES, SA\t\r\nZONA INDUSTRIAL CAVADAS\t\r\nR. Liberdade n.21\tAPARTADO 115\t\r\nAlgar\t\r\n3040-656 Coimbra\t3721-908 VILA CUCUJAES\t\r\nTelef.: 239802670 - Tlm.: 917594110\tPORTUGAL\t\r\nWeb: www.catalogosantosefernandes.pt\t\r\nContribuinte n° 501931414\t\r\nSociedade por Quotas - Capital Social: 399.038,31 Euros\t\r\nMatriculada na C.R.C. Coimbra sob o n° 4781\t\r\nORIGINAL\t\r\nORDEM COMPRA N° OC250000525\t\r\nFORNECEDOR CONTRIBUINTE\tDATA\tPÁGINA\t\r\n00072\t500248800\t2025-10-08\t1/1\t\r\nREFERÊNCIA\tDESCRIÇÃO\tQUANTIDADE\tP. UNITARIO\tDESC.\tLIQUIDO ENTREGA\t\r\n26.100145\tCOLCHAO 1,95X1,40=27\"SPA CHERRY VISCO\"COLMOL\t1.000 UN\t2025-10-17\t\r\n26.100100\tCOLCHAO 1,83X1,33=24Cm ORTOPEDICO\"KOLUNA \"COLMOL\t3.000 UN\t2025-10-17\t\r\nProcessado por computador - xSoft\t\r\nLOCAL DE ENTREGA:\t\r\nO Dep. Compras",
   "baixa_qualidade_texto": false
 }
