@@ -15,3 +15,4 @@ easyocr
 camelot-py[base]
 pdfplumber
 rapidfuzz
+pymupdf
