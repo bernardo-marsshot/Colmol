@@ -22,6 +22,15 @@ from django.db import transaction
 from .models import (InboundDocument, ReceiptLine, CodeMapping, MatchResult,
                      ExceptionTask, POLine, PurchaseOrder)
 
+# PyMuPDF for better PDF text extraction
+try:
+    import fitz  # PyMuPDF
+    PYMUPDF_AVAILABLE = True
+    print("✅ PyMuPDF disponível para extração avançada de PDF")
+except ImportError:
+    PYMUPDF_AVAILABLE = False
+    print("⚠️ PyMuPDF não disponível")
+
 # --- QR code detection (usando OpenCV) ---
 try:
     import cv2
@@ -611,8 +620,14 @@ def real_ocr_extract(file_path: str):
 
     print(f"🔍 Processando com Tesseract: {os.path.basename(file_path)}")
     
+    # Flag para controlar se usamos PyMuPDF
+    used_pymupdf = False
+    
     if ext == ".pdf":
         text_content, qr_codes = extract_text_from_pdf(file_path)
+        # Verificar se PyMuPDF foi usado (texto contém marcadores de página)
+        if "--- Página" in text_content:
+            used_pymupdf = True
     elif ext in [".jpg", ".jpeg", ".png", ".tiff", ".bmp"]:
         text_content, qr_codes = extract_text_from_image(file_path)
 
@@ -649,19 +664,105 @@ def real_ocr_extract(file_path: str):
         return error_result
 
     result = parse_portuguese_document(text_content, qr_codes, texto_pdfplumber_curto, file_path=file_path)
+    
+    # FALLBACK INTELIGENTE: Se PyMuPDF foi usado mas nenhum produto foi extraído,
+    # fazer fallback para pdfplumber que tem melhor compatibilidade com parsers existentes
+    produtos_extraidos = len(result.get('produtos', []))
+    if used_pymupdf and produtos_extraidos == 0 and ext == ".pdf":
+        # Verificar se o texto contém códigos de produtos (indica que há dados para extrair)
+        import re
+        tem_codigos = bool(re.search(r'\b[A-Z]{3}\d{12}\b', text_content))
+        
+        if tem_codigos:
+            print("🔄 PyMuPDF extraiu texto mas parser retornou 0 produtos - fallback para pdfplumber...")
+            # Forçar uso de pdfplumber/Tesseract
+            try:
+                import pdfplumber
+                text_pdfplumber = ""
+                with pdfplumber.open(file_path) as pdf:
+                    for page in pdf.pages:
+                        page_text = page.extract_text() or ""
+                        text_pdfplumber += page_text + "\n"
+                
+                if text_pdfplumber.strip():
+                    print(f"✅ pdfplumber fallback: {len(text_pdfplumber)} chars")
+                    result = parse_portuguese_document(text_pdfplumber, qr_codes, False, file_path=file_path)
+                    produtos_extraidos = len(result.get('produtos', []))
+                    print(f"✅ Fallback result: {produtos_extraidos} produtos extraídos")
+            except Exception as e:
+                print(f"⚠️ Fallback pdfplumber falhou: {e}")
+    
     save_extraction_to_json(result)
     return result
 
 
+def extract_with_pymupdf(file_path: str):
+    """
+    Extrai texto de PDF usando PyMuPDF (fitz) preservando layout e estrutura.
+    Melhor que PyPDF2 para tabelas multi-página e preservação de layout.
+    
+    Returns:
+        tuple: (texto_extraido, qr_codes) ou None se falhar
+    """
+    if not PYMUPDF_AVAILABLE:
+        return None
+    
+    try:
+        doc = fitz.open(file_path)
+        text_parts = []
+        
+        print(f"📄 PyMuPDF: Processando {len(doc)} página(s)...")
+        
+        for page_num, page in enumerate(doc, start=1):
+            # Extrai texto mantendo layout original (melhor para tabelas)
+            page_text = page.get_text("text")
+            
+            if page_text.strip():
+                text_parts.append(f"--- Página {page_num} ---\n{page_text}\n")
+        
+        doc.close()
+        
+        full_text = "\n".join(text_parts)
+        
+        if full_text.strip() and len(full_text.strip()) > 50:
+            print(f"✅ PyMuPDF extraction: {len(full_text)} chars de {len(text_parts)} página(s)")
+            
+            # Detectar QR codes
+            qr_codes = []
+            if QR_CODE_ENABLED:
+                try:
+                    print("🔍 Procurando QR codes no PDF...")
+                    pages = convert_from_path(file_path, dpi=300)
+                    for page_num, page_img in enumerate(pages, start=1):
+                        page_qr = detect_and_read_qrcodes(page_img, page_number=page_num)
+                        qr_codes.extend(page_qr)
+                except Exception as e:
+                    print(f"⚠️ Erro ao buscar QR codes: {e}")
+            
+            return full_text.strip(), qr_codes
+        
+        return None
+        
+    except Exception as e:
+        print(f"⚠️ PyMuPDF falhou: {e}")
+        return None
+
+
 def extract_text_from_pdf(file_path: str):
     """
-    Cascata de extração de PDF (4 níveis):
-    1. Texto embutido (PyPDF2) - mais rápido
-    2. OCR.space API - cloud, preciso, grátis 25k/mês
-    3. PaddleOCR/EasyOCR/Tesseract - local, offline
+    Cascata de extração de PDF (5 níveis):
+    1. PyMuPDF (fitz) - melhor layout e multi-página
+    2. PyPDF2 texto embutido - mais rápido como fallback
+    3. OCR.space API - cloud, preciso, grátis 25k/mês
+    4. PaddleOCR/EasyOCR/Tesseract - local, offline
     """
     try:
-        # LEVEL 1: Tenta texto embutido primeiro (mais rápido)
+        # LEVEL 1: PyMuPDF (melhor para layout e multi-página)
+        pymupdf_result = extract_with_pymupdf(file_path)
+        if pymupdf_result:
+            return pymupdf_result
+        
+        # LEVEL 2: Tenta texto embutido com PyPDF2 (fallback)
         text = ""
         with open(file_path, "rb") as f:
             reader = PyPDF2.PdfReader(f)
@@ -670,7 +771,7 @@ def extract_text_from_pdf(file_path: str):
                 text += page_text + "\n"
 
         if text.strip() and len(text.strip()) > 50:
-            print(f"✅ PDF text extraction: {len(text)} chars")
+            print(f"✅ PyPDF2 text extraction: {len(text)} chars")
             # Mesmo com texto embutido, tenta detectar QR codes
             qr_codes = []
             if QR_CODE_ENABLED:
@@ -685,7 +786,7 @@ def extract_text_from_pdf(file_path: str):
                     print(f"⚠️ Erro ao buscar QR codes: {e}")
             return text.strip(), qr_codes
 
-        # LEVEL 2: OCR.space API (cloud, grátis, preciso)
+        # LEVEL 3: OCR.space API (cloud, grátis, preciso)
         print("📄 PDF sem texto embutido - tentando OCR.space API...")
         ocr_text = ocr_space_api(file_path, language='por')
         
@@ -703,7 +804,7 @@ def extract_text_from_pdf(file_path: str):
                     print(f"⚠️ Erro ao buscar QR codes: {e}")
             return ocr_text.strip(), qr_codes
 
-        # LEVEL 3: Engines locais (PaddleOCR → EasyOCR → Tesseract)
+        # LEVEL 4: Engines locais (PaddleOCR → EasyOCR → Tesseract)
         print("📄 OCR.space falhou - usando engines locais (PaddleOCR/EasyOCR/Tesseract)...")
         return extract_text_from_pdf_with_ocr(file_path)
 
