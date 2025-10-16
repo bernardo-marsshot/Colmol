@@ -167,3 +167,39 @@ The project is built on Django 5.0.6 using Python 3.11, with SQLite for the data
   - Documentos ilegíveis/corrompidos são identificados visualmente
   - Não mistura falhas técnicas com exceções de negócio
 - **Architect Review**: Aprovado - exceções de OCR preservadas corretamente, status diferenciado sem regressões
+
+### October 16, 2025 - Correção: Proteção Contra None Explícito do LLM
+- **Problema Resolvido**: AttributeError quando LLM retorna `numero_encomenda: None` explicitamente
+- **Erro Original**:
+  ```
+  AttributeError: 'NoneType' object has no attribute 'strip'
+  Linha 2700: po_number = produto.get("numero_encomenda", "").strip()
+  ```
+- **Causa Raiz**: `.get("key", default)` retorna `None` se chave existe com valor `None`, ignorando o default
+- **Soluções Implementadas**:
+  1. **create_po_from_nota_encomenda** (linha 2704):
+     - ANTES: `produto.get("numero_encomenda", "").strip()`
+     - DEPOIS: `(produto.get("numero_encomenda") or "").strip()`
+  2. **map_supplier_codes - formato "produtos"** (linha 2665):
+     - ANTES: `produto.get("numero_encomenda", "")`
+     - DEPOIS: `(produto.get("numero_encomenda") or "")`
+  3. **map_supplier_codes - formato "lines"** (linha 2678):
+     - ADICIONADO: `"po_number_extracted": ""`
+  4. **ReceiptLine model** (models.py):
+     - ADICIONADO: `default=''` ao campo `po_number_extracted`
+     - Migration 0007 criada e aplicada
+- **Padrão de Proteção**:
+  ```python
+  # ❌ ERRADO: default ignorado se key:None
+  value = dict.get("key", "default")
+  
+  # ✅ CORRETO: or converte None para default
+  value = (dict.get("key") or "default")
+  ```
+- **Teste Bem-Sucedido**: PDF "DOC091025-09102025093733-0002" processado sem erros
+- **Benefícios**:
+  - Sistema robusto contra valores None explícitos do LLM
+  - Sem AttributeError em operações de string
+  - Sem IntegrityError no banco de dados
+  - Todos os formatos de payload protegidos
+- **Architect Review**: Aprovado - proteção contra None completa, sem regressões
