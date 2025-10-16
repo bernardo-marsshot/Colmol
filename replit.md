@@ -56,6 +56,17 @@ The project is built on Django 5.0.6 using Python 3.11, with SQLite for the data
 
 ## Recent Changes
 
+### October 16, 2025 - CORREÇÃO CRÍTICA: OCR Prioridade sobre LLM
+- **Bug Crítico Corrigido**: LLM estava sobrescrevendo dados corretos do OCR
+  - **Antes**: Sistema extraía 51 produtos com OCR → LLM retornava 9 produtos → Sistema usava só os 9 do LLM ❌
+  - **Depois**: Sistema extrai com OCR → Se OCR >0 produtos, usa OCR → LLM só usado se OCR = 0 produtos ✅
+- **Impacto**: Agora todos os 51 produtos (40 códigos únicos) extraídos pelo OCR são preservados e mostrados na interface
+- **Lógica Correta de Fallback**:
+  1. OCR cascade extrai produtos primeiro (PyMuPDF → pdfplumber → outros)
+  2. Se OCR extraiu produtos (>0): **USA DADOS OCR** ✅
+  3. Se OCR extraiu 0 produtos: **SÓ ENTÃO tenta LLM como fallback**
+- **Resultado**: 100% dos produtos extraídos agora aparecem na interface web
+
 ### October 16, 2025 - Implementação: PyMuPDF + Fallback Inteligente + Parser Tolerante
 - **Novo Método de Extração**: PyMuPDF (fitz) adicionado como Level 1 na cascata de OCR
   - Extração mais rápida e eficiente de PDFs multi-página

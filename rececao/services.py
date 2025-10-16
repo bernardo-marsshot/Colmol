@@ -2871,46 +2871,54 @@ def create_po_from_nota_encomenda(inbound: InboundDocument, payload: dict):
 
 @transaction.atomic
 def process_inbound(inbound: InboundDocument):
-    # Estratégia híbrida: OCR rápido + Ollama pós-processamento
-    # 1. Primeiro: OCR rápido para obter texto (sempre disponível)
+    # Estratégia: OCR primeiro, LLM só como fallback se OCR falhar
+    # 1. Primeiro: OCR rápido para obter texto e produtos
     ocr_payload = real_ocr_extract(inbound.file.path)
     ocr_text = ocr_payload.get('texto_completo', '')
+    ocr_produtos = len(ocr_payload.get('produtos', [])) + len(ocr_payload.get('lines', []))
     
-    # 2. Depois: Tentar Ollama com texto OCR como contexto (melhora precisão)
-    ollama_data = ollama_extract_document(inbound.file.path, ocr_text=ocr_text)
-    
-    if ollama_data and ollama_data.get('produtos'):
-        # Ollama extraiu dados com sucesso - usar dados LLM
-        print(f"✅ Usando dados do Ollama LLM ({len(ollama_data.get('produtos', []))} produtos)")
-        
-        # Converter formato Ollama para formato esperado
-        payload = {
-            "fornecedor": ollama_data.get('fornecedor', ''),
-            "nif": ollama_data.get('nif', ''),
-            "numero_documento": ollama_data.get('numero_documento', ''),
-            "data_documento": ollama_data.get('data_documento', ''),
-            "po_number": ollama_data.get('numero_encomenda', ''),
-            "iban": ollama_data.get('iban', ''),
-            "produtos": [
-                {
-                    "artigo": p.get('codigo', ''),
-                    "descricao": p.get('descricao', ''),
-                    "quantidade": float(p.get('quantidade') or 0),
-                    "preco_unitario": float(p.get('preco_unitario') or 0),
-                    "total": float(p.get('total') or 0),
-                    "numero_encomenda": p.get('numero_encomenda', '')
-                }
-                for p in ollama_data.get('produtos', [])
-            ],
-            "total": ollama_data.get('total_geral', 0),
-            "texto_completo": ocr_text or "Dados extraídos via Ollama LLM",
-            "tipo_documento": ollama_data.get('tipo_documento', 'UNKNOWN_LLM'),
-            "extraction_method": "ollama_llm"
-        }
-    else:
-        # Fallback: Usar dados OCR diretamente
-        print("🔄 Ollama não disponível/falhou - usando dados OCR cascade")
+    # 2. Verificar se OCR extraiu produtos com sucesso
+    if ocr_produtos > 0:
+        # OCR funcionou - usar dados OCR
+        print(f"✅ Usando dados do OCR cascade ({ocr_produtos} produtos extraídos)")
         payload = ocr_payload
+    else:
+        # OCR falhou (0 produtos) - tentar LLM como fallback
+        print("⚠️ OCR retornou 0 produtos - tentando LLM como fallback...")
+        ollama_data = ollama_extract_document(inbound.file.path, ocr_text=ocr_text)
+        
+        if ollama_data and ollama_data.get('produtos'):
+            # Ollama extraiu dados - usar como fallback
+            print(f"✅ LLM fallback: {len(ollama_data.get('produtos', []))} produtos extraídos")
+            
+            # Converter formato Ollama para formato esperado
+            payload = {
+                "fornecedor": ollama_data.get('fornecedor', ''),
+                "nif": ollama_data.get('nif', ''),
+                "numero_documento": ollama_data.get('numero_documento', ''),
+                "data_documento": ollama_data.get('data_documento', ''),
+                "po_number": ollama_data.get('numero_encomenda', ''),
+                "iban": ollama_data.get('iban', ''),
+                "produtos": [
+                    {
+                        "artigo": p.get('codigo', ''),
+                        "descricao": p.get('descricao', ''),
+                        "quantidade": float(p.get('quantidade') or 0),
+                        "preco_unitario": float(p.get('preco_unitario') or 0),
+                        "total": float(p.get('total') or 0),
+                        "numero_encomenda": p.get('numero_encomenda', '')
+                    }
+                    for p in ollama_data.get('produtos', [])
+                ],
+                "total": ollama_data.get('total_geral', 0),
+                "texto_completo": ocr_text or "Dados extraídos via Ollama LLM",
+                "tipo_documento": ollama_data.get('tipo_documento', 'UNKNOWN_LLM'),
+                "extraction_method": "ollama_llm"
+            }
+        else:
+            # LLM também falhou - usar dados OCR mesmo vazios
+            print("❌ LLM também falhou - usando payload OCR")
+            payload = ocr_payload
 
     if payload.get("error"):
         ExceptionTask.objects.create(
