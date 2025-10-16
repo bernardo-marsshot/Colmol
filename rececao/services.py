@@ -2849,11 +2849,13 @@ def process_inbound(inbound: InboundDocument):
             qty_received=ml.get("qty", 0),
         )
 
-    # ligar à PO (se existir)
-    po = PurchaseOrder.objects.filter(number=payload.get("po_number")).first()
-    if po:
-        inbound.po = po
-        inbound.save()
+    # ligar à PO (se existir e ainda não estiver vinculada)
+    # NOTA: Se doc_type == 'FT', já criou e vinculou PO acima, não desvincular!
+    if not inbound.po:
+        po = PurchaseOrder.objects.filter(number=payload.get("po_number")).first()
+        if po:
+            inbound.po = po
+            inbound.save()
 
     # Matching
     ok = 0

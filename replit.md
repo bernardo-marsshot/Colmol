@@ -45,6 +45,22 @@ Key architectural decisions and features include:
 
 ## Recent Changes
 
+### October 16, 2025 - Correção: Processamento de Nota de Encomenda sem Exceções
+- **Bug Fix**: Notas de encomenda agora são processadas completamente sem gerar exceção "PO não identificada"
+- **Problema**: Quando processava nota de encomenda (FT):
+  1. Criava PO e vinculava ao documento
+  2. Mas depois tentava vincular novamente usando `po_number` do payload
+  3. Se número diferente/ausente, DESVINCULAVA a PO criada
+  4. Resultado: exceção "PO não identificada" no matching
+- **Solução**: Adicionada verificação `if not inbound.po:` antes de tentar vincular PO
+  - Se já tem PO (caso FT), não tenta desvincular
+  - Só faz lookup por po_number se ainda não estiver vinculada
+- **Benefícios**:
+  - Notas de encomenda processam sem exceções
+  - PO criada automaticamente permanece vinculada
+  - Compatibilidade mantida com outros tipos de documento
+- **Architect Review**: Aprovado - sem regressões detectadas
+
 ### October 15, 2025 - Auto-Criação de CodeMapping para Produtos Desconhecidos
 - **Feature**: Produtos desconhecidos em notas de encomenda agora são adicionados automaticamente à base de dados
 - **Problema Resolvido**: Anteriormente, quando uma nota de encomenda continha produtos sem CodeMapping, o sistema gerava exceção "Código não mapeado para SKU interno"
