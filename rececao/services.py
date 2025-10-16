@@ -7,6 +7,7 @@ import base64
 from io import BytesIO
 from PIL import Image
 import signal
+from decimal import Decimal
 
 import PyPDF2
 import pytesseract
@@ -2697,7 +2698,7 @@ def create_po_from_nota_encomenda(inbound: InboundDocument, payload: dict):
         article_code = produto.get("artigo") or produto.get("codigo") or produto.get("supplier_code") or ""
         description = produto.get("descricao") or produto.get("description") or ""
         unit = produto.get("unidade") or produto.get("unit") or "UN"
-        qty_ordered = float(produto.get("quantidade") or produto.get("qty") or 0)
+        qty_ordered = Decimal(str(produto.get("quantidade") or produto.get("qty") or 0))
         
         if not article_code or qty_ordered <= 0:
             continue
@@ -2715,7 +2716,7 @@ def create_po_from_nota_encomenda(inbound: InboundDocument, payload: dict):
         )
         
         if not created:
-            # Linha já existia - somar quantidades
+            # Linha já existia - somar quantidades (ambos são Decimal agora)
             po_line.qty_ordered += qty_ordered
             po_line.save()
             print(f"📊 Agregado {qty_ordered} {unit} ao produto {article_code} (total: {po_line.qty_ordered})")
