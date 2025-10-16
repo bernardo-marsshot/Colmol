@@ -2690,7 +2690,7 @@ def create_po_from_nota_encomenda(inbound: InboundDocument, payload: dict):
     if not produtos:
         produtos = payload.get("lines", [])
     
-    # Criar POLines para cada produto
+    # Criar POLines para cada produto (agregar quantidades se produto repetir)
     lines_created = 0
     for produto in produtos:
         # Extrair dados do produto (garantir que não são None)
@@ -2702,15 +2702,24 @@ def create_po_from_nota_encomenda(inbound: InboundDocument, payload: dict):
         if not article_code or qty_ordered <= 0:
             continue
         
-        # Usar article_code como internal_sku (pode ser mapeado depois)
-        POLine.objects.create(
+        # Usar get_or_create para evitar duplicados - se SKU já existe, agregar quantidade
+        po_line, created = POLine.objects.get_or_create(
             po=po,
             internal_sku=article_code,
-            description=description,
-            unit=unit,
-            qty_ordered=qty_ordered,
-            tolerance=0
+            defaults={
+                'description': description,
+                'unit': unit,
+                'qty_ordered': qty_ordered,
+                'tolerance': 0
+            }
         )
+        
+        if not created:
+            # Linha já existia - somar quantidades
+            po_line.qty_ordered += qty_ordered
+            po_line.save()
+            print(f"📊 Agregado {qty_ordered} {unit} ao produto {article_code} (total: {po_line.qty_ordered})")
+        
         lines_created += 1
     
     print(f"✅ Criadas {lines_created} linhas na PO {po_number}")
