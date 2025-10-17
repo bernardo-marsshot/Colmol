@@ -54,6 +54,30 @@ The project is built on Django 5.0.6 using Python 3.11, with SQLite for the data
 
 ## Recent Changes
 
+### October 17, 2025 - Parser Especializado para Guias FLEXIPOL/EUROSPUMA
+- **Novo Parser Criado**: `parse_guia_flexipol()` em `services.py` (linhas 1323-1413)
+  - Desenvolvido para documentos FLEXIPOL/EUROSPUMA com layout em colunas verticais
+  - Regex expandido para capturar todos os tipos de código: `^N[A-Z]{2,3}\d+$`
+    - Suporta: NIU, NIJ, NND, NNF, NPZ, NUF, NZF, NKN, etc
+    - Filtra "NIF" que não é código de produto
+  - Lógica de códigos únicos: extrai apenas primeira ocorrência de cada código (produtos principais em negrito)
+  - Estrutura detectada: códigos aparecem repetidos em múltiplas colunas (layout colunar do PDF)
+- **Detecção Automática**: Integrado na cascata de detecção de documentos
+  - Acionado quando detecta "FLEXIPOL" ou "EUROSPUMA" no texto
+  - Prioridade após parsers Elastron e Colmol
+- **Dados Extraídos**:
+  - Código do produto (artigo)
+  - Descrição PLACA com dimensões (extraídas via regex)
+  - Lote de produção
+  - Quantidade (primeira quantidade de cada produto único)
+  - Unidade (UN, MT, ML, M²)
+  - Número de pedido/encomenda
+- **Limitações Conhecidas**:
+  - PyMuPDF não preserva informação de formatação (negrito)
+  - Não é possível distinguir visualmente produtos principais de subtotais
+  - Parser usa heurística de códigos únicos (pode precisar ajuste fino baseado em testes reais)
+- **Validação Pendente**: Aguardando teste com documento real para confirmar extração correta dos 41 produtos esperados
+
 ### October 16, 2025 - Integração PyMuPDF para Melhor Extração de Tabelas
 - **Nova Biblioteca**: Instalado PyMuPDF (fitz v1.26.5) para extração avançada de PDF
 - **Função Criada**: `extract_text_with_pymupdf()` em `services.py` (linhas 659-705)
