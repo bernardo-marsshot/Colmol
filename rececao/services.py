@@ -41,11 +41,8 @@ def normalize_number(value_str: str) -> float:
     Normaliza valores numéricos com vírgula, detectando formato de milhares vs decimais.
     
     Regras baseadas no NÚMERO DE DÍGITOS após a vírgula:
-    - 3 dígitos após vírgula:
-      * Se são zeros (000) → separador de milhares (retornar parte inteira)
-        Exemplos: "115,000" → 115.0, "68,000" → 68.0, "2,000" → 2.0
-      * Se não são zeros → valor real em milésimos (concatenar partes)
-        Exemplos: "1,880" → 1880.0, "0,150" → 150.0, "2,005" → 2005.0
+    - 3 dígitos após vírgula → formato de milhares (remover vírgula)
+      Exemplos: "1,880" → 1880.0, "0,150" → 150.0, "2,000" → 2000.0, "125,000" → 125000.0
     - 1-2 dígitos após vírgula → formato decimal (substituir vírgula por ponto)
       Exemplos: "1,88" → 1.88, "2,5" → 2.5, "34,00" → 34.0
     
@@ -80,19 +77,11 @@ def normalize_number(value_str: str) -> float:
     integer_part = parts[0].replace(' ', '')
     decimal_part = parts[1].replace(' ', '')
     
-    # Se tem exatamente 3 dígitos após vírgula:
-    # - Se são todos zeros (000) → separador de milhares, retornar só parte inteira
-    #   Exemplos: "115,000" → 115.0, "68,000" → 68.0
-    # - Se não são zeros → valor real em milésimos
-    #   Exemplos: "1,880" → 1880.0, "0,150" → 150.0, "2,005" → 2005.0
+    # Se tem exatamente 3 dígitos após vírgula → formato de milhares
+    # Remover vírgula completamente: "1,880" → "1880", "2,000" → "2000"
     if len(decimal_part) == 3:
         try:
-            if decimal_part == "000":
-                # Separador de milhares com zeros → retornar apenas parte inteira
-                return float(integer_part)
-            else:
-                # Valor real → concatenar partes
-                return float(integer_part + decimal_part)
+            return float(integer_part + decimal_part)
         except ValueError:
             return 0.0
     
@@ -664,72 +653,15 @@ def real_ocr_extract(file_path: str):
     return result
 
 
-def extract_text_with_pymupdf(file_path: str):
-    """
-    Extrai texto de PDF usando PyMuPDF (fitz) mantendo layout original.
-    Ideal para documentos com tabelas e estruturas complexas.
-    Percorre todas as páginas do documento preservando espaços em branco.
-    
-    Returns:
-        tuple: (texto_completo, lista_qr_codes)
-    """
-    try:
-        import fitz
-        
-        doc = fitz.open(file_path)
-        text_parts = []
-        
-        for page_num, page in enumerate(doc, start=1):
-            # Usa flags para preservar espaços em branco e layout (importante para tabelas)
-            page_text = page.get_text("text", flags=fitz.TEXT_PRESERVE_WHITESPACE | fitz.TEXT_PRESERVE_LIGATURES | fitz.TEXT_PRESERVE_IMAGES)
-            
-            if page_text.strip():
-                text_parts.append(f"--- Página {page_num} ---\n{page_text}\n")
-        
-        doc.close()
-        
-        full_text = "\n".join(text_parts)
-        
-        if full_text.strip() and len(full_text.strip()) > 50:
-            print(f"✅ PyMuPDF extraction: {len(full_text)} chars from {len(text_parts)} pages")
-            
-            qr_codes = []
-            if QR_CODE_ENABLED:
-                try:
-                    print("🔍 Procurando QR codes no PDF...")
-                    pages = convert_from_path(file_path, dpi=300)
-                    for page_num, page_img in enumerate(pages, start=1):
-                        page_qr = detect_and_read_qrcodes(page_img, page_number=page_num)
-                        qr_codes.extend(page_qr)
-                except Exception as e:
-                    print(f"⚠️ Erro ao buscar QR codes: {e}")
-            
-            return full_text.strip(), qr_codes
-        else:
-            print("⚠️ PyMuPDF não extraiu texto suficiente")
-            return None, []
-            
-    except Exception as e:
-        print(f"⚠️ PyMuPDF falhou: {e}")
-        return None, []
-
-
 def extract_text_from_pdf(file_path: str):
     """
-    Cascata de extração de PDF (5 níveis):
-    0. PyMuPDF (fitz) - mantém layout original, ideal para tabelas
-    1. Texto embutido (PyPDF2) - fallback rápido
+    Cascata de extração de PDF (4 níveis):
+    1. Texto embutido (PyPDF2) - mais rápido
     2. OCR.space API - cloud, preciso, grátis 25k/mês
     3. PaddleOCR/EasyOCR/Tesseract - local, offline
     """
     try:
-        # LEVEL 0: PyMuPDF - preserva layout original (melhor para tabelas)
-        pymupdf_text, pymupdf_qr = extract_text_with_pymupdf(file_path)
-        if pymupdf_text:
-            return pymupdf_text, pymupdf_qr
-        
-        # LEVEL 1: PyPDF2 - texto embutido (fallback rápido)
-        print("📄 PyMuPDF não extraiu texto suficiente - tentando PyPDF2...")
+        # LEVEL 1: Tenta texto embutido primeiro (mais rápido)
         text = ""
         with open(file_path, "rb") as f:
             reader = PyPDF2.PdfReader(f)
@@ -738,7 +670,7 @@ def extract_text_from_pdf(file_path: str):
                 text += page_text + "\n"
 
         if text.strip() and len(text.strip()) > 50:
-            print(f"✅ PyPDF2 text extraction: {len(text)} chars")
+            print(f"✅ PDF text extraction: {len(text)} chars")
             # Mesmo com texto embutido, tenta detectar QR codes
             qr_codes = []
             if QR_CODE_ENABLED:
@@ -1236,8 +1168,6 @@ def detect_document_type(text: str):
         return "ORDEM_COMPRA"
     elif "elastron" in text_lower and "fatura" in text_lower:
         return "FATURA_ELASTRON"
-    elif ("flexipol" in text_lower or "eurospuma" in text_lower) and "guia" in text_lower:
-        return "GUIA_FLEXIPOL"
     elif "colmol" in text_lower and ("guia" in text_lower or "comunicação de saída" in text_lower):
         return "GUIA_COLMOL"
     elif "fatura" in text_lower or "ft" in text_lower:
@@ -1324,99 +1254,6 @@ def parse_fatura_elastron(text: str):
             except (ValueError, IndexError) as e:
                 print(f"⚠️ Erro ao parsear linha Elastron '{line_stripped[:60]}': {e}")
                 continue
-    
-    return produtos
-
-
-def parse_guia_flexipol(text: str):
-    """
-    Parser específico para Guias de Remessa FLEXIPOL/EUROSPUMA.
-    Formato: dados em colunas verticais com códigos repetidos para múltiplas colunas.
-    Extrai apenas produtos principais (primeira ocorrência de cada código único).
-    """
-    produtos = []
-    lines = text.split("\n")
-    
-    # Coletar todos os dados em ordem de aparecimento
-    codigos_raw = []
-    descricoes = []
-    lotes = []
-    quantidades = []
-    unidades = []
-    pedidos = []
-    
-    for line in lines:
-        stripped = line.strip()
-        
-        # Códigos de produto (excluir NIF que não é produto)
-        if re.match(r'^N[A-Z]{2,3}\d+$', stripped) and not stripped.startswith('NIF'):
-            codigos_raw.append(stripped)
-        
-        # Descrições (PLACA com dimensões)
-        elif re.match(r'^PLACA\s+\d+x\d+x\d+', stripped):
-            descricoes.append(stripped)
-        
-        # Lotes (padrão: número + letra + espaço + letra(s))
-        elif re.match(r'^\d+\s+[A-Z]\s+[A-Z]+$', stripped):
-            lotes.append(stripped)
-        
-        # Quantidades (número com vírgula seguido de 000)
-        elif re.match(r'^\d+,\d{3}$', stripped):
-            quantidades.append(normalize_number(stripped))
-        
-        # Unidades isoladas
-        elif stripped in ['UN', 'MT', 'ML', 'M²']:
-            unidades.append(stripped)
-        
-        # Números de pedido
-        elif re.match(r'^\d{5,}/\d+$', stripped):
-            pedidos.append(stripped)
-    
-    # Identificar produtos únicos (primeira ocorrência de cada código)
-    # Códigos aparecem em blocos repetidos (ex: A,A,A,B,B,B,C,C,C para 3 colunas)
-    codigos_unicos = []
-    codigos_indices = []
-    
-    for i, codigo in enumerate(codigos_raw):
-        if codigo not in codigos_unicos:
-            codigos_unicos.append(codigo)
-            codigos_indices.append(i)
-    
-    # Detectar quantas colunas há (códigos totais / códigos únicos)
-    num_colunas = len(codigos_raw) // len(codigos_unicos) if codigos_unicos else 0
-    
-    print(f"🔍 Parser FLEXIPOL: {len(codigos_raw)} códigos totais, {len(codigos_unicos)} únicos, {num_colunas} colunas")
-    print(f"   Descrições: {len(descricoes)}, Quantidades: {len(quantidades)}")
-    
-    # Emparelhar produtos únicos com suas descrições e primeira quantidade
-    for i, codigo in enumerate(codigos_unicos):
-        if i < len(descricoes):
-            # Extrair dimensões da descrição
-            dims_match = re.search(r'(\d+)x(\d+)x(\d+)', descricoes[i])
-            dimensoes = dims_match.group(0) if dims_match else ""
-            
-            # Primeira quantidade corresponde ao produto
-            quantidade = quantidades[i] if i < len(quantidades) else 0
-            
-            # Só adicionar produtos com quantidade > 0
-            if quantidade > 0:
-                produtos.append({
-                    "artigo": codigo,
-                    "descricao": descricoes[i],
-                    "lote_producao": lotes[i] if i < len(lotes) else "",
-                    "quantidade": quantidade,
-                    "unidade": unidades[i] if i < len(unidades) else "UN",
-                    "dimensoes": dimensoes,
-                    "numero_encomenda": pedidos[i] if i < len(pedidos) else "",
-                    "referencia_ordem": "",
-                    "volume": 0,
-                    "peso": 0.0,
-                    "iva": 23.0,
-                    "total": 0.0
-                })
-    
-    if produtos:
-        print(f"✅ Parser FLEXIPOL extraiu {len(produtos)} produtos principais (apenas em negrito)")
     
     return produtos
 
@@ -2542,22 +2379,6 @@ def parse_portuguese_document(text: str, qr_codes=None, texto_pdfplumber_curto=F
             if produtos:
                 result["produtos"] = produtos
                 print(f"✅ Extraídos {len(produtos)} produtos com parser genérico")
-    elif doc_type == "GUIA_FLEXIPOL":
-        produtos = parse_guia_flexipol(text)
-        if produtos:
-            result["produtos"] = produtos
-            # Tentar detectar fornecedor no texto
-            if "flexipol" in text.lower():
-                result["supplier_name"] = "FLEXIPOL-ESPUMAS SINTETICAS, SA"
-            elif "eurospuma" in text.lower():
-                result["supplier_name"] = "EUROSPUMA-SOC.IND.ESPUMAS SINT. S.A."
-            print(f"✅ Extraídos {len(produtos)} produtos da Guia FLEXIPOL/EUROSPUMA")
-        else:
-            print("⚠️ Parser FLEXIPOL retornou 0 produtos, tentando parser genérico...")
-            produtos = parse_guia_generica(text)
-            if produtos:
-                result["produtos"] = produtos
-                print(f"✅ Extraídos {len(produtos)} produtos com parser genérico")
     elif doc_type == "GUIA_COLMOL":
         produtos = parse_guia_colmol(text)
         if produtos:
@@ -2937,55 +2758,40 @@ def process_inbound(inbound: InboundDocument):
     ocr_payload = real_ocr_extract(inbound.file.path)
     ocr_text = ocr_payload.get('texto_completo', '')
     
-    # Verificar se parser específico teve sucesso
-    ocr_produtos = ocr_payload.get('produtos', [])
-    ocr_tipo_documento = ocr_payload.get('tipo_documento', '')
+    # 2. Depois: Tentar Ollama com texto OCR como contexto (melhora precisão)
+    ollama_data = ollama_extract_document(inbound.file.path, ocr_text=ocr_text)
     
-    # Parser específico teve sucesso se:
-    # 1. Extraiu produtos E
-    # 2. Tipo documento é específico (não desconhecido/genérico)
-    tipos_especificos = ['GUIA_FLEXIPOL', 'FATURA_ELASTRON', 'GUIA_COLMOL', 'ORDEM_COMPRA', 'NOTA_ENCOMENDA']
-    parser_succeeded = len(ocr_produtos) > 0 and ocr_tipo_documento in tipos_especificos
-    
-    # 2. Depois: Tentar Ollama APENAS se parser específico falhou
-    if not parser_succeeded:
-        ollama_data = ollama_extract_document(inbound.file.path, ocr_text=ocr_text)
+    if ollama_data and ollama_data.get('produtos'):
+        # Ollama extraiu dados com sucesso - usar dados LLM
+        print(f"✅ Usando dados do Ollama LLM ({len(ollama_data.get('produtos', []))} produtos)")
         
-        if ollama_data and ollama_data.get('produtos'):
-            # Ollama extraiu dados com sucesso - usar dados LLM como fallback
-            print(f"✅ Usando dados do Ollama LLM ({len(ollama_data.get('produtos', []))} produtos) - parser específico não teve sucesso")
-            
-            # Converter formato Ollama para formato esperado
-            payload = {
-                "fornecedor": ollama_data.get('fornecedor', ''),
-                "nif": ollama_data.get('nif', ''),
-                "numero_documento": ollama_data.get('numero_documento', ''),
-                "data_documento": ollama_data.get('data_documento', ''),
-                "po_number": ollama_data.get('numero_encomenda', ''),
-                "iban": ollama_data.get('iban', ''),
-                "produtos": [
-                    {
-                        "artigo": p.get('codigo', ''),
-                        "descricao": p.get('descricao', ''),
-                        "quantidade": float(p.get('quantidade') or 0),
-                        "preco_unitario": float(p.get('preco_unitario') or 0),
-                        "total": float(p.get('total') or 0),
-                        "numero_encomenda": p.get('numero_encomenda', '')
-                    }
-                    for p in ollama_data.get('produtos', [])
-                ],
-                "total": ollama_data.get('total_geral', 0),
-                "texto_completo": ocr_text or "Dados extraídos via Ollama LLM",
-                "tipo_documento": ollama_data.get('tipo_documento', 'UNKNOWN_LLM'),
-                "extraction_method": "ollama_llm"
-            }
-        else:
-            # Fallback: Usar dados OCR diretamente
-            print("🔄 Ollama não disponível/falhou - usando dados OCR cascade")
-            payload = ocr_payload
+        # Converter formato Ollama para formato esperado
+        payload = {
+            "fornecedor": ollama_data.get('fornecedor', ''),
+            "nif": ollama_data.get('nif', ''),
+            "numero_documento": ollama_data.get('numero_documento', ''),
+            "data_documento": ollama_data.get('data_documento', ''),
+            "po_number": ollama_data.get('numero_encomenda', ''),
+            "iban": ollama_data.get('iban', ''),
+            "produtos": [
+                {
+                    "artigo": p.get('codigo', ''),
+                    "descricao": p.get('descricao', ''),
+                    "quantidade": float(p.get('quantidade') or 0),
+                    "preco_unitario": float(p.get('preco_unitario') or 0),
+                    "total": float(p.get('total') or 0),
+                    "numero_encomenda": p.get('numero_encomenda', '')
+                }
+                for p in ollama_data.get('produtos', [])
+            ],
+            "total": ollama_data.get('total_geral', 0),
+            "texto_completo": ocr_text or "Dados extraídos via Ollama LLM",
+            "tipo_documento": ollama_data.get('tipo_documento', 'UNKNOWN_LLM'),
+            "extraction_method": "ollama_llm"
+        }
     else:
-        # Parser específico teve sucesso - usar seus dados diretamente
-        print(f"✅ Parser específico ({ocr_tipo_documento}) extraiu {len(ocr_produtos)} produtos - ignorando LLM")
+        # Fallback: Usar dados OCR diretamente
+        print("🔄 Ollama não disponível/falhou - usando dados OCR cascade")
         payload = ocr_payload
 
     if payload.get("error"):
