@@ -85,6 +85,26 @@ The project is built on Django 5.0.6 using Python 3.11, with SQLite for the data
   - PyMuPDF não preserva informação de formatação (negrito)
   - Não é possível distinguir visualmente produtos principais de subtotais
   - Parser usa heurística de códigos únicos (ajuste fino baseado em testes reais)
+- **Correção Crítica - Bug de Normalização de Números**:
+  - **Problema Identificado**: Função `normalize_number` estava multiplicando quantidades por 1000
+    - Exemplo: `115,000` → `115000.0` ❌ (deveria ser `115.0`)
+    - Exemplo: `68,000` → `68000.0` ❌ (deveria ser `68.0`)
+    - Causa: concatenava partes sem reconhecer separador de milhares com zeros
+  - **Solução Implementada** (linha 90 de `services.py`):
+    - Nova lógica diferencia:
+      * **3 zeros após vírgula (,000)** → separador de milhares → retorna só parte inteira
+        - Exemplos: `115,000 → 115.0`, `68,000 → 68.0`, `2,000 → 2.0`
+      * **3 dígitos não-zeros** → valor real em milésimos → concatena partes
+        - Exemplos: `1,880 → 1880.0`, `0,150 → 150.0`, `2,005 → 2005.0`
+  - **Testes de Validação** (todos ✅):
+    ```
+    115,000 → 115.0    ✅ (separador com zeros)
+    68,000 → 68.0      ✅ (separador com zeros)
+    1,880 → 1880.0     ✅ (valor real)
+    2,5 → 2.5          ✅ (decimal normal)
+    ```
+  - **Impacto**: Afeta TODOS os parsers (FLEXIPOL, Elastron, Colmol, Genérico, LLM)
+  - **Docstring Atualizado**: Documentação clara com exemplos de ambos os casos
 
 ### October 16, 2025 - Integração PyMuPDF para Melhor Extração de Tabelas
 - **Nova Biblioteca**: Instalado PyMuPDF (fitz v1.26.5) para extração avançada de PDF
