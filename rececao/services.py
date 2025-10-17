@@ -41,8 +41,11 @@ def normalize_number(value_str: str) -> float:
     Normaliza valores numéricos com vírgula, detectando formato de milhares vs decimais.
     
     Regras baseadas no NÚMERO DE DÍGITOS após a vírgula:
-    - 3 dígitos após vírgula → formato de milhares (remover vírgula)
-      Exemplos: "1,880" → 1880.0, "0,150" → 150.0, "2,000" → 2000.0, "125,000" → 125000.0
+    - 3 dígitos após vírgula:
+      * Se são zeros (000) → separador de milhares (retornar parte inteira)
+        Exemplos: "115,000" → 115.0, "68,000" → 68.0, "2,000" → 2.0
+      * Se não são zeros → valor real em milésimos (concatenar partes)
+        Exemplos: "1,880" → 1880.0, "0,150" → 150.0, "2,005" → 2005.0
     - 1-2 dígitos após vírgula → formato decimal (substituir vírgula por ponto)
       Exemplos: "1,88" → 1.88, "2,5" → 2.5, "34,00" → 34.0
     
@@ -77,11 +80,19 @@ def normalize_number(value_str: str) -> float:
     integer_part = parts[0].replace(' ', '')
     decimal_part = parts[1].replace(' ', '')
     
-    # Se tem exatamente 3 dígitos após vírgula → formato de milhares
-    # Remover vírgula completamente: "1,880" → "1880", "2,000" → "2000"
+    # Se tem exatamente 3 dígitos após vírgula:
+    # - Se são todos zeros (000) → separador de milhares, retornar só parte inteira
+    #   Exemplos: "115,000" → 115.0, "68,000" → 68.0
+    # - Se não são zeros → valor real em milésimos
+    #   Exemplos: "1,880" → 1880.0, "0,150" → 150.0, "2,005" → 2005.0
     if len(decimal_part) == 3:
         try:
-            return float(integer_part + decimal_part)
+            if decimal_part == "000":
+                # Separador de milhares com zeros → retornar apenas parte inteira
+                return float(integer_part)
+            else:
+                # Valor real → concatenar partes
+                return float(integer_part + decimal_part)
         except ValueError:
             return 0.0
     
