@@ -72,11 +72,19 @@ The project is built on Django 5.0.6 using Python 3.11, with SQLite for the data
   - Quantidade (primeira quantidade de cada produto único)
   - Unidade (UN, MT, ML, M²)
   - Número de pedido/encomenda
+- **Correção Crítica - Prioridade de Parsers**:
+  - **Problema Identificado**: LLM (Groq/Ollama) estava sobrescrevendo dados de parsers específicos
+    - Exemplo: Parser FLEXIPOL extraía 24 produtos → LLM retornava 6 → Sistema mostrava apenas 6 ❌
+  - **Solução Implementada** (`process_inbound()` linha 2932-2981):
+    - Verifica se parser específico teve sucesso (tipo_documento in tipos_especificos E produtos > 0)
+    - SE parser específico teve sucesso → usa dados do parser, NÃO chama LLM ✅
+    - SE parser falhou ou genérico → chama LLM como fallback
+    - Tipos específicos: GUIA_FLEXIPOL, FATURA_ELASTRON, GUIA_COLMOL, ORDEM_COMPRA, NOTA_ENCOMENDA
+  - **Resultado**: Parsers específicos agora têm prioridade absoluta sobre LLM
 - **Limitações Conhecidas**:
   - PyMuPDF não preserva informação de formatação (negrito)
   - Não é possível distinguir visualmente produtos principais de subtotais
-  - Parser usa heurística de códigos únicos (pode precisar ajuste fino baseado em testes reais)
-- **Validação Pendente**: Aguardando teste com documento real para confirmar extração correta dos 41 produtos esperados
+  - Parser usa heurística de códigos únicos (ajuste fino baseado em testes reais)
 
 ### October 16, 2025 - Integração PyMuPDF para Melhor Extração de Tabelas
 - **Nova Biblioteca**: Instalado PyMuPDF (fitz v1.26.5) para extração avançada de PDF
