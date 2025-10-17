@@ -1225,6 +1225,8 @@ def detect_document_type(text: str):
         return "ORDEM_COMPRA"
     elif "elastron" in text_lower and "fatura" in text_lower:
         return "FATURA_ELASTRON"
+    elif ("flexipol" in text_lower or "eurospuma" in text_lower) and "guia" in text_lower:
+        return "GUIA_FLEXIPOL"
     elif "colmol" in text_lower and ("guia" in text_lower or "comunicação de saída" in text_lower):
         return "GUIA_COLMOL"
     elif "fatura" in text_lower or "ft" in text_lower:
@@ -1311,6 +1313,129 @@ def parse_fatura_elastron(text: str):
             except (ValueError, IndexError) as e:
                 print(f"⚠️ Erro ao parsear linha Elastron '{line_stripped[:60]}': {e}")
                 continue
+    
+    return produtos
+
+
+def parse_guia_flexipol(text: str):
+    """
+    Parser específico para Guias de Remessa FLEXIPOL/EUROSPUMA.
+    Formato: dados em colunas verticais processadas página por página.
+    Cada página pode ter múltiplas colunas de quantidades para o mesmo produto.
+    """
+    produtos = []
+    
+    # Processar cada página separadamente para manter alinhamento correto
+    paginas = text.split('--- Página')
+    
+    for idx_pagina, pagina_texto in enumerate(paginas):
+        if idx_pagina == 0:  # Pular texto antes da primeira página
+            continue
+            
+        lines = pagina_texto.split("\n")
+        
+        # Coletar dados desta página
+        codigos_pag = []
+        descricoes_pag = []
+        lotes_pag = []
+        quantidades_pag = []
+        unidades_pag = []
+        pedidos_pag = []
+        
+        for line in lines:
+            stripped = line.strip()
+            
+            # Códigos de produto (excluir NIF que não é produto)
+            if re.match(r'^N[A-Z]{2,3}\d+$', stripped) and not stripped.startswith('NIF'):
+                codigos_pag.append(stripped)
+            
+            # Descrições (PLACA com dimensões)
+            elif re.match(r'^PLACA\s+\d+x\d+x\d+', stripped):
+                descricoes_pag.append(stripped)
+            
+            # Lotes (padrão: número + letra + espaço + letra(s))
+            elif re.match(r'^\d+\s+[A-Z]\s+[A-Z]+$', stripped):
+                lotes_pag.append(stripped)
+            
+            # Quantidades (número com vírgula seguido de 000)
+            elif re.match(r'^\d+,\d{3}$', stripped):
+                quantidades_pag.append(normalize_number(stripped))
+            
+            # Unidades isoladas
+            elif stripped in ['UN', 'MT', 'ML', 'M²']:
+                unidades_pag.append(stripped)
+            
+            # Números de pedido
+            elif re.match(r'^\d{5,}/\d+$', stripped):
+                pedidos_pag.append(stripped)
+        
+        # Remover códigos duplicados consecutivos (mesmo produto repetido em colunas)
+        codigos_unicos = []
+        for codigo in codigos_pag:
+            if not codigos_unicos or codigos_unicos[-1] != codigo:
+                codigos_unicos.append(codigo)
+        
+        # Calcular quantas colunas de quantidade há por produto
+        # Se temos mais quantidades que códigos, são múltiplas colunas
+        if len(codigos_unicos) > 0 and len(quantidades_pag) > len(codigos_unicos):
+            colunas_qty = len(quantidades_pag) // len(codigos_unicos)
+            print(f"   Página {idx_pagina}: {len(codigos_unicos)} produtos × {colunas_qty} colunas = {len(quantidades_pag)} quantidades")
+            
+            # Agrupar quantidades por produto
+            for i, codigo in enumerate(codigos_unicos):
+                # Coletar quantidades deste produto (pode haver múltiplas colunas)
+                qtys_produto = []
+                for col in range(colunas_qty):
+                    idx_qty = i + (col * len(codigos_unicos))
+                    if idx_qty < len(quantidades_pag):
+                        qty = quantidades_pag[idx_qty]
+                        if qty > 0:  # Só adicionar quantidades válidas
+                            qtys_produto.append(qty)
+                
+                # Se há múltiplas quantidades, criar um produto para cada
+                if len(qtys_produto) > 0:
+                    for qty_idx, qty in enumerate(qtys_produto):
+                        dims_match = re.search(r'(\d+)x(\d+)x(\d+)', descricoes_pag[i]) if i < len(descricoes_pag) else None
+                        dimensoes = dims_match.group(0) if dims_match else ""
+                        
+                        produtos.append({
+                            "artigo": codigo,
+                            "descricao": descricoes_pag[i] if i < len(descricoes_pag) else "",
+                            "lote_producao": lotes_pag[i] if i < len(lotes_pag) else "",
+                            "quantidade": qty,
+                            "unidade": unidades_pag[i] if i < len(unidades_pag) else "UN",
+                            "dimensoes": dimensoes,
+                            "numero_encomenda": pedidos_pag[i + (qty_idx * len(codigos_unicos))] if i + (qty_idx * len(codigos_unicos)) < len(pedidos_pag) else "",
+                            "referencia_ordem": f"Pág.{idx_pagina}",
+                            "volume": 0,
+                            "peso": 0.0,
+                            "iva": 23.0,
+                            "total": 0.0
+                        })
+        else:
+            # Fallback: emparelhar 1:1
+            min_len = min(len(codigos_unicos), len(descricoes_pag), len(quantidades_pag)) if codigos_unicos and descricoes_pag and quantidades_pag else 0
+            for i in range(min_len):
+                dims_match = re.search(r'(\d+)x(\d+)x(\d+)', descricoes_pag[i])
+                dimensoes = dims_match.group(0) if dims_match else ""
+                
+                produtos.append({
+                    "artigo": codigos_unicos[i],
+                    "descricao": descricoes_pag[i],
+                    "lote_producao": lotes_pag[i] if i < len(lotes_pag) else "",
+                    "quantidade": quantidades_pag[i],
+                    "unidade": unidades_pag[i] if i < len(unidades_pag) else "UN",
+                    "dimensoes": dimensoes,
+                    "numero_encomenda": pedidos_pag[i] if i < len(pedidos_pag) else "",
+                    "referencia_ordem": f"Pág.{idx_pagina}",
+                    "volume": 0,
+                    "peso": 0.0,
+                    "iva": 23.0,
+                    "total": 0.0
+                })
+    
+    if produtos:
+        print(f"✅ Parser FLEXIPOL extraiu {len(produtos)} produtos de {len(paginas)-1} páginas")
     
     return produtos
 
@@ -2432,6 +2557,22 @@ def parse_portuguese_document(text: str, qr_codes=None, texto_pdfplumber_curto=F
             print(f"✅ Extraídos {len(produtos)} produtos da Fatura Elastron")
         else:
             print("⚠️ Parser Elastron retornou 0 produtos, tentando parser genérico...")
+            produtos = parse_guia_generica(text)
+            if produtos:
+                result["produtos"] = produtos
+                print(f"✅ Extraídos {len(produtos)} produtos com parser genérico")
+    elif doc_type == "GUIA_FLEXIPOL":
+        produtos = parse_guia_flexipol(text)
+        if produtos:
+            result["produtos"] = produtos
+            # Tentar detectar fornecedor no texto
+            if "flexipol" in text.lower():
+                result["supplier_name"] = "FLEXIPOL-ESPUMAS SINTETICAS, SA"
+            elif "eurospuma" in text.lower():
+                result["supplier_name"] = "EUROSPUMA-SOC.IND.ESPUMAS SINT. S.A."
+            print(f"✅ Extraídos {len(produtos)} produtos da Guia FLEXIPOL/EUROSPUMA")
+        else:
+            print("⚠️ Parser FLEXIPOL retornou 0 produtos, tentando parser genérico...")
             produtos = parse_guia_generica(text)
             if produtos:
                 result["produtos"] = produtos
